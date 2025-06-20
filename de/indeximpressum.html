@@ -11,23 +11,16 @@
 </head>
 <style>
 
-
   @font-face {
     font-family: "Bank-Gothic-Medium";
     src: url("assets/fonts/Bank-Gothic-Medium.woff") format("woff");
   }
-
-
-
-
-
   body {
     font-family: "PublicSans-VariableFont_wght"
   }
   h1 {
     font-size: 3rem;
     font-family: "Bank-Gothic-Medium";
-    color: #b3b3b3;
     letter-spacing: .2rem;
   }
   p {
@@ -36,6 +29,13 @@
     font-size: 0.7rem;
     text-transform: uppercase;
   }
+  hr {
+    margin: 2rem 0;
+    color: inherit;
+    border: 0;
+    border-top: var(--bs-border-width) solid;
+    opacity: 1.25;
+}
   .bold {
       font-weight: 625;
   }
@@ -50,21 +50,21 @@
 
 </style>
 <body>
-
-
             <div class="container mt-5">
               <div class="row">
                 <div class="col-12 col-sm-12 col-md-10 col-lg-6 offset-0 offset-sm-0 offset-md-1 offset-lg-3">
-                  <img class="logo" src="assets/images/logo.svg" alt="Company Logo" class="mb-4">
+                  <a href="/">  
+                    <img class="logo" src="assets/images/logo.svg" alt="Company Logo" class="mb-4">
+                  </a> 
                   <h1 class="mt-5 mb-5 bold">Impressum</h1>
                   <div class="text-start">
                       <p>Bernhard Glimm</p>
                       <p>Georg-Lechleiter-Platz 2</p>
                       <p>68165 Mannheim</p>
                       <p>Deutschland</p>
-                      <p><br></p>
-                      <p><hr style="color: black;"></p>
-                      <p><br></p>
+                     
+                      <hr>
+                    
                       <p>Tel.:
                         <a href="tel:+491738216011"
                         style="color: black;
@@ -79,7 +79,6 @@
                         text-decoration: none;"
                         onmouseover="this.style.textDecoration='underline'"
                         onmouseout="this.style.textDecoration='none'">
-
                         shemonstervintage@googlemail.com</a></p>
 
                       <p>Ust. ID: DE 814 502 433</p>
