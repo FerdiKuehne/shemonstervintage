@@ -10,14 +10,18 @@
 
       <!-- Sentinel: triggers loading BEFORE scroll reaches end -->
       <!--
-      
+
       -->
 
     </div>
-    
+
 </template>
 
+<style>
 
+  .card { overflow: unset !important; }
+
+</style>
 
 
 <script setup>
@@ -71,7 +75,7 @@ function checkIfNearBottom() {
 function loadImages(count = 8) {
   loading.value = true;
   imgIndex.value = imgIndex.value + count;
-  const indexMaske = "http://localhost:3000/_nuxt/public/img/Sabotage_NN_MM.jpg"
+  const indexMaske = "http://localhost:3001/_nuxt/public/img/Sabotage_NN_MM.jpg"
 
   for(let i = imgIndex.value - 8; i < imgIndex.value; i++) {
     const newImges = [];
@@ -128,5 +132,3 @@ onUnmounted(() => {
   clearInterval(fallbackCheckInterval);
 });
 </script>
-
-
