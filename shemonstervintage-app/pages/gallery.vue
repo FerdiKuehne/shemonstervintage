@@ -1,12 +1,10 @@
 <template>
-
     <div class="container py-4">
-      <h1 class="mt-5 mb-5 fw-bold text-center">Sabotage</h1>
 
       <componentGallery :images="images"/>
 
       <!-- Spacer to make scrollable area before the trigger -->
-      <div style="height: 100px"></div>
+      <!-- <div style="height: 200px"></div> -->
 
       <!-- Sentinel: triggers loading BEFORE scroll reaches end -->
       <!--
@@ -16,14 +14,6 @@
     </div>
 
 </template>
-
-<style>
-
-  .card { overflow: unset !important; }
-
-</style>
-
-
 <script setup>
 
 /*
@@ -68,31 +58,32 @@ function checkIfNearBottom() {
   const scrollPosition = window.innerHeight + window.scrollY;
   const threshold = document.body.scrollHeight - 800;
   if (scrollPosition >= threshold && !loading.value) {
-    loadImages(8);
+    loadImages();
   }
 }
+const indexMaske = "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCFNNNN.jpg";
 
-function loadImages(count = 8) {
-  loading.value = true;
-  imgIndex.value = imgIndex.value + count;
-  const indexMaske = "http://localhost:3001/_nuxt/public/img/Sabotage_NN_MM.jpg"
-
-  for(let i = imgIndex.value - 8; i < imgIndex.value; i++) {
-    const newImges = [];
-    for(let j = 1; j < 5; j++){
-      newImges.push(indexMaske.replace("NN", i + 1).replace("MM", j));
+async function loadImages() {
+  for (let i = 129; i < 150; i++) {
+    const indexpicture = i.toString().padStart(4, '0');
+    const imageUrl = indexMaske.replace("NNNN", indexpicture);
+    
+    try {
+      const response = await fetch(imageUrl, { method: 'HEAD' });
+      if (response.ok) {
+        images.value.push(imageUrl);
+      }
+    } catch (error) {
+      console.warn(`Image not found: ${imageUrl}`);
     }
-    images.value.push(newImges);
   }
-  console.log(images.value);
-  setTimeout(() => {
-    loading.value = false;
-  }, 400);
+
+  loading.value = false;
 }
 
 async function ensurePageIsScrollable() {
   while (document.body.scrollHeight <= window.innerHeight) {
-    loadImages(8);
+    loadImages();
     await new Promise((resolve) => setTimeout(resolve, 500));
     await nextTick();
   }
@@ -101,7 +92,7 @@ async function ensurePageIsScrollable() {
 let observer;
 
 onMounted(async () => {
-  loadImages(8);
+  loadImages();
   /*
   await ensurePageIsScrollable();
 
@@ -132,3 +123,10 @@ onUnmounted(() => {
   clearInterval(fallbackCheckInterval);
 });
 </script>
+
+
+<style>
+
+  .card { overflow: unset !important; }
+
+</style>

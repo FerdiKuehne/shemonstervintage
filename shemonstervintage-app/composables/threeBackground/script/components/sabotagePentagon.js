@@ -1,49 +1,21 @@
 import { Mesh, PlaneGeometry, Uniform, Vector2, Vector3 } from "three";
 
-import { AssetsId } from "../constants/AssetsId";
-import { AssetsManager } from "../managers/AssetsManager";
 import { CardMaterial } from "../materials/CardMaterial";
 import { ExtendedObject3D } from "../utils/ExtendedObject3D";
-import { Grid } from "./Grid";
+
 import { MainThree } from "../MainThree";
-import { mapLinear } from "three/src/math/MathUtils.js";
 
-export class Card extends ExtendedObject3D {
-  static #_DefaultScale = new Vector3();
-  static #_MaxScale = new Vector3();
-  static #_Textures = [
-    AssetsId.TEXTURE_1,
-    AssetsId.TEXTURE_2,
-    AssetsId.TEXTURE_3,
-    AssetsId.TEXTURE_4,
-    AssetsId.TEXTURE_5,
-    AssetsId.TEXTURE_6,
-    AssetsId.TEXTURE_7,
-    AssetsId.TEXTURE_8,
-    AssetsId.TEXTURE_9,
-    AssetsId.TEXTURE_10,
-  ];
 
+export class SabotagePentagon extends ExtendedObject3D {
   static Geometry = new PlaneGeometry(1, 1);
 
   #_defaultScale = new Vector3().setScalar(0.5);
-  #_targetScale = new Vector3();
-
-  #_gridPosition = new Vector3();
-  #_targetPosition = new Vector3();
-
-  pos = false;
-  zeroPos = false;
-  #_phase1 = false;
 
   mesh;
   material;
-  gridPosition = new Vector2();
 
   constructor(i, j) {
     super();
-
-    this.gridPosition.set(i, j);
 
     this.#_createMesh();
     this.#_setTargetPosition();
@@ -51,9 +23,10 @@ export class Card extends ExtendedObject3D {
   }
 
   #_createMesh() {
-    const randomIndex = Math.floor(Math.random() * Card.#_Textures.length);
-    const textureId = Card.#_Textures[randomIndex];
-    const texture = AssetsManager.GetAsset(textureId);
+
+        /*
+    const texture = AssetsManager.GetAsset(textureId); // hier unterschieldlige textures
+        */
 
     this.material = new CardMaterial({
       uniforms: {
@@ -62,19 +35,14 @@ export class Card extends ExtendedObject3D {
       },
     });
 
-    this.mesh = new Mesh(Card.Geometry, this.material);
-
-    this.mesh.scale.copy(Card.#_DefaultScale);
+    this.mesh = new Mesh(Card.Geometry, 
+        this.material);
 
     this.add(this.mesh);
   }
 
   #_setTargetPosition() {
-    let { x, y } = this.gridPosition;
-
-    const cardWidth = Card.#_DefaultScale.x * 0.5;
-    const cardHeight = Card.#_DefaultScale.y * 0.5;
-
+ 
     x =
       mapLinear(
         x,

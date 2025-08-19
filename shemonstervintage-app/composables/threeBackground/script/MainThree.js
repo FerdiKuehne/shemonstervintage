@@ -1,15 +1,8 @@
-import { ACESFilmicToneMapping, OrthographicCamera, Scene, WebGLRenderer } from "three";
+import { ACESFilmicToneMapping, PerspectiveCamera, Scene, WebGLRenderer } from "three";
 
 import { DomElements } from "./constants/DomElements";
 import { ExtendedObject3D } from "./utils/ExtendedObject3D";
 import { Ticker } from "./utils/Ticker";
-
-/*
-  grid kleiner machen camera posistion sollte gleich bleiben
-
-*/
-
-
 
 export class MainThree {
   static #_Scene = new Scene();
@@ -17,7 +10,7 @@ export class MainThree {
   /**  @type {HTMLElement} */
   static #_CanvasContainer;
 
-  /**  @type {OrthographicCamera} */
+  /**  @type {PerspectiveCamera} */
   static #_Camera;
 
   /**  @type {WebGLRenderer} */
@@ -71,7 +64,7 @@ export class MainThree {
       powerPreference: "high-performance",
     });
 
-    const container = document.getElementById("THREE-CONTAINER");
+    const container = document.getElementById("three-background");
 
     this.#_Renderer.toneMapping = ACESFilmicToneMapping;
     this.#_Renderer.setSize(container.clientWidth, container.clientHeight);
@@ -79,7 +72,7 @@ export class MainThree {
   }
 
   static #_CreateCamera() {
-    this.#_Camera = new OrthographicCamera(-1, 1, 1, -1);
+    this.#_Camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.#_Camera.position.z = 6;
   }
 
@@ -105,7 +98,7 @@ export class MainThree {
     return this.#_Scene;
   }
 
-  /** @returns {OrthographicCamera} */
+  /** @returns {PerspectiveCamera} */
   static get Camera() {
     return this.#_Camera;
   }

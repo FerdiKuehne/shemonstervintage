@@ -26,7 +26,7 @@
             </li>
           </ul>
         </div>
-        <div class="d-flex align-items-center ms-auto">
+        <div class="d-flex align-items-center ms-auto cart-button wishlist">
           <NuxtLinkLocale to="/wunschliste">
             <svg
               v-if="isEmpty"
@@ -99,7 +99,7 @@
     </header>
     <NuxtPage keepalive />
     <footer>
-      <div class="container text-center py-4 footer">
+      <div class="footer text-center">
         <div class="row">
           <div class="col-12 d-flex">
             <a>
@@ -132,6 +132,22 @@ const isEmpty = computed(() => wishes.value.length === 0);
 </script>
 
 <style>
+
+.wishlist {
+
+  padding-right: 2rem;
+
+}
+
+
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  width: 100%;
+}
+
 .dropdown-menu {
   background-color: white;
   border: 0.1rem solid black;
@@ -144,11 +160,11 @@ const isEmpty = computed(() => wishes.value.length === 0);
 
 .navbar {
   background-color: white;
-  border-bottom: 1px solid black;
-  padding: 1.5rem 1.5rem 1.5rem 1.5rem;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 .logo {
-  height: 80px;
+  height: 25px;
   width: auto;
 }
 @media screen and (max-width: 512px) {
@@ -167,8 +183,22 @@ body {
 }
 
 footer {
-  border-top: 1px solid black;
+  height: 5vh;
+  bottom: 0;
+  position: fixed;
+  align-items: center;
+  width: 100%;
+  overflow: hidden;
+  background-color: white;
+  z-index: 3;
 }
+
+footer a {
+  padding-top: 0;
+  padding-left: 1rem;
+}
+
+
 
 a {
   text-decoration: none;
