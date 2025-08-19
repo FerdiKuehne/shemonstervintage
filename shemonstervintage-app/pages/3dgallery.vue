@@ -1,137 +1,155 @@
 <template>
-    <div class="wrapper">
-      <div ref="container" class="three-container"></div>
-    </div>
-  </template>
-    
-    <script setup>
-  import { onMounted, ref, nextTick } from 'vue'
-  import * as THREE from 'three'
-  import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
+  <div class="wrapper">
+    <div ref="threeContainer" class="three-container"></div>
+  </div>
+</template>
+
+<script setup>
+import * as THREE from "three";
+import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
+import { FontLoader } from "three/addons/loaders/FontLoader.js";
+import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect';
+import { ref, onMounted } from "vue";
+
+const threeContainer = ref(null);
+const galleryItems = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0].reverse(); // Example indices for gallery items
+const indexMaske =
+  "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCFNNNN.jpg";
+const images = [
+  "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCF0129.JPG",
+  "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCF0130.JPG",
+  "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCF0131.JPG",
+  "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCF0134.JPG",
+  "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCF0135.JPG",
+  "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCF0136.JPG",
+  "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCF0137.JPG",
+  "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCF0138.JPG",
+  "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCF0139.JPG",
+];
+const gridLines = [];
+
+function setGridPosition(index, columns, object, spacing) {
+  const row = Math.floor(index / columns);
+  const col = index % columns;
+  object.position.x = col * spacing;
+  object.position.y = -(row * spacing);
+}
+
+onMounted(() => {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf3f3f3); // Set background color
+  const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+
+  const renderer = new THREE.WebGLRenderer();
+  const grid = new THREE.Group();
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  let lineGeometry = new THREE.BufferGeometry()
+  const lineMaterial = new THREE.LineBasicMaterial( { color: 0x0000ff } );
+  let line = null;
+
+  threeContainer.value.appendChild(renderer.domElement);
+
+  images.forEach((url, index) => {
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      url,
+      (texture) => {
+        texture.format = THREE.RGBAFormat;
+        texture.type = THREE.UnsignedByteType;
+
+        const imageWidth = texture.image.width;
+        const imageHeight = texture.image.height;
+        const aspect = imageWidth / imageHeight;
+
+        const targetHeight = 2; // Keep consistent visual height
+        const targetWidth = targetHeight * aspect;
+
+        const geometry = new THREE.PlaneGeometry(targetWidth, targetHeight);
+        const material = new THREE.MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+       
+        setGridPosition(index, 4, mesh, 3); 
+
+        gridLines.push(new THREE.Vector3(mesh.position.x - 0.8, mesh.position.y + 1.1, mesh.position.z));
+        if(index === 2){
+          lineGeometry.setFromPoints(gridLines);
+          line = new THREE.Line( lineGeometry, lineMaterial );
+          grid.add( line );
+        } 
+        if(index > 2) {
+          lineGeometry.dispose(); // Dispose old geometry
+          lineGeometry = new THREE.BufferGeometry().setFromPoints(gridLines);
+          line.geometry = lineGeometry;
+        }
   
-  const container = ref(null)
-  
-  
-  onMounted(async () => {
-    await nextTick()
-    const scene = new THREE.Scene()
-  
-    console.log('START');
-  
-    const width = container.value.clientWidth
-    const height = container.value.clientHeight
-  
-    const camera = new THREE.OrthographicCamera( width / - 30, width / 40, height / 30, height / - 40, -10, 1000 );
-    camera.position.z = 1;
-  
-  /*fov  — Camera frustum vertical field of view.
-  aspect — Camera frustum aspect ratio.
-  near   — Camera frustum near plane.
-  far    — Camera frustum far plane.
-  */
-  
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  
-    renderer.setSize(width, height)
-   
-    container.value.appendChild(renderer.domElement)
-  
-    const cubeGeometry = new THREE.BoxGeometry(1, 1, 1)
-    const sphereGeometry = new THREE.SphereGeometry(2, 20, 20) // radius, widthSegments, heightSegments
-  
-   
-    const wireframe = new THREE.LineSegments(
-      new THREE.EdgesGeometry(cubeGeometry),
-      new THREE.LineBasicMaterial({  color: 0x000000 , linewidth: 1 })
-    )
-  
-    const wireframe2 = new THREE.LineSegments(
-      new THREE.EdgesGeometry(cubeGeometry),
-      new THREE.LineBasicMaterial({  color: 0x000000 , linewidth: 1 })
-    )
-  
-    const wireframe3 = new THREE.LineSegments(
-      new THREE.EdgesGeometry(sphereGeometry),
-      new THREE.LineBasicMaterial({  color: 0x000000 , linewidth: 1 })
-    )
-  
-    const color = 0xFFFFFF;
-    const density = 0.05;
-    //scene.fog = new THREE.FogExp2(color, density);
-    
-    wireframe2.position.x = -5
-  
-    scene.add(wireframe)
-    scene.add(wireframe2)
-    scene.add(wireframe3)
-  
-    const amplitude = 4.0 // how high it moves
-    const amplitudeX = 15.0 
-  
-  const speed = 0.005 // delta increment
-  const speedX = 0.0005 // delta increment
-  
-    const animate = (delta) => {
-  
-      requestAnimationFrame(animate)
-   
-    //wireframe.position.y = Math.exp(Math.cos(delta*speed) * amplitude * 0.5) 
-    wireframe2.position.y = Math.sin(delta*speed) * amplitude
-    wireframe3.position.y = Math.cos(delta*speed*1.15) * amplitude
-  
-    //camera.position.z = Math.sin(delta*speed) * 1000;
-     
-      //wireframe.position.x = Math.exp(Math.cos(delta*speedX) * amplitudeX*0.5)
-      wireframe2.position.x = Math.sin(delta*speedX) * amplitudeX
-      wireframe3.position.x = Math.cos(delta*speedX*1.2) * amplitudeX
-  
-      //wireframe.position.z = Math.cos(delta*speedX*0.66) * 6
-      wireframe2.position.z = Math.sin(delta*speedX*0.66) * 6
-      wireframe3.position.z = Math.cos(delta*speedX) * 3
-  
-      wireframe.rotation.y += 0.03
-      wireframe2.rotation.y -= 0.03
-      wireframe.rotation.x += 0.03
-      wireframe2.rotation.x -= 0.03
-  
-      wireframe3.rotation.y += 0.03
-      wireframe3.rotation.x += 0.03
-      renderer.render(scene, camera)
+        grid.add(mesh);
+      },
+      undefined,
+      (err) => {
+        console.error("Error loading texture:", err);
+      }
+    );
+  });
+
+  grid.position.set(-4, 0, 5); // Center the grid
+
+  const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const cubeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+  const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+  cube.position.set(0, 0, 0);
+
+
+  scene.add(grid);
+  scene.add(cube);
+
+  camera.position.z = 10;
+
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+
+  function onMouseMove(event) {
+    // Normalize mouse coordinates to [-1, 1]
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  }
+
+  window.addEventListener("mousemove", onMouseMove, false);
+
+
+
+
+  function animate() {
+    // Update the picking ray with the camera and mouse position
+    raycaster.setFromCamera(mouse, camera);
+
+    // Calculate objects intersecting the picking ray
+    const intersects = raycaster.intersectObjects(scene.children);
+
+    // Highlight intersected objects
+    for (let i = 0; i < intersects.length; i++) {
+      intersects[i].object.position.z = 0; // Move the intersected object closer
     }
-  
-    animate()
-  
-    window.addEventListener('resize', () => {
-      const width = container.value.clientWidth
-      const height = container.value.clientHeight
-   
-  
-    })
-  })
-  
-  
-  </script>
-  
+    renderer.render(scene, camera);
     
-    <style scoped>
-    .wrapper {
-    display: flex;
-    justify-content: center;  /* horizontal center */
-    align-items: center;      /* vertical center */
-    height: 50vh;            /* full viewport height */
-    width: 100vw;             /* full viewport width */
-    background: #f5f5f5;
   }
-  
-  .three-container {
-    width: 100vw;
-    height: 50vh; 
-    margin: auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  
-    </style>
-    
-    
+  renderer.setAnimationLoop(animate);
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+});
+</script>
+
+<style scoped></style>
