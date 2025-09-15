@@ -1,4 +1,10 @@
 <template>
+
+  <div id="ui">
+    <label class="btn" for="picker">Panorama wählen</label>
+    <input id="picker" type="file" accept="image/*" />
+  </div>
+
   <div id="scroll-container" :style="{ height: containerHeight + 'vh' }">
     <div ref="threeContainer" class="three-container"></div>
     <div
@@ -27,6 +33,7 @@ import { ref, onMounted } from "vue";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Observer } from "gsap/Observer";
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 gsap.registerPlugin(Observer);
 gsap.registerPlugin(ScrollTrigger);
@@ -95,6 +102,7 @@ function closeObject() {
 
       textImage.value = null;
       isModalOpen.value = false;
+      objectModal.rotation.x = 0;
       enableScroll();
     },
   });
@@ -145,7 +153,30 @@ function closeObject() {
     );
 }
 
+
+let currentObjectURL;
+
 onMounted(() => {
+
+  // Upload Handling
+  document.getElementById('picker').addEventListener('change', function (e) {
+    const file = e.target.files && e.target.files[0];
+    if (file) loadPanoramaFromFile(file);
+  });
+
+  function loadPanoramaFromFile(file) {
+    if (currentObjectURL) URL.revokeObjectURL(currentObjectURL);
+    currentObjectURL = URL.createObjectURL(file);
+
+    const img = new Image();
+    img.onload = () => applyTexture(img);
+    img.onerror = () => alert('Konnte Bild nicht laden.');
+    img.src = currentObjectURL;
+  }
+
+
+
+
   if (window.innerWidth > 1200) {
     currendGrid = 4;
   } else if (window.innerWidth > 768 && window.innerWidth < 1200) {
@@ -162,6 +193,25 @@ onMounted(() => {
     0.1,
     1000
   );
+
+  const geom = new THREE.SphereGeometry(500, 60, 40);
+  geom.scale(-1, 1, 1);
+  const mat  = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  const sphere = new THREE.Mesh(geom, mat);
+  scene.add(sphere);
+
+
+  function applyTexture(img) {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img,0,0);
+    const tex = new THREE.Texture(canvas);
+    tex.needsUpdate = true;
+    sphere.material.map = tex;
+    sphere.material.needsUpdate = true;
+    console.log('Texture applied:', canvas.width + 'x' + canvas.height);
+  }
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio);
@@ -180,6 +230,12 @@ onMounted(() => {
     const gridHeightInPx = scrollHeight * worldToScreenRatio;
     containerHeight.value = (gridHeightInPx / window.innerHeight) * 100 + 20; // in vh
   }
+
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.enableZoom    = false;
+  controls.update();
 
   const targetHeight = 4.5 * 0.56;
   const targetWidth = 4 * 0.56;
@@ -229,6 +285,11 @@ onMounted(() => {
 
             // Force update
             texture.needsUpdate = true;
+
+
+
+
+            //SHADER
             const material = new THREE.ShaderMaterial({
               uniforms: {
                 uTexture: { value: texture },
@@ -589,6 +650,10 @@ onMounted(() => {
           ? positionXRight
           : positionXLeft;
 
+          img.material.depthTest = false;
+          img.material.depthWrite = false;
+          img.renderOrder = 1; // höher als objectModal
+
       const tl = gsap.timeline();
       tl.to(
         img.position,
@@ -596,6 +661,15 @@ onMounted(() => {
           x: positionX,
           y: targetPos.y,
           z: targetPos.z,
+          duration: 2.6,
+          ease: "power2.inOut",
+        },
+        0
+      )
+      .to(
+        img.rotation,
+        {
+          x: 2 * Math.PI,
           duration: 2.6,
           ease: "power2.inOut",
         },
@@ -618,6 +692,15 @@ onMounted(() => {
             x: targetPos.x,
             y: targetPos.y,
             z: targetPos.z,
+            duration: 2.6,
+            ease: "power2.inOut",
+          },
+          0
+        )
+        .to(
+          objectModal.rotation,
+          {
+            x: 2 * Math.PI,
             duration: 2.6,
             ease: "power2.inOut",
           },
@@ -649,6 +732,7 @@ onMounted(() => {
       prevPosition.copy(img.position);
     }
 
+    controls.update();
     renderer.render(scene, camera);
   }
 
@@ -720,4 +804,13 @@ onMounted(() => {
   z-index: 1;
   transform: translate(-50%, 0);
 }
+
+
+
+#ui  { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:10;
+       background:rgba(12,16,22,.7); border:1px solid rgba(255,255,255,.12);
+       border-radius:10px; padding:8px 10px; display:flex; gap:10px; align-items:center; }
+.btn { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.25);
+       color:#fff; padding:7px 12px; border-radius:8px; cursor:pointer; font-weight:600; }
+input[type="file"] { display:none; }
 </style>
