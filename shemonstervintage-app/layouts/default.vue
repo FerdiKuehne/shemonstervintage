@@ -2,7 +2,8 @@
 <!-- layouts/default.vue -->
 <template>
   <div>
-    <header>
+    <!--
+        <header>
       <nav class="navbar navbar-expand-lg navbar-light">
         <a class="navbar-brand" href="/">
           <img class="logo" src="assets/images/logo.svg" alt="Company Logo"
@@ -97,8 +98,13 @@
         </button>
       </nav>
     </header>
+    -->
+
+    
     <NuxtPage keepalive />
-    <footer>
+   
+<!--
+        <footer>
       <div class="footer text-center">
         <div class="row">
           <div class="col-12 d-flex">
@@ -116,6 +122,10 @@
         </div>
       </div>
     </footer>
+
+
+-->
+
   </div>
 </template>
 
