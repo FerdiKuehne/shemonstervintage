@@ -6,7 +6,7 @@
       class="modal-wrapper"
       :class="{ open: isModalOpen }"
     >
-      <button class="close-modal">x</button>
+      <button class="close-modal" @click="closeObject" >x</button>
       <div class="modal-content">
         <div>
           <div class="modal-text">
@@ -38,6 +38,8 @@ const textImage = ref(null);
 const scrollerModal = ref(null);
 
 let currendGrid;
+let img = null;
+let objectModal;
 
 const itemGapX = 2.4;
 const itemGapY = 2.6;
@@ -53,6 +55,7 @@ const images = Array.from(
 );
 
 let newImages = null;
+let grid;
 let loadedCount = 0;
 let total = images.length;
 let oldTotal = total;
@@ -71,6 +74,77 @@ function disableScroll() {
 function enableScroll() {
   document.body.style.overflow = "";
 }
+
+function closeObject() {
+    // 🔹 CLOSE
+    const snap = img.userData.snapshot;
+    const targetWorld = snap.grid.localToWorld(snap.position.clone());
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        snap.grid.add(img);
+
+        // restore index order
+        if (snap.grid.children.length - 1 !== snap.index) {
+          snap.grid.children.splice(snap.index, 0, snap.grid.children.pop());
+        }
+
+        img.position.copy(snap.position);
+        img.quaternion.copy(snap.quaternion);
+        img.scale.copy(snap.scale);
+        img.userData.snapshot = null;
+
+        textImage.value = null;
+        isModalOpen.value = false;
+        enableScroll();
+      },
+    });
+
+    tl.to(
+      objectModal.position,
+      {
+        x: targetWorld.x,
+        y: targetWorld.y,
+        z: targetWorld.z,
+        duration: 0.3,
+        ease: "power2.inOut",
+      },
+      0
+    )
+      .to(
+        objectModal.scale,
+        {
+          x: 1,
+          y: 1,
+          z: 1,
+          duration: 0.3,
+          ease: "power2.inOut",
+        },
+        0
+      )
+      .to(
+        img.position,
+        {
+          x: targetWorld.x,
+          y: targetWorld.y,
+          z: targetWorld.z,
+          duration: 0.3,
+          ease: "power2.inOut",
+        },
+        0
+      )
+      .to(
+        img.scale,
+        {
+          x: snap.scale.x,
+          y: snap.scale.y,
+          z: snap.scale.z,
+          duration: 0.3,
+          ease: "power2.inOut",
+        },
+        0
+      );
+  }
 
 onMounted(() => {
   if (window.innerWidth > 1200) {
@@ -94,7 +168,7 @@ onMounted(() => {
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
 
-  const grid = new THREE.Group();
+   grid = new THREE.Group();
   threeContainer.value.appendChild(renderer.domElement);
 
   function updateContainerHeight() {
@@ -118,7 +192,7 @@ onMounted(() => {
     transparent: false,
   });
 
-  const objectModal = new THREE.Mesh(geometryModal, materialModal);
+  objectModal = new THREE.Mesh(geometryModal, materialModal);
 
   function loadMoreImages() {
     return new Promise((resolve) => {
@@ -336,45 +410,45 @@ onMounted(() => {
   });
 
   function createScrollAnimation() {
-  if (scrollTween) {
-    scrollTween.scrollTrigger.kill();
-    scrollTween.kill();
+    if (scrollTween) {
+      scrollTween.scrollTrigger.kill();
+      scrollTween.kill();
+    }
+
+    updateContainerHeight();
+
+    // Convert world grid height → px scroll length
+    const worldToScreenRatio =
+      window.innerHeight /
+      (2 * Math.tan((camera.fov * Math.PI) / 360) * camera.position.z);
+    const gridHeightInPx = scrollHeight * worldToScreenRatio;
+
+    console.log("Create scroll animation with gridHeightInPx:", gridHeightInPx);
+
+    scrollTween = gsap.to(grid.position, {
+      y: scrollHeight,
+      ease: "none",
+      scrollTrigger: {
+        trigger: "#scroll-container",
+        start: "top top",
+        end: "+=" + gridHeightInPx,
+        scrub: true,
+        onUpdate: (self) => {
+          console.log("Scroll progress:", self.progress);
+          if (self.progress > 0.4 && !loadingMore) {
+            loadingMore = true;
+            loadMoreImages().then(() => {
+              ScrollTrigger.refresh();
+            });
+          }
+        },
+      },
+    });
   }
 
-  updateContainerHeight();
-
-  // Convert world grid height → px scroll length
-  const worldToScreenRatio =
-    window.innerHeight /
-    (2 * Math.tan((camera.fov * Math.PI) / 360) * camera.position.z);
-  const gridHeightInPx = scrollHeight * worldToScreenRatio;
-
-  console.log("Create scroll animation with gridHeightInPx:", gridHeightInPx);
-
-  scrollTween = gsap.to(grid.position, {
-    y: scrollHeight,
-    ease: "none",
-    scrollTrigger: {
-      trigger: "#scroll-container",
-      start: "top top",
-      end: "+=" + gridHeightInPx,
-      scrub: true,
-      onUpdate: (self) => {
-        console.log("Scroll progress:", self.progress);
-        if (self.progress > 0.4 && !loadingMore) {
-          loadingMore = true;
-          loadMoreImages().then(() => {
-            ScrollTrigger.refresh();
-          });
-        }
-      },
-    },
-  });
-}
 
 
-  let activObject = false;
-  let img = null;
+
 
   Observer.create({
     target: renderer.domElement,
@@ -385,149 +459,98 @@ onMounted(() => {
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-      if (activObject && img) {
-        // 🔹 CLOSE
-        const snap = img.userData.snapshot;
-        const targetWorld = snap.grid.localToWorld(snap.position.clone());
+      console.log("click");
 
-        const tl = gsap.timeline({
-          onComplete: () => {
-            snap.grid.add(img);
+      // 🔹 OPEN
+      disableScroll();
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects([scene], true);
+      if (!hits.length) return;
 
-            // restore index order
-            if (snap.grid.children.length - 1 !== snap.index) {
-              snap.grid.children.splice(
-                snap.index,
-                0,
-                snap.grid.children.pop()
-              );
-            }
+      img = hits[0].object;
 
-            img.position.copy(snap.position);
-            img.quaternion.copy(snap.quaternion);
-            img.scale.copy(snap.scale);
-            img.userData.snapshot = null;
+      isModalOpen.value = true;
+      textImage.value = img.userData.text;
 
-            activObject = false;
-            textImage.value = null;
-            isModalOpen.value = false;
-            enableScroll();
-          },
-        });
+      // snapshot original
+      img.userData.snapshot = {
+        grid,
+        index: grid.children.indexOf(img),
+        position: img.position.clone(),
+        quaternion: img.quaternion.clone(),
+        scale: img.scale.clone(),
+      };
 
-        tl.to(
-          objectModal.position,
+      // keep transform when reparenting
+      scene.attach(img);
+
+      objectModal.position.copy(getObjectPosition(img));
+
+      // target world position in front of camera
+      const d = Math.max(camera.near + 0.5, 1);
+      const targetPos = new THREE.Vector3(0, 0, -d).applyMatrix4(
+        camera.matrixWorld
+      );
+
+      // viewport dimensions at distance d
+      const vFOV = THREE.MathUtils.degToRad(camera.fov);
+      const visibleH = 2 * Math.tan(vFOV / 2) * d;
+      const visibleW = visibleH * camera.aspect;
+
+      // scale object to ~50% screen
+      const box = new THREE.Box3().setFromObject(img);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+
+      const s =
+        Math.min(
+          visibleW / Math.max(size.x, 1e-6),
+          visibleH / Math.max(size.y, 1e-6)
+        ) * 0.999;
+
+      // modal scaling
+      const scaleX = (modalWidth / visibleW) * 2;
+      const scaleY = modalHeight / visibleH;
+
+      const positionXLeft = -visibleW / 2 + size.x * s * 0.5 * 1.0009;
+      const positionXRight = visibleW / 2 - size.x * s * 0.5 * 1.0009;
+
+      const positionX =
+        img.position.x === 0
+          ? Math.random() > 0.5
+            ? positionXLeft
+            : positionXRight
+          : img.position.x < 0
+          ? positionXRight
+          : positionXLeft;
+
+      const tl = gsap.timeline();
+      tl.to(
+        img.position,
+        {
+          x: positionX,
+          y: targetPos.y,
+          z: targetPos.z,
+          duration: 0.6,
+          ease: "power2.inOut",
+        },
+        0
+      )
+        .to(
+          img.scale,
           {
-            x: targetWorld.x,
-            y: targetWorld.y,
-            z: targetWorld.z,
-            duration: 0.3,
+            x: s,
+            y: s,
+            z: s,
+            duration: 0.6,
             ease: "power2.inOut",
           },
           0
         )
-          .to(
-            objectModal.scale,
-            {
-              x: 1,
-              y: 1,
-              z: 1,
-              duration: 0.3,
-              ease: "power2.inOut",
-            },
-            0
-          )
-          .to(
-            img.position,
-            {
-              x: targetWorld.x,
-              y: targetWorld.y,
-              z: targetWorld.z,
-              duration: 0.3,
-              ease: "power2.inOut",
-            },
-            0
-          )
-          .to(
-            img.scale,
-            {
-              x: snap.scale.x,
-              y: snap.scale.y,
-              z: snap.scale.z,
-              duration: 0.3,
-              ease: "power2.inOut",
-            },
-            0
-          );
-      } else {
-        // 🔹 OPEN
-        disableScroll();
-        raycaster.setFromCamera(mouse, camera);
-        const hits = raycaster.intersectObjects([scene], true);
-        if (!hits.length) return;
-
-        img = hits[0].object;
-
-        isModalOpen.value = true;
-        textImage.value = img.userData.text;
-
-        // snapshot original
-        img.userData.snapshot = {
-          grid,
-          index: grid.children.indexOf(img),
-          position: img.position.clone(),
-          quaternion: img.quaternion.clone(),
-          scale: img.scale.clone(),
-        };
-
-        // keep transform when reparenting
-        scene.attach(img);
-
-        objectModal.position.copy(getObjectPosition(img));
-
-        // target world position in front of camera
-        const d = Math.max(camera.near + 0.5, 1);
-        const targetPos = new THREE.Vector3(0, 0, -d).applyMatrix4(
-          camera.matrixWorld
-        );
-
-        // viewport dimensions at distance d
-        const vFOV = THREE.MathUtils.degToRad(camera.fov);
-        const visibleH = 2 * Math.tan(vFOV / 2) * d;
-        const visibleW = visibleH * camera.aspect;
-
-        // scale object to ~50% screen
-        const box = new THREE.Box3().setFromObject(img);
-        const size = new THREE.Vector3();
-        box.getSize(size);
-
-        const s =
-          Math.min(
-            visibleW / Math.max(size.x, 1e-6),
-            visibleH / Math.max(size.y, 1e-6)
-          ) * 0.999;
-
-        // modal scaling
-        const scaleX = (modalWidth / visibleW) * 2;
-        const scaleY = modalHeight / visibleH;
-
-        const positionXLeft = -visibleW / 2 + size.x * s * 0.5 * 1.0009;
-        const positionXRight = visibleW / 2 - size.x * s * 0.5 * 1.0009;
-
-        const positionX =
-          img.position.x === 0
-            ? Math.random() > 0.5
-              ? positionXLeft
-              : positionXRight
-            : img.position.x < 0
-            ? positionXRight
-            : positionXLeft;
-
-        const tl = gsap.timeline();
-        tl.to(
-          img.position,
+        .to(
+          objectModal.position,
           {
-            x: positionX,
+            x: targetPos.x,
             y: targetPos.y,
             z: targetPos.z,
             duration: 0.6,
@@ -535,43 +558,17 @@ onMounted(() => {
           },
           0
         )
-          .to(
-            img.scale,
-            {
-              x: s,
-              y: s,
-              z: s,
-              duration: 0.6,
-              ease: "power2.inOut",
-            },
-            0
-          )
-          .to(
-            objectModal.position,
-            {
-              x: targetPos.x,
-              y: targetPos.y,
-              z: targetPos.z,
-              duration: 0.6,
-              ease: "power2.inOut",
-            },
-            0
-          )
-          .to(
-            objectModal.scale,
-            {
-              x: scaleX,
-              y: scaleY,
-              z: 1,
-              duration: 0.6,
-              ease: "power2.inOut",
-            },
-            0
-          );
-
-
-        activObject = true;
-      }
+        .to(
+          objectModal.scale,
+          {
+            x: scaleX,
+            y: scaleY,
+            z: 1,
+            duration: 0.6,
+            ease: "power2.inOut",
+          },
+          0
+        );
     },
   });
 
@@ -614,14 +611,17 @@ onMounted(() => {
 .modal-wrapper.open {
   pointer-events: all;
   display: block;
-  animation: fade-in .3s forwards;
-  animation-delay: .5s;
+  animation: fade-in 0.3s forwards;
+  animation-delay: 0.5s;
 }
 @keyframes fade-in {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
 }
-
 
 .modal-content {
   width: 50%;
