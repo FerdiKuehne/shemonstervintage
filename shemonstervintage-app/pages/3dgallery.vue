@@ -6,7 +6,7 @@
       class="modal-wrapper"
       :class="{ open: isModalOpen }"
     >
-      <button class="close-modal" @click="closeObject" >x</button>
+      <button class="close-modal" @click="closeObject">x</button>
       <div class="modal-content">
         <div>
           <div class="modal-text">
@@ -58,7 +58,6 @@ let newImages = null;
 let grid;
 let loadedCount = 0;
 let total = images.length;
-let oldTotal = total;
 
 function setGridPosition(index, columns, object, spacingX, spacingY) {
   const row = Math.floor(index / columns);
@@ -76,32 +75,54 @@ function enableScroll() {
 }
 
 function closeObject() {
-    // 🔹 CLOSE
-    const snap = img.userData.snapshot;
-    const targetWorld = snap.grid.localToWorld(snap.position.clone());
+  // 🔹 CLOSE
+  const snap = img.userData.snapshot;
+  const targetWorld = snap.grid.localToWorld(snap.position.clone());
 
-    const tl = gsap.timeline({
-      onComplete: () => {
-        snap.grid.add(img);
+  const tl = gsap.timeline({
+    onComplete: () => {
+      snap.grid.add(img);
 
-        // restore index order
-        if (snap.grid.children.length - 1 !== snap.index) {
-          snap.grid.children.splice(snap.index, 0, snap.grid.children.pop());
-        }
+      // restore index order
+      if (snap.grid.children.length - 1 !== snap.index) {
+        snap.grid.children.splice(snap.index, 0, snap.grid.children.pop());
+      }
 
-        img.position.copy(snap.position);
-        img.quaternion.copy(snap.quaternion);
-        img.scale.copy(snap.scale);
-        img.userData.snapshot = null;
+      img.position.copy(snap.position);
+      img.quaternion.copy(snap.quaternion);
+      img.scale.copy(snap.scale);
+      img.userData.snapshot = null;
 
-        textImage.value = null;
-        isModalOpen.value = false;
-        enableScroll();
+      textImage.value = null;
+      isModalOpen.value = false;
+      enableScroll();
+    },
+  });
+
+  tl.to(
+    objectModal.position,
+    {
+      x: targetWorld.x,
+      y: targetWorld.y,
+      z: targetWorld.z,
+      duration: 0.3,
+      ease: "power2.inOut",
+    },
+    0
+  )
+    .to(
+      objectModal.scale,
+      {
+        x: 1,
+        y: 1,
+        z: 1,
+        duration: 0.3,
+        ease: "power2.inOut",
       },
-    });
-
-    tl.to(
-      objectModal.position,
+      0
+    )
+    .to(
+      img.position,
       {
         x: targetWorld.x,
         y: targetWorld.y,
@@ -111,40 +132,18 @@ function closeObject() {
       },
       0
     )
-      .to(
-        objectModal.scale,
-        {
-          x: 1,
-          y: 1,
-          z: 1,
-          duration: 0.3,
-          ease: "power2.inOut",
-        },
-        0
-      )
-      .to(
-        img.position,
-        {
-          x: targetWorld.x,
-          y: targetWorld.y,
-          z: targetWorld.z,
-          duration: 0.3,
-          ease: "power2.inOut",
-        },
-        0
-      )
-      .to(
-        img.scale,
-        {
-          x: snap.scale.x,
-          y: snap.scale.y,
-          z: snap.scale.z,
-          duration: 0.3,
-          ease: "power2.inOut",
-        },
-        0
-      );
-  }
+    .to(
+      img.scale,
+      {
+        x: snap.scale.x,
+        y: snap.scale.y,
+        z: snap.scale.z,
+        duration: 0.3,
+        ease: "power2.inOut",
+      },
+      0
+    );
+}
 
 onMounted(() => {
   if (window.innerWidth > 1200) {
@@ -168,7 +167,7 @@ onMounted(() => {
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
 
-   grid = new THREE.Group();
+  grid = new THREE.Group();
   threeContainer.value.appendChild(renderer.domElement);
 
   function updateContainerHeight() {
@@ -230,9 +229,44 @@ onMounted(() => {
 
             // Force update
             texture.needsUpdate = true;
+            const material = new THREE.ShaderMaterial({
+              uniforms: {
+                uTexture: { value: texture },
+                uShiftAmount: { value: 0.05 }, // max shift
+                uVelocity: { value: new THREE.Vector3() }, // movement vector
+              },
+              vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vVelocity;
+    uniform vec3 uVelocity;
 
-            const material = new THREE.MeshBasicMaterial({
-              map: texture,
+    void main() {
+      vUv = uv;
+      vVelocity = uVelocity; // pass velocity to fragment shader
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+    }
+  `,
+              fragmentShader: `
+    uniform sampler2D uTexture;
+    uniform float uShiftAmount;
+    varying vec2 vUv;
+    varying vec3 vVelocity;
+
+    void main() {
+      // compute shift based on velocity magnitude
+      float shift = clamp(length(vVelocity.xy) * uShiftAmount, 0.0, uShiftAmount);
+
+      vec2 uvR = vUv + vec2( shift, 0.0);
+      vec2 uvG = vUv;
+      vec2 uvB = vUv - vec2( shift, 0.0);
+
+      vec4 colorR = texture2D(uTexture, uvR);
+      vec4 colorG = texture2D(uTexture, uvG);
+      vec4 colorB = texture2D(uTexture, uvB);
+
+      gl_FragColor = vec4(colorR.r, colorG.g, colorB.b, colorG.a);
+    }
+  `,
               transparent: true,
             });
 
@@ -306,10 +340,46 @@ onMounted(() => {
         // Force update
         texture.needsUpdate = true;
 
-        const material = new THREE.MeshBasicMaterial({
-          map: texture,
-          transparent: true,
-        });
+        const material = new THREE.ShaderMaterial({
+              uniforms: {
+                uTexture: { value: texture },
+                uShiftAmount: { value: 1.05 }, // max shift
+                uVelocity: { value: new THREE.Vector3() }, // movement vector
+              },
+              vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vVelocity;
+    uniform vec3 uVelocity;
+
+    void main() {
+      vUv = uv;
+      vVelocity = uVelocity; // pass velocity to fragment shader
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+    }
+  `,
+              fragmentShader: `
+    uniform sampler2D uTexture;
+    uniform float uShiftAmount;
+    varying vec2 vUv;
+    varying vec3 vVelocity;
+
+    void main() {
+      // compute shift based on velocity magnitude
+      float shift = clamp(length(vVelocity.xy) * uShiftAmount, 0.0, uShiftAmount);
+
+      vec2 uvR = vUv + vec2( shift, 0.0);
+      vec2 uvG = vUv;
+      vec2 uvB = vUv - vec2( shift, 0.0);
+
+      vec4 colorR = texture2D(uTexture, uvR);
+      vec4 colorG = texture2D(uTexture, uvG);
+      vec4 colorB = texture2D(uTexture, uvB);
+
+      gl_FragColor = vec4(colorR.r, colorG.g, colorB.b, colorG.a);
+    }
+  `,
+              transparent: true,
+            });
 
         const mesh = new THREE.Mesh(geometry, material);
         mesh.userData.text =
@@ -446,10 +516,6 @@ onMounted(() => {
     });
   }
 
-
-
-
-
   Observer.create({
     target: renderer.domElement,
     type: "pointer",
@@ -458,7 +524,6 @@ onMounted(() => {
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
       console.log("click");
 
       // 🔹 OPEN
@@ -531,7 +596,7 @@ onMounted(() => {
           x: positionX,
           y: targetPos.y,
           z: targetPos.z,
-          duration: 0.6,
+          duration: 2.6,
           ease: "power2.inOut",
         },
         0
@@ -542,7 +607,7 @@ onMounted(() => {
             x: s,
             y: s,
             z: s,
-            duration: 0.6,
+            duration: 2.6,
             ease: "power2.inOut",
           },
           0
@@ -553,7 +618,7 @@ onMounted(() => {
             x: targetPos.x,
             y: targetPos.y,
             z: targetPos.z,
-            duration: 0.6,
+            duration: 2.6,
             ease: "power2.inOut",
           },
           0
@@ -564,7 +629,7 @@ onMounted(() => {
             x: scaleX,
             y: scaleY,
             z: 1,
-            duration: 0.6,
+            duration: 2.6,
             ease: "power2.inOut",
           },
           0
@@ -572,7 +637,18 @@ onMounted(() => {
     },
   });
 
+  let prevPosition = new THREE.Vector3();
+
   function animate() {
+    if (img) {
+      const velocity = new THREE.Vector3().subVectors(
+        img.position,
+        prevPosition
+      );
+      img.material.uniforms.uVelocity.value.copy(velocity);
+      prevPosition.copy(img.position);
+    }
+
     renderer.render(scene, camera);
   }
 
