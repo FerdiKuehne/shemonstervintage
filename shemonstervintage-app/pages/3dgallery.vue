@@ -97,12 +97,12 @@ onMounted(() => {
   function updateContainerHeight() {
     if (!scrollHeight) return;
     // Convert scene grid height (world units) to px scroll length
+    console.log("Update container height", scrollHeight);
     const worldToScreenRatio =
       window.innerHeight /
       (2 * Math.tan((camera.fov * Math.PI) / 360) * camera.position.z);
     const gridHeightInPx = scrollHeight * worldToScreenRatio;
-
-    containerHeight.value = (gridHeightInPx / window.innerHeight) * 100; // in vh
+    containerHeight.value = (gridHeightInPx / window.innerHeight) * 100 + 20; // in vh
   }
 
   const targetHeight = 4.5 * 0.56;
@@ -130,8 +130,6 @@ onMounted(() => {
       newImages.forEach((url, index) => {
         const indexDelta = index + grid.children.length;
         const loader = new THREE.TextureLoader();
-
-        console.log("Loading image:", indexDelta);
 
         let gridsize;
 
@@ -171,12 +169,14 @@ onMounted(() => {
 
             if (loadedCount === total) {
               const { height } = getGridSize();
-
               scrollHeight = height; // set scroll height based on grid size
+              console.log("All new images loaded", height);
               loadingMore = false;
+
               updateContainerHeight();
-              createScrollAnimation();
+
               ScrollTrigger.refresh();
+              createScrollAnimation();
               resolve();
             }
           },
@@ -244,19 +244,16 @@ onMounted(() => {
         loadedCount++;
 
         if (loadedCount === total) {
+          scene.updateMatrixWorld(true);
+          grid.updateWorldMatrix(true, true);
+
           const { width, height } = getGridSize();
           const { width: objectWidth } = getObjectSize(grid.children[0]);
           grid.position.x = -width / 2 + objectWidth / 2; // center the grid
-          console.log(grid.position.x);
-          console.log(width / 2);
-          console.log((objectWidth * gridsize) / 2);
-          console.log((itemGapX - objectWidth) / 2);
 
-          scrollHeight = height; // set scroll height based on grid size
+          scrollHeight = height * 1.3; // set scroll height based on grid size
 
-          console.log("Initial load complete, scrollHeight:", scrollHeight);
-          console.log("Grid size:", width, height);
-
+          updateContainerHeight();
           createScrollAnimation();
           loadingMore = false;
           ScrollTrigger.refresh();
@@ -268,15 +265,6 @@ onMounted(() => {
       }
     );
   });
-
-  function scrollDown(amount = 100, duration = 0.5) {
-    if (!scrollerModal.value) return;
-    gsap.to(scrollerModal.value, {
-      scrollTop: scrollerModal.value.scrollTop + amount,
-      duration: duration,
-      ease: "power2.out",
-    });
-  }
 
   grid.position.set(0, 0, 0);
   scene.add(objectModal);
@@ -340,32 +328,47 @@ onMounted(() => {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
       updateContainerHeight();
-      createScrollAnimation();
       ScrollTrigger.refresh();
     }, 200);
   });
 
   function createScrollAnimation() {
-    if (scrollTween) scrollTween.kill();
-    scrollTween = gsap.to(grid.position, {
-      y: scrollHeight,
-      ease: "none",
-      scrollTrigger: {
-        trigger: "#scroll-container",
-        start: "top top",
-        end: "bottom bottom",
-        scrub: true,
-        onUpdate: (self) => {
-          if (self.progress > 0.7 && !loadingMore) {
-            loadingMore = true;
-            loadMoreImages().then(() => {
-              ScrollTrigger.refresh();
-            });
-          }
-        },
-      },
-    });
+  if (scrollTween) {
+    scrollTween.scrollTrigger.kill();
+    scrollTween.kill();
   }
+
+  updateContainerHeight();
+
+  // Convert world grid height → px scroll length
+  const worldToScreenRatio =
+    window.innerHeight /
+    (2 * Math.tan((camera.fov * Math.PI) / 360) * camera.position.z);
+  const gridHeightInPx = scrollHeight * worldToScreenRatio;
+
+  console.log("Create scroll animation with gridHeightInPx:", gridHeightInPx);
+
+  scrollTween = gsap.to(grid.position, {
+    y: scrollHeight,
+    ease: "none",
+    scrollTrigger: {
+      trigger: "#scroll-container",
+      start: "top top",
+      end: "+=" + gridHeightInPx,
+      scrub: true,
+      onUpdate: (self) => {
+        console.log("Scroll progress:", self.progress);
+        if (self.progress > 0.4 && !loadingMore) {
+          loadingMore = true;
+          loadMoreImages().then(() => {
+            ScrollTrigger.refresh();
+          });
+        }
+      },
+    },
+  });
+}
+
 
   let activObject = false;
   let img = null;
@@ -562,11 +565,6 @@ onMounted(() => {
             },
             0
           );
-        gsap.to(scrollerModal.value, {
-          bottom: 50, // or '10%' to your liking
-          duration: 1,
-          ease: "power2.out",
-        });
 
         activObject = true;
       }
