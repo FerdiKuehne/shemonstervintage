@@ -3,16 +3,19 @@
     <div ref="threeContainer" class="three-container"></div>
     <div
       ref="scrollerModal"
-      class="modal-content"
+      class="modal-wrapper"
       :class="{ open: isModalOpen }"
     >
-      <div class="modal-text-wrapper">
-        <div class="modal-text">
-          {{ textImage }}
+      <button class="close-modal">x</button>
+      <div class="modal-content">
+        <div>
+          <div class="modal-text">
+            {{ textImage }}
+          </div>
         </div>
-      </div>
-      <div class="modal-buttons">
-        <button>Close</button>
+        <div class="modal-buttons">
+          <button>add to wishlist</button>
+        </div>
       </div>
     </div>
   </div>
@@ -562,11 +565,7 @@ onMounted(() => {
             },
             0
           );
-        gsap.to(scrollerModal.value, {
-          bottom: 50, // or '10%' to your liking
-          duration: 1,
-          ease: "power2.out",
-        });
+
 
         activObject = true;
       }
@@ -590,23 +589,56 @@ onMounted(() => {
   height: 100%;
 }
 
-.modal-content {
+.modal-wrapper {
   position: fixed;
-  bottom: -100%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 400px;
-  max-height: 60vh; /* limits the height */
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  padding: 0;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+}
+@media screen and (max-width: 768px) {
+  .modal-wrapper {
+    padding: 100vh 0 0 0;
+  }
 }
 
-.modal-text-wrapper {
-  overflow-y: auto; /* enable scroll */
-  flex: 1; /* takes all remaining vertical space */
+.modal-wrapper.open {
+  pointer-events: all;
+  display: block;
+  animation: fade-in .3s forwards;
+  animation-delay: .5s;
+}
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+
+.modal-content {
+  width: 50%;
+  height: 100vh;
   padding: 20px;
+  background-color: #fff;
+}
+@media screen and (max-width: 768px) {
+  .modal-content {
+    width: 100%;
+  }
+}
+
+.close-modal {
+  width: 48px;
+  height: 48px;
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  z-index: 1;
+  transform: translate(-50%, 0);
 }
 </style>
