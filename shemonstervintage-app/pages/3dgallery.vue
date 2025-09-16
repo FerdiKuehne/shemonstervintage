@@ -401,46 +401,77 @@ onMounted(() => {
         // Force update
         texture.needsUpdate = true;
 
-        const material = new THREE.ShaderMaterial({
+            // Three.js: ShaderMaterial für Vortex-Maske
+            const material = new THREE.ShaderMaterial({
               uniforms: {
-                uTexture: { value: texture },
+                uTexture: { value: texture },   // THREE.Texture
                 uShiftAmount: { value: 1.05 }, // max shift
+                uCenter:    { value: new THREE.Vector2(0.5, 0.5) }, // Zentrum in UV (0..1)
                 uVelocity: { value: new THREE.Vector3() }, // movement vector
+                uRadius:    { value: 0.35 },                   // Maskenradius in UV
+                uFeather:   { value: 0.02 },                   // weiche Kante
+                uStrength:  { value: 2.5 },                    // Wirbelstärke (Radians max)
               },
               vertexShader: `
-    varying vec2 vUv;
-    varying vec3 vVelocity;
-    uniform vec3 uVelocity;
-
-    void main() {
-      vUv = uv;
-      vVelocity = uVelocity; // pass velocity to fragment shader
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
-    }
-  `,
+                varying vec2 vUv;
+                void main() {
+                  vUv = uv;
+                  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+              `,
               fragmentShader: `
-    uniform sampler2D uTexture;
-    uniform float uShiftAmount;
-    varying vec2 vUv;
-    varying vec3 vVelocity;
+                precision highp float;
 
-    void main() {
-      // compute shift based on velocity magnitude
-      float shift = clamp(length(vVelocity.xy) * uShiftAmount, 0.0, uShiftAmount);
+                uniform sampler2D uTexture;
+                uniform vec2  uCenter;
+                uniform float uRadius;
+                uniform float uFeather;
+                uniform float uStrength;
 
-      vec2 uvR = vUv + vec2( shift, 0.0);
-      vec2 uvG = vUv;
-      vec2 uvB = vUv - vec2( shift, 0.0);
+                varying vec2 vUv;
 
-      vec4 colorR = texture2D(uTexture, uvR);
-      vec4 colorG = texture2D(uTexture, uvG);
-      vec4 colorB = texture2D(uTexture, uvB);
+                // rotiert "p" um "angle" um den Ursprung
+                vec2 rotate(vec2 p, float angle) {
+                  float s = sin(angle), c = cos(angle);
+                  return mat2(c, -s, s, c) * p;
+                }
 
-      gl_FragColor = vec4(colorR.r, colorG.g, colorB.b, colorG.a);
-    }
-  `,
-              transparent: true,
+                void main() {
+                  // Abstand vom Zentrum in UV
+                  float d = distance(vUv, uCenter);
+
+                  // --- Maske ---
+                  // weicher Maskenwert: 1 innen, 0 außen
+                  float mask = 1.0 - smoothstep(uRadius - uFeather, uRadius, d);
+
+                  // Optional harte Kante: wenn du wirklich *nichts* außerhalb zeichnen willst,
+                  // nutze discard (spart Fill, aber bricht Transparenz/Blending an der Kante hart ab):
+                  // if (d > uRadius) discard;
+
+                  // --- Vortex / Swirl ---
+                  // Winkel-Offset nimmt zur Kante hin ab (0 am Rand, max in der Mitte)
+                  float t = clamp(1.0 - d / uRadius, 0.0, 1.0);
+                  float angle = uStrength * t * t; // easing (quadratisch) für glatteren Verlauf
+
+                  // wirbeln um uCenter
+                  vec2 offset = vUv - uCenter;
+                  vec2 uvSwirled = uCenter + rotate(offset, angle);
+
+                  // außerhalb des Radius bleiben die UV unverändert (optional):
+                  uvSwirled = mix(vUv, uvSwirled, step(d, uRadius));
+
+                  vec4 tex = texture2D(uTexture, uvSwirled);
+
+                  // weiche Maskierung über Alpha
+                  gl_FragColor = vec4(tex.rgb, tex.a * mask);
+                }
+              `,
+              transparent: true,           // wichtig für Alpha-Maskierung
+              depthWrite: false,           // oft sinnvoll bei halbtransparenter Kante
+              // alphaTest: 0.5,           // optional: wenn du harte Kante via Alpha willst (keine Blending-Halbkanten)
             });
+
+
 
         const mesh = new THREE.Mesh(geometry, material);
         mesh.userData.text =
