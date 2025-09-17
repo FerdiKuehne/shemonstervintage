@@ -1,67 +1,64 @@
-import { AssetsId } from "../composables/three/constants/AssetsId";
-import { AssetsManager } from "@/composables/three/managers/AssetsManager.js";
-import { Grid } from "@/composables/three/components/Grid.js";
-import { MainThree } from "@/composables/three/MainThree.js";
-import { Ticker } from "@/composables/three/utils/Ticker.js";
+import {
+  Scene,
+  Color,
+  PerspectiveCamera,
+  WebGLRenderer,
+  AxesHelper,
+  GridHelper,
+} from "three";
+import { createBackgroundSphere } from "./backgroundsphere.js";
+import { initGrid } from "./grid.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { gsap } from "gsap";
 
-export class Main {
 
-  indexMaske = "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCFNNNN.jpg";
 
-  static async Init() {
+async function run(container, containerHeight) {
+  const scene = new Scene();
+  const sphere = createBackgroundSphere();
+  const renderer = new WebGLRenderer({ antialias: true });
+  const axesHelper = new AxesHelper(30);
+  const gridHelper = new GridHelper(20, 20);
+  
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  const camera = new PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+  container.appendChild(renderer.domElement);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.enableZoom = false;
+  controls.dampingFactor = 0.05;
+  controls.target.set(0, 0, 0);
+  const grid = await initGrid(renderer);
 
-    MainThree.Init();
-    Ticker.Start();
+  scene.background = new Color(0x000000);
+  camera.position.z = 6;
+  gridHelper.rotation.x = Math.PI / 2;
+  controls.update();
 
-    await this.#_LoadAssets();
-    this.#_CreateScene();
+  /* add Objects */
+  scene.add(axesHelper);
+  scene.add(gridHelper);
+  scene.add(sphere);
+  scene.add(grid);
+
+  /* End add Objects */
+
+
+  function animate() {
+    controls.update();
+    renderer.render(scene, camera);
   }
 
+  renderer.setAnimationLoop(animate);
 
-  static async #_LoadAssets() {
-
-    for (let i = 129; i < 150; i++) {
-      const indexpicture = i.toString().padStart(4, '0');
-      const imageUrl = indexMaske.replace("NNNN", indexpicture);
-      
-      try {
-        const response = await fetch(imageUrl, { method: 'HEAD' });
-        if (response.ok) {
-          AssetsManager.AddTexture(AssetsId[`TEXTURE_${i}`], `${imageUrl}`);
-        }
-      } catch (error) {
-        console.warn(`Image not found: ${imageUrl}`);
-      }
-    }
-    await AssetsManager.Load();
-  }
-
-  static #_CreateScene() {
-    MainThree.Add(new Grid());
-  }
-
-
+  return { grid, camera, renderer };
 }
 
-
-
-const indexMaske = "http://localhost:3000/_nuxt/public/img/sabo.stock/DSCFNNNN.jpg";
-
-async function loadImages() {
-  for (let i = 129; i < 1423; i++) {
-    const indexpicture = i.toString().padStart(4, '0');
-    const imageUrl = indexMaske.replace("NNNN", indexpicture);
-    
-    try {
-      const response = await fetch(imageUrl, { method: 'HEAD' });
-      if (response.ok) {
-        images.value.push(imageUrl);
-      }
-    } catch (error) {
-      console.warn(`Image not found: ${imageUrl}`);
-    }
-  }
-
-  loading.value = false;
-}
-
+export { run };

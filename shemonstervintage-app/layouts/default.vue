@@ -132,9 +132,7 @@
 <script setup>
 import { NuxtPage } from "#components";
 import { useI18n } from "vue-i18n";
-import { useWishlist } from "@/composables/useWishlist";
 
-const { wishes } = useWishlist();
 
 const { locales, setLocale } = useI18n();
 
