@@ -9,12 +9,8 @@ import {
 import { createBackgroundSphere } from "./backgroundsphere.js";
 import { initGrid } from "./grid.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { gsap } from "gsap";
 
-
-
-async function run(container, containerHeight) {
+async function run(container, containerHeight, scrollContainer) {
   const scene = new Scene();
   const sphere = createBackgroundSphere();
   const renderer = new WebGLRenderer({ antialias: true });
@@ -29,16 +25,18 @@ async function run(container, containerHeight) {
     0.1,
     1000
   );
-  container.appendChild(renderer.domElement);
+  camera.position.z = 6;
+  container.value.appendChild(renderer.domElement);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.enableZoom = false;
   controls.dampingFactor = 0.05;
   controls.target.set(0, 0, 0);
-  const grid = await initGrid(renderer);
+
+  const grid = await initGrid(renderer,camera, containerHeight,scrollContainer);
 
   scene.background = new Color(0x000000);
-  camera.position.z = 6;
+
   gridHelper.rotation.x = Math.PI / 2;
   controls.update();
 
@@ -57,8 +55,6 @@ async function run(container, containerHeight) {
   }
 
   renderer.setAnimationLoop(animate);
-
-  return { grid, camera, renderer };
 }
 
 export { run };

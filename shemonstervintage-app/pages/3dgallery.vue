@@ -3,21 +3,20 @@ import { onMounted } from "vue";
 import { run } from "~/composables/main.js";
 
 
-
 const threeContainer = ref(null);
-const containerHeight = ref(null);
-
+const containerHeight = ref(100);
+const scrollContainer = ref(null);
 
 onMounted(async () => {
   await nextTick();
-  if (threeContainer.value) {
-    run(threeContainer.value,containerHeight);
+  if (threeContainer.value && scrollContainer.value)  {
+    run(threeContainer,containerHeight,scrollContainer);
   }
 });
 </script>
 
 <template>
-  <div id="scroll-container" :style="{ height: containerHeight + 'vh' }">
+  <div id="scroll-container" ref="scrollContainer" :style="{ height: containerHeight + 'vh' }">
     <div ref="threeContainer" class="three-container"></div>
   </div>
 </template>
