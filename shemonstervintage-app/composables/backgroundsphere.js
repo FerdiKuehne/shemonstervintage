@@ -1,7 +1,7 @@
 import { SphereGeometry, MeshBasicMaterial, Mesh, TextureLoader, DoubleSide } from 'three';
 
 function createBackgroundSphere() {
-  const geom = new SphereGeometry(500, 60, 40);
+  const geom = new SphereGeometry(50, 60, 40);
   geom.scale(-1, 1, 1); // invert the sphere to see the texture from inside
 
   // Load texture

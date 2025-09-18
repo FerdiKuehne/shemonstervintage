@@ -6,13 +6,17 @@ import {
   LinearFilter,
   NearestFilter,
   Mesh,
-  MeshBasicMaterial,
   Box3,
   Vector3,
+  ShaderMaterial
 } from "three";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { nextTick } from "vue";
+import vertexShader from './shaders/vertex.glsl?raw';
+import fragmentShader from './shaders/fragment.glsl?raw';
+
+
 
 let gridSize, currendGrid;
 let resizeTimeout;
@@ -100,7 +104,13 @@ async function loadGridImages(grid, images, renderer) {
           texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
           texture.needsUpdate = true;
 
-          const material = new MeshBasicMaterial({ map: texture });
+          const material = new ShaderMaterial({
+            vertexShader: vertexShader,
+            fragmentShader: fragmentShader,
+            uniforms: {
+              uTexture: { value: texture }
+            }
+          });
           const mesh = new Mesh(geometry, material);
 
           setGridPosition(indexDelta, gridSize, mesh);
