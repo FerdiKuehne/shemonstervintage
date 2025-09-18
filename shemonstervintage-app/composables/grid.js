@@ -14,8 +14,8 @@ import {
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { nextTick } from "vue";
-import vertexShader from './shaders/vertex.glsl?raw';
-import fragmentShader from './shaders/fragment.glsl?raw';
+import vertexShader from './shaders/griditems/vertex.glsl?raw';
+import fragmentShader from './shaders/griditems/fragment.glsl?raw';
 
 
 
