@@ -8,7 +8,8 @@ import {
   Mesh,
   Box3,
   Vector3,
-  ShaderMaterial
+  ShaderMaterial,
+  Vector2
 } from "three";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -108,7 +109,11 @@ async function loadGridImages(grid, images, renderer) {
             vertexShader: vertexShader,
             fragmentShader: fragmentShader,
             uniforms: {
-              uTexture: { value: texture }
+              uTexture: { value: texture },
+              uCenter: { value: new Vector2(0.5, 0.5) },
+              uRadius: { value: 0.5 },
+              uFeather: { value: 0.05 },
+              uStrength: { value: 2.0 }
             }
           });
           const mesh = new Mesh(geometry, material);
