@@ -112,9 +112,10 @@ async function loadGridImages(grid, images, renderer) {
               uTexture: { value: texture },
               uCenter: { value: new Vector2(0.5, 0.5) },
               uRadius: { value: 0.5 },
-              uFeather: { value: 0.05 },
-              uStrength: { value: 2.0 }
-            }
+              uFeather: { value: 0.5 },
+              uStrength: { value: 33.0 }
+            },
+            transparent: true,
           });
           const mesh = new Mesh(geometry, material);
 

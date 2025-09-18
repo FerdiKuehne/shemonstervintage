@@ -1,19 +1,23 @@
-import { SphereGeometry, MeshBasicMaterial, Mesh, TextureLoader, DoubleSide } from 'three';
+import { SphereGeometry, ShaderMaterial, Mesh, TextureLoader } from 'three';
+import vertexShader from './shaders/backgroundsphere/vertex.glsl?raw';
+import fragmentShader from './shaders/backgroundsphere/fragment.glsl?raw';
 
 function createBackgroundSphere() {
   const geom = new SphereGeometry(50, 60, 40);
   geom.scale(-1, 1, 1); // invert the sphere to see the texture from inside
 
-  // Load texture
-  const loader = new TextureLoader();
-  const texture = loader.load('https://shemonstervintage.de/img/panorama.jpg');
+  const texture = new TextureLoader().load('https://shemonstervintage.de/img/panorama.jpg');
 
-  const mat = new MeshBasicMaterial({
-    map: texture, // assign texture
-    side: DoubleSide, // make sure it's visible inside
+  const material = new ShaderMaterial({
+    uniforms: {
+      uTexture: { value: texture },
+    },
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
+    side: 2, // DoubleSide
   });
-
-  const sphere = new Mesh(geom, mat);
+  
+  const sphere = new Mesh(geom, material);
   return sphere;
 }
 
