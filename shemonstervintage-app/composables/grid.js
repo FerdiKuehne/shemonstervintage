@@ -105,6 +105,8 @@ async function loadGridImages(grid, images, renderer) {
           texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
           texture.needsUpdate = true;
 
+          /* Tonek´s Area */
+
           const material = new ShaderMaterial({
             vertexShader: vertexShader,
             fragmentShader: fragmentShader,
@@ -160,23 +162,23 @@ function getGridHeightInPx(camera) {
 
 function updateContainerHeight(containerHeightRef, camera) {
     const gridWorldHeight = getGridSize().height; // total height of the grid in world units
-  
+
     // Compute visible height of camera in world units
     const frustumHeight = 2 * camera.position.z * Math.tan((camera.fov * Math.PI) / 360);
-  
+
     // Convert world units to vh:
     // The visible part (frustumHeight) corresponds to 100vh
     const vhPerUnit = 100 / frustumHeight;
     const gridHeightInVh = gridWorldHeight * vhPerUnit + 5; // small padding to avoid cutting off
-  
+
     containerHeightRef.value = gridHeightInVh;
     console.log("Updated container height (vh):", containerHeightRef.value);
     console.log("Grid world height:", gridWorldHeight, "Camera frustum height:", frustumHeight);
   }
-  
+
   function createScrollTrigger(camera, renderer, containerHeight, scrollContainer) {
     getGridHeightInPx(camera);
-  
+
     // create scrollTrigger without tweening grid.position internally
     scrollTrigger = ScrollTrigger.create({
       trigger: scrollContainer,
@@ -186,35 +188,35 @@ function updateContainerHeight(containerHeightRef, camera) {
       onUpdate: async (self) => {
         // directly control grid y based on progress
         grid.position.y = self.progress * (gridWorldHeight - (3 * targetHeight) ) + targetHeight;
-  
+
         console.log("Grid.pos.y:", grid.position.y);
         console.log("gridworldheight:", gridWorldHeight);
         console.log("progress:", self.progress);
         console.log("ScrollerStart:", self.start);
         console.log("ScrollerEnd:", self.end);
-  
+
         // load more images dynamically
         if (grid.children.length < 200 && self.progress > 0.7 && !loadingMore) {
           loadingMore = true;
           await loadGridImages(grid, images, renderer);
-  
+
           // update container height based on camera frustum
           updateContainerHeight(containerHeight, camera);
-  
+
           await nextTick(); // wait for Vue to re-render
-  
+
           // recalc ScrollTrigger end
           ScrollTrigger.refresh();
-  
+
           // ensure grid y is correct after refresh
           grid.position.y = self.progress * gridWorldHeight;
-  
+
           loadingMore = false;
         }
       },
     });
   }
-  
+
 
 async function initGrid(renderer, camera, containerHeight, scrollContainer) {
   const scrollEl = scrollContainer.value;
