@@ -115,7 +115,7 @@ async function loadGridImages(grid, images, renderer) {
               uCenter: { value: new Vector2(0.5, 0.5) },
               uRadius: { value: 0.5 },
               uFeather: { value: 0.5 },
-              uStrength: { value: 33.0 }
+              uStrength: { value: 1.0 }
             },
             transparent: true,
           });
@@ -175,6 +175,7 @@ function updateContainerHeight(containerHeightRef, camera) {
     containerHeightRef.value = gridHeightInVh;
     console.log("Updated container height (vh):", containerHeightRef.value);
     console.log("Grid world height:", gridWorldHeight, "Camera frustum height:", frustumHeight);
+    ScrollTrigger.refresh();
   }
 
   function createScrollTrigger(camera, renderer, containerHeight, scrollContainer) {
@@ -228,16 +229,11 @@ async function initGrid(renderer, camera, containerHeight, scrollContainer) {
   grid.position.x = -totalWidth / 2 + targetWidth / 2;
   grid.position.y = targetHeight;
 
-  console.log("Before: ", containerHeight.value);
-
   await loadGridImages(grid, images, renderer);
   updateContainerHeight(containerHeight, camera);
 
-  console.log("After: ", containerHeight.value);
-
   createScrollTrigger(camera, renderer, containerHeight, scrollEl);
 
-  console.log("Scroller: ", containerHeight.value);
 
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -251,11 +247,11 @@ async function initGrid(renderer, camera, containerHeight, scrollContainer) {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
       updateContainerHeight(containerHeight, camera);
-      ScrollTrigger.refresh();
+      
     }, 200);
   });
 
   return grid;
 }
 
-export { initGrid };
+export { initGrid, updateContainerHeight };

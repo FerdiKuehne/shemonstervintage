@@ -10,11 +10,12 @@ import {
   PlaneGeometry,
   MeshBasicMaterial,
     Mesh,
-    DoubleSide
+    DoubleSide,
+    BoxGeometry
 } from "three";
 import gsap from "gsap";
-import { createBackgroundSphere } from "./backgroundsphere.js";
-import { initGrid } from "./grid.js";
+import { createBackgroundSphere } from "./backgroundsphere.js"; 
+import { initGrid, updateContainerHeight } from "./grid.js"; 
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { Observer } from "gsap/Observer";
 
@@ -55,13 +56,14 @@ plane.position.set(0, 2, 3);
   axesHelper.layers.set(1);
   gridHelper.layers.set(1);
   raycaster.layers.set(0);
-
+/*
   const grid = await initGrid(
     renderer,
     camera,
     containerHeight,
     scrollContainer
   );
+  */
 
   zoomSpace.to(camera.position, {
     duration: 1,
@@ -71,7 +73,7 @@ plane.position.set(0, 2, 3);
     ease: "power2.inOut",
   });
 
-  grid.visible = false;
+  /* grid.visible = false; */
   scene.background = new Color(0x000000);
 
   gridHelper.rotation.x = Math.PI / 2;
@@ -80,14 +82,16 @@ plane.position.set(0, 2, 3);
   /* add Objects */
   scene.add(axesHelper);
   scene.add(gridHelper);
-  scene.add(sphere);
-  scene.add(grid);
-  scene.add(plane);
+
+
+
+ scene.add(sphere);
+ /* scene.add(grid);
+  scene.add(plane); *7
 
   /* End add Objects */
 
-  /* Observer click object */
-
+/*
   Observer.create({
     target: renderer.domElement,
     type: "pointer",
@@ -101,23 +105,30 @@ plane.position.set(0, 2, 3);
       const hits = raycaster.intersectObjects([scene], true);
       if (!hits.length) return;
       selectedObj = hits[0].object;
+      /* 
       if (selectedObj.geometry.type === "SphereGeometry") {
         if (!zoomedIn) {
             zoomSpace.play();     
-          } else {
+          } 
+          /*
+          else {
             zoomSpace.reverse();
-          }
+          } 
+            
           zoomedIn = !zoomedIn;
-      } if(selectedObj.userData.name === "openGrid"){
+      }  
+      
+      /*
+      if(selectedObj.userData.name === "openGrid"){
         if(!grid.visible) {
             grid.visible = true;
         } else {
             grid.visible = false;
         }
       }
-      console.log("Selected object:", selectedObj);
-    },
-  });
+*/
+
+  
 
   function animate() {
     controls.update();

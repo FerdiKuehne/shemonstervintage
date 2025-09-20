@@ -1,24 +1,39 @@
-import { SphereGeometry, ShaderMaterial, Mesh, TextureLoader } from 'three';
-import vertexShader from './shaders/backgroundsphere/vertex.glsl?raw';
-import fragmentShader from './shaders/backgroundsphere/fragment.glsl?raw';
+import { SphereGeometry, ShaderMaterial, Mesh, TextureLoader, DoubleSide } from "three";
+import vertexShader from "./shaders/backgroundsphere/vertex.glsl?raw";
+import fragmentShader from "./shaders/backgroundsphere/fragment.glsl?raw";
 
-function createBackgroundSphere() {
-  const geom = new SphereGeometry(50, 60, 40);
-  geom.scale(-1, 1, 1); // invert the sphere to see the texture from inside
+export async function createBackgroundSphereFromAPI(dpr = window.devicePixelRatio || 1) {
+  // Fetch device-specific texture with DPR parameter
+  const res = await fetch(`/test/api/texture.php?dpr=${dpr}`);
+  const data = await res.json();
 
-  const texture = new TextureLoader().load('https://shemonstervintage.de/img/panorama.jpg');
+  // Geometry
+  const geom = new SphereGeometry(10, 60, 40);
+  geom.scale(-1, 1, 1); // inside-out sphere
 
+  let textureUrl = `/test${data.texture}`; // prepend /test
+  // Load texture asynchronously
+  const texture = await new Promise((resolve, reject) => {
+    new TextureLoader().load(
+      textureUrl,
+      (loadedTexture) => resolve(loadedTexture),
+      undefined,
+      (err) => reject(err)
+    );
+  });
+
+  // Shader material (after texture loaded)
   const material = new ShaderMaterial({
     uniforms: {
       uTexture: { value: texture },
+      uTime: { value: 0 },
+      uAmplitude: { value: 0 },
     },
-    vertexShader: vertexShader,
-    fragmentShader: fragmentShader,
-    side: 2, // DoubleSide
+    vertexShader,
+    fragmentShader,
+    side: DoubleSide,
   });
-  
-  const sphere = new Mesh(geom, material);
-  return sphere;
-}
 
-export { createBackgroundSphere };
+  // Mesh
+  return new Mesh(geom, material);
+}

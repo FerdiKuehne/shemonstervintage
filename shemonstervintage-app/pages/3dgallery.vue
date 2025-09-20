@@ -1,115 +1,135 @@
-<script setup>
-import { onMounted } from "vue";
-import { run } from "~/composables/main.js";
-
-
-const threeContainer = ref(null);
-const containerHeight = ref(100);
-const scrollContainer = ref(null);
-
-onMounted(async () => {
-  await nextTick();
-  if (threeContainer.value && scrollContainer.value)  {
-    run(threeContainer,containerHeight,scrollContainer);
-  }
-});
-</script>
-
 <template>
-  <div id="scroll-container" ref="scrollContainer" :style="{ height: containerHeight + 'vh' }">
+  <div>
     <div ref="threeContainer" class="three-container"></div>
+    <button class="enter-btn" @click="moveCamera">{{ buttonText }}</button>
   </div>
 </template>
 
+<script setup>
+import { onMounted, ref } from "vue";
+import { Scene, PerspectiveCamera, WebGLRenderer } from "three";
+import { createBackgroundSphereFromAPI } from "@/composables/backgroundsphere.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import gsap from "gsap";
+
+const threeContainer = ref(null);
+const buttonText = ref("Enter");
+let camera, controls, cameraTween, sphere;
+
+function moveCamera() {
+  if (!camera || !controls) return;
+  if (cameraTween) cameraTween.kill();
+
+  const goingIn = buttonText.value === "Enter"; // true when zooming in
+  const targetZ = goingIn ? 5 : 50;
+  buttonText.value = goingIn ? "Back" : "Enter";
+
+  const startTime = performance.now();
+
+  // Camera tween
+  cameraTween = gsap.to(camera.position, {
+    duration: 1,
+    z: targetZ,
+    x: 0,
+    y: 0,
+    ease: "power2.inOut",
+    onUpdate: () => {
+      const elapsed = (performance.now() - startTime) * 0.001;
+      sphere.material.uniforms.uTime.value = elapsed;
+      controls.update();
+    },
+    onStart: () => {
+      // Warp up when entering
+      gsap.to(sphere.material.uniforms.uAmplitude, {
+        value: 1.0,
+        duration: 0.3,
+        ease: "power2.inOut",
+      });
+    },
+    onComplete: () => {
+      // Warp fade + reset uTime
+      gsap.to(sphere.material.uniforms.uAmplitude, {
+        value: 0.0,
+        duration: 0.3,
+        ease: "power2.out",
+        onComplete: () => {
+          sphere.material.uniforms.uTime.value = 0.0; // reset warp phase
+        },
+      });
+      camera.position.x = 0;
+      camera.position.y = 0;
+    },
+  });
+}
+
+onMounted(async () => {
+  if (!threeContainer.value) return;
+
+  const scene = new Scene();
+  sphere = await createBackgroundSphereFromAPI(window.devicePixelRatio || 1);
+
+  const renderer = new WebGLRenderer({ antialias: true });
+  camera = new PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.enableZoom = false;
+  controls.dampingFactor = 0.05;
+  controls.target.set(0, 0, 0);
+  camera.position.z = 50;
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  threeContainer.value.appendChild(renderer.domElement);
+
+  scene.add(sphere);
+
+  function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+});
+</script>
+
 <style scoped>
 .three-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.modal-wrapper {
-  position: fixed;
-  top: 0;
-  left: 0;
   width: 100%;
   height: 100vh;
-  padding: 0;
-  overflow-y: scroll;
-  overflow-x: hidden;
-  display: none;
-  opacity: 0;
-  pointer-events: none;
-}
-@media screen and (max-width: 768px) {
-  .modal-wrapper {
-    padding: 100vh 0 0 0;
-  }
-}
-
-.modal-wrapper.open {
-  pointer-events: all;
   display: block;
-  animation: fade-in 0.3s forwards;
-  animation-delay: 0.5s;
-}
-@keyframes fade-in {
-  0% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-  }
+  position: relative;
 }
 
-.modal-content {
-  width: 50%;
-  height: 100vh;
-  padding: 20px;
-  background-color: #fff;
-}
-@media screen and (max-width: 768px) {
-  .modal-content {
-    width: 100%;
-  }
-}
-
-.close-modal {
-  width: 48px;
-  height: 48px;
+/* Overlay button styling */
+.enter-btn {
   position: absolute;
-  bottom: 1rem;
   left: 50%;
-  z-index: 1;
-  transform: translate(-50%, 0);
-}
-
-#ui {
-  position: fixed;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 70%;
+  transform: translate(
+    -50%,
+    30px
+  ); /* horizontally centered, 30px below center */
   z-index: 10;
-  background: rgba(12, 16, 22, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 8px 10px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #fff;
-  padding: 7px 12px;
-  border-radius: 8px;
-  cursor: pointer;
+  padding: 12px 24px;
+  font-size: 16px;
   font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: background 0.2s;
 }
-input[type="file"] {
-  display: none;
+.enter-btn:hover {
+  background-color: rgba(255, 255, 255, 1);
 }
 </style>
