@@ -4,7 +4,7 @@
   <header>
 
     <ul class="main-nav">
-      <li><NuxtLink to="/"><span class="num">01</span> Home</NuxtLink></li>
+      <li @click="moveCamera"><span class="num">01</span> Home</li>
       <li><NuxtLink to="/"><span class="num">02</span> About</NuxtLink></li>
       <li><NuxtLink to="/gallery"><span class="num">03</span> Gallery</NuxtLink></li>
       <li><NuxtLink to="/anfahrt"><span class="num">04</span> Location</NuxtLink></li>
@@ -150,11 +150,11 @@ ul.main-nav {
   padding: 0;
 }
 
-ul.main-nav li a {
+ul.main-nav li {
+  cursor: pointer;
   min-width: 300px;
   display: block;
   text-transform: uppercase;
-  text-decoration: none;
   font-size: 1rem;
   font-weight: bolder;
   color: #000;
@@ -163,26 +163,31 @@ ul.main-nav li a {
 }
 
 
-ul.main-nav li a:hover {
+ul.main-nav li:hover {
   font-size: 5rem;
   line-height: 5rem;
   transition: font-size .3s, line-height .3s;
 }
 
-ul.main-nav li a .num {
+ul.main-nav li .num {
   display: inline-block;
   font-size: 1rem;
   transform: translate(0, 0);
   transition: font-size .3s, transform .3s;
 }
 
-ul.main-nav li a:hover .num {
+ul.main-nav li:hover .num {
   font-size: 2rem;
   transform: translate(0, -33px);
   transition: font-size .3s, transform .3s;
 }
 
-ul.main-nav li a:hover:after {
+ul.main-nav li a {
+  color: #000;
+  text-decoration: none;
+}
+
+ul.main-nav li:hover a:after {
   content: "_";
   animation: blink .3s infinite;
 }
