@@ -1,12 +1,13 @@
 <template>
   <header>
-    <NuxtLink to="/">Home</NuxtLink>
-    <NuxtLink to="/impressum">impressu ↑ </NuxtLink>
-    <NuxtLink to="/kontakt">kontakt ↓ </NuxtLink>
-    <NuxtLink to="/anfahrt">anfahrt ← </NuxtLink>
-    <NuxtLink to="/Datenschutz">Datenschutz → </NuxtLink>
-    <NuxtLink to="/gallery">gallery</NuxtLink>
-    <NuxtLink to="/test">test reset</NuxtLink>
+
+    <ul class="main-nav">
+      <li><NuxtLink to="/">Home</NuxtLink></li>
+      <li><NuxtLink to="/gallery">Gallery</NuxtLink></li>
+      <li><NuxtLink to="/kontakt">Contact</NuxtLink></li>
+      <li><NuxtLink to="/anfahrt">Location</NuxtLink></li>
+    </ul>
+
   </header>
 
   <div id="app">
@@ -16,7 +17,19 @@
     <button class="enter-btn" @click="moveCamera">{{ buttonText }}</button>
     <NuxtLayout />
   </div>
+
+
+  <footer>
+    <ul class="footer-nav">
+      <li><NuxtLink to="/Datenschutz">Privacy Policy</NuxtLink></li>
+      <li><NuxtLink to="/impressum">Imprint </NuxtLink></li>
+      <li><NuxtLink to="/test">test reset</NuxtLink></li>
+    </ul>
+  </footer>
+
+
 </template>
+
 
 <script setup>
 import gsap from "gsap";
@@ -99,16 +112,76 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+
+*,
+*:after,
+*:before {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 header {
-  position: relative;
-  z-index: 10;
-  padding: 1rem;
-  color: white;
-  background: rgba(0,0,0,0.5);
+  position: fixed;
+  top: 50%;
+  left: 1rem;
+  z-index: 20;
+  transform: translate(0, -50%);
+}
+
+ul.main-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+ul.main-nav li a {
+  width: 300px;
+  display: block;
+  text-transform: uppercase;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: bolder;
+  color: #000;
+  line-height: 2rem;
+  transition: font-size .3s, line-height .3s;
+}
+
+ul.main-nav li a:hover {
+  font-size: 5rem;
+  line-height: 5rem;
+  transition: font-size .3s, line-height .3s;
+}
+
+footer {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+}
+
+ul.footer-nav {
+  display: flex;
+  list-style: none;
+}
+
+ul.footer-nav li {
+  margin: 0 .5rem;
+}
+
+ul.footer-nav li:first-child {
+  margin: 0 .5rem 0 0;
+}
+
+ul.footer-nav li a {
+  font-size: .8rem;
+  text-decoration: none;
+  color: #000;
+  filter: invert(1);
+  display: block;
 }
 
 .three-container {
-  pointer-events: auto; 
+  pointer-events: auto;
   position: fixed;
   top: 0;
   left: 0;
