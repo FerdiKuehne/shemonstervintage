@@ -1,4 +1,6 @@
 <template>
+
+  <div class="logo">SHEMONSTER</div>
   <header>
 
     <ul class="main-nav">
@@ -120,6 +122,17 @@ onMounted(async () => {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+
+.logo {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1;
+  font-size: 1.5rem;
+  font-weight: bolder;
+  letter-spacing: -1.5px;
 }
 
 header {
