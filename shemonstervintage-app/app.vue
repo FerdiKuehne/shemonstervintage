@@ -3,9 +3,10 @@
 
     <ul class="main-nav">
       <li><NuxtLink to="/"><span class="num">01</span> Home</NuxtLink></li>
-      <li><NuxtLink to="/gallery"><span class="num">02</span>  Gallery</NuxtLink></li>
-      <li><NuxtLink to="/anfahrt"><span class="num">03</span>  Location</NuxtLink></li>
-      <li><NuxtLink to="/kontakt"><span class="num">04</span>  Contact</NuxtLink></li>
+      <li><NuxtLink to="/"><span class="num">02</span> About</NuxtLink></li>
+      <li><NuxtLink to="/gallery"><span class="num">03</span> Gallery</NuxtLink></li>
+      <li><NuxtLink to="/anfahrt"><span class="num">04</span> Location</NuxtLink></li>
+      <li><NuxtLink to="/kontakt"><span class="num">05</span> Contact</NuxtLink></li>
     </ul>
 
   </header>
