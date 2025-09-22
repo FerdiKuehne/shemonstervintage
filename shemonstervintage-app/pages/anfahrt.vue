@@ -1,6 +1,7 @@
 <template>
   <div>
-    <div class="container mt-2">
+    <div class="container-fluid p-0">
+      <div class="page-headline">LOCATION</div>
       <div class="row">
         <div class="col-12">
           <div class="text-start">

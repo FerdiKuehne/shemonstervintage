@@ -132,6 +132,7 @@ onMounted(async () => {
   z-index: 1;
   font-size: 1.5rem;
   font-weight: bolder;
+  color: #000;
   letter-spacing: -1.5px;
 }
 
@@ -247,4 +248,12 @@ ul.footer-nav li a {
 .enter-btn:hover {
   background-color: rgba(255, 255, 255, 1);
 }
+</style>
+
+
+<style>
+  .page-headline {
+    color: #000;
+    padding: 1.2rem 1rem 0 170px;
+  }
 </style>

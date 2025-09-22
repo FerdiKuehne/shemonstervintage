@@ -1,5 +1,8 @@
 <template>
   <div>
+    <div class="container-fluid p-0">
+      <div class="page-headline">GALLERY</div>
+    </div>
     <div ref="threeContainer" class="three-container"></div>
     <button class="enter-btn" @click="moveCamera">{{ buttonText }}</button>
   </div>

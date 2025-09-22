@@ -1,5 +1,7 @@
 <template>
-  <div>Test</div>
+  <div class="container-fluid p-0">
+    <div class="page-headline">TEST</div>
+  </div>
 </template>
 
 <script setup>

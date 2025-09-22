@@ -21,5 +21,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>Home</div>
+  <div>
+    <div class="container-fluid p-0">
+      <div class="page-headline">HOME</div>
+    </div>
+  </div>
 </template>

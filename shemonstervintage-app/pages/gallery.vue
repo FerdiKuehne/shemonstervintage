@@ -1,18 +1,18 @@
 <template>
-  <div class="container mt-5">
-    <div>gallery lets goooooooooo</div>
+  <div class="container-fluid p-0">
+    <div class="page-headline">GALLERY</div>
   </div>
 </template>
 
 <script setup>
 import { onMounted, watchEffect, ref } from "vue";
-import { initGrid, updateContainerHeight } from "@/composables/grid.js"; 
+import { initGrid, updateContainerHeight } from "@/composables/grid.js";
 
 definePageMeta({
   layout: 'three'
 })
 
-const containerHeight = ref(100); // vh 
+const containerHeight = ref(100); // vh
 
 const { $three } = useNuxtApp();
 
