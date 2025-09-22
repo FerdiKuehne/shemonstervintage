@@ -181,7 +181,7 @@ ul.main-nav li a:hover:after {
 footer {
   position: fixed;
   bottom: 1rem;
-  left: 1rem;
+  right: 1rem;
 }
 
 ul.footer-nav {
@@ -201,7 +201,6 @@ ul.footer-nav li a {
   font-size: .8rem;
   text-decoration: none;
   color: #000;
-  filter: invert(1);
   display: block;
 }
 
