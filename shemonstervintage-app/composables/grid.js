@@ -198,9 +198,10 @@ function updateContainerHeight(containerHeightRef, camera) {
         console.log("ScrollerEnd:", self.end);
 
         // load more images dynamically
-        if (grid.children.length < 200 && self.progress > 0.7 && !loadingMore) {
+        if (grid.children.length < 46 && self.progress > 0.7 && !loadingMore) {
           loadingMore = true;
-          await loadGridImages(grid, images, renderer);
+
+       /*    await loadGridImages(grid, images, renderer);
 
           // update container height based on camera frustum
           updateContainerHeight(containerHeight, camera);
@@ -212,7 +213,7 @@ function updateContainerHeight(containerHeightRef, camera) {
 
           // ensure grid y is correct after refresh
           grid.position.y = self.progress * gridWorldHeight;
-
+*/
           loadingMore = false;
         }
       },

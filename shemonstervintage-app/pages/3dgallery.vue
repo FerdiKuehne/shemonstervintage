@@ -6,11 +6,13 @@
 </template>
 
 <script setup>
+
 import { onMounted, ref } from "vue";
 import { Scene, PerspectiveCamera, WebGLRenderer } from "three";
 import { createBackgroundSphereFromAPI } from "@/composables/backgroundsphere.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import gsap from "gsap";
+
 
 const threeContainer = ref(null);
 const buttonText = ref("Enter");

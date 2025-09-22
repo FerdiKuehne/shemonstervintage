@@ -1,4 +1,3 @@
-// plugins/bootstrap-vue.client.ts
 import { defineNuxtPlugin } from '#app'
 import BootstrapVue3 from 'bootstrap-vue-3'
 

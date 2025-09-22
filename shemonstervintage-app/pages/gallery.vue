@@ -1,64 +1,38 @@
 <template>
-  <div class="container py-4">
-    <componentGallery :images="images" />
+  <div class="container mt-5">
+    <div>gallery lets goooooooooo</div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from "vue";
-import componentGallery from "~/components/componentGallery.vue";
+import { onMounted, watchEffect, ref } from "vue";
+import { initGrid, updateContainerHeight } from "@/composables/grid.js"; 
 
 definePageMeta({
-  name: "gallery",
-});
+  layout: 'three'
+})
 
-const images = ref([]);
-const loading = ref(false);
-const imgIndex = ref(0);
+const containerHeight = ref(100); // vh 
 
-function checkIfNearBottom() {
-  const scrollPosition = window.innerHeight + window.scrollY;
-  const threshold = document.body.scrollHeight - 800;
-  if (scrollPosition >= threshold && !loading.value) {
-    loadImages();
-  }
-}
+const { $three } = useNuxtApp();
 
-// Load random product-like images (2:3 ratio, white background)
-async function loadImages(count = 20) {
-  loading.value = true;
 
-  for (let i = 0; i < count; i++) {
-    const randomSeed = Date.now() + Math.floor(Math.random() * 10000);
-    // 400x600 → 2:3 aspect ratio
-    const imageUrl = `https://picsum.photos/seed/${randomSeed}/400/600`;
-    images.value.push(imageUrl);
-  }
-
-  loading.value = false;
-}
-
-async function ensurePageIsScrollable() {
-  while (document.body.scrollHeight <= window.innerHeight) {
-    await loadImages();
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    await nextTick();
-  }
-}
 
 onMounted(async () => {
-  await loadImages();
-  await ensurePageIsScrollable();
-  window.addEventListener("scroll", checkIfNearBottom);
-});
+  console.log("Gallery page mounted, waiting for Three.js...")
 
-onUnmounted(() => {
-  window.removeEventListener("scroll", checkIfNearBottom);
-});
+  await $three.ready;
+
+  const grid = await initGrid($three.renderer, $three.camera, containerHeight, $three.scroller);
+  $three.scene.add(grid);
+
+  $three.addAnimatedCallback("sphere", (delta) => {
+    if ($three.backgroundSphere) {
+      $three.backgroundSphere.position.y += delta;
+    }
+  })
+})
+
 </script>
 
-<style>
-.card {
-  overflow: unset !important;
-}
-</style>
+<style scoped></style>

@@ -6,7 +6,9 @@ export default defineNuxtConfig({
   ssr: true, // or false if you only need SPA
   compatibilityDate: '2025-05-15',
   devtools: { enabled: true },
-
+  plugins: [
+    { src: '~/plugins/three.client.ts', mode: 'client' }
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

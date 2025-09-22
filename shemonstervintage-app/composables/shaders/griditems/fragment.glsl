@@ -19,7 +19,7 @@ void main() {
     float d = distance(vUv, uCenter);
 
                   // --- Maske ---
-                  // weicher Maskenwert: 1 innen, 0 außen
+                  // weicher Maskenwert: 1 innen, 0 xaußen
     float mask = 1.0 - smoothstep(uRadius - uFeather, uRadius, d);
 
                   // Optional harte Kante: wenn du wirklich *nichts* außerhalb zeichnen willst,

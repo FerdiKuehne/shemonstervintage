@@ -13,3 +13,27 @@
     </div>
   </div>
 </template>
+
+<script setup>
+import { onMounted } from "vue";
+definePageMeta({
+  layout: "three",
+});
+const { $three } = useNuxtApp();
+
+onMounted(async () => {
+  // wait until scene is ready
+
+  console.log(
+    "Gallery page mounted, waiting for Three.js scene to initialize...",
+    $three.initialized
+  );
+  await $three.ready;
+
+  $three.addAnimatedCallback("sphere", (delta) => {
+    if ($three.backgroundSphere) {
+      $three.backgroundSphere.position.y -= delta;
+    }
+  });
+});
+</script>
