@@ -2,10 +2,10 @@
   <header>
 
     <ul class="main-nav">
-      <li><NuxtLink to="/">Home</NuxtLink></li>
-      <li><NuxtLink to="/gallery">Gallery</NuxtLink></li>
-      <li><NuxtLink to="/anfahrt">Location</NuxtLink></li>
-      <li><NuxtLink to="/kontakt">Contact</NuxtLink></li>
+      <li><NuxtLink to="/"><span class="num">01</span> Home</NuxtLink></li>
+      <li><NuxtLink to="/gallery"><span class="num">02</span>  Gallery</NuxtLink></li>
+      <li><NuxtLink to="/anfahrt"><span class="num">03</span>  Location</NuxtLink></li>
+      <li><NuxtLink to="/kontakt"><span class="num">04</span>  Contact</NuxtLink></li>
     </ul>
 
   </header>
@@ -136,7 +136,7 @@ ul.main-nav {
 }
 
 ul.main-nav li a {
-  width: 300px;
+  min-width: 300px;
   display: block;
   text-transform: uppercase;
   text-decoration: none;
@@ -147,10 +147,24 @@ ul.main-nav li a {
   transition: font-size .3s, line-height .3s;
 }
 
+
 ul.main-nav li a:hover {
   font-size: 5rem;
   line-height: 5rem;
   transition: font-size .3s, line-height .3s;
+}
+
+ul.main-nav li a .num {
+  display: inline-block;
+  font-size: 1rem;
+  transform: translate(0, 0);
+  transition: font-size .3s, transform .3s;
+}
+
+ul.main-nav li a:hover .num {
+  font-size: 2rem;
+  transform: translate(0, -33px);
+  transition: font-size .3s, transform .3s;
 }
 
 ul.main-nav li a:hover:after {
