@@ -237,8 +237,8 @@ ul.footer-nav li a {
 .enter-btn {
   position: absolute;
   left: 50%;
-  top: 70%;
-  transform: translate(-50%, 30px);
+  bottom: 2rem;
+  transform: translate(-50%, 0);
   z-index: 10;
   padding: 12px 24px;
   font-size: 16px;
