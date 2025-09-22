@@ -4,8 +4,8 @@
     <ul class="main-nav">
       <li><NuxtLink to="/">Home</NuxtLink></li>
       <li><NuxtLink to="/gallery">Gallery</NuxtLink></li>
-      <li><NuxtLink to="/kontakt">Contact</NuxtLink></li>
       <li><NuxtLink to="/anfahrt">Location</NuxtLink></li>
+      <li><NuxtLink to="/kontakt">Contact</NuxtLink></li>
     </ul>
 
   </header>
@@ -151,6 +151,16 @@ ul.main-nav li a:hover {
   font-size: 5rem;
   line-height: 5rem;
   transition: font-size .3s, line-height .3s;
+}
+
+ul.main-nav li a:hover:after {
+  content: "_";
+  animation: blink .3s infinite;
+}
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 footer {
