@@ -187,7 +187,7 @@ ul.main-nav li a {
   text-decoration: none;
 }
 
-ul.main-nav li:hover a:after {
+ul.main-nav li:hover:after {
   content: "_";
   animation: blink .3s infinite;
 }
