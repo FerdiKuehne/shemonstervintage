@@ -253,6 +253,7 @@ ul.footer-nav li a {
 
 <style>
   .page-headline {
+    position: fixed;
     color: #000;
     padding: 1.25rem 1rem 0 170px;
   }
