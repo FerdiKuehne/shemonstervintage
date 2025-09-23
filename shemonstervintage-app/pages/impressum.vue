@@ -56,6 +56,7 @@ onMounted(async () => {
   });
 });
 </script>
+
 <style scoped>
 .links-a {
   padding: 0;
