@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted } from "vue";
+import { onMounted, nextTick } from "vue";
+import { homeCameraShift } from "~/composables/screenplay.js";
 definePageMeta({
   layout: "three",
 });
@@ -7,16 +8,9 @@ definePageMeta({
 const { $three } = useNuxtApp();
 
 onMounted(async () => {
-  // wait until scene is ready
-
-
   await $three.ready;
-
-  $three.addAnimatedCallback("sphere", (delta) => {
-    if ($three.backgroundSphere) {
-      $three.backgroundSphere.rotation.y += delta;
-    }
-  });
+  await nextTick();
+  homeCameraShift($three.camera);
 });
 </script>
 

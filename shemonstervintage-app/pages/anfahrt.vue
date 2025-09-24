@@ -22,7 +22,8 @@
 import AnfahrtUndMap from "~/components/anfahrt/AnfahrtUndMap.vue";
 import AnfahrtContact from "~/components/anfahrt/AnfahrtContact.vue";
 import Openinghours from "~/components/anfahrt/Openinghours.vue";
-import { onMounted, watchEffect } from "vue";
+import { onMounted, watchEffect, nextTick } from "vue";
+import { locationCameraShift } from "~/composables/screenplay.js";
 
 definePageMeta({
   layout: "three",
@@ -31,19 +32,8 @@ definePageMeta({
 const { $three } = useNuxtApp();
 
 onMounted(async () => {
-  // wait until scene is ready
-
-  console.log(
-    "Gallery page mounted, waiting for Three.js scene to initialize...",
-    $three.initialized
-  );
-
   await $three.ready;
-
-  $three.addAnimatedCallback("sphere", (delta) => {
-    if ($three.backgroundSphere) {
-      $three.backgroundSphere.position.x -= delta;
-    }
-  });
+  await nextTick();
+  locationCameraShift($three.camera);
 });
 </script>
