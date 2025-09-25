@@ -13,6 +13,7 @@
 </script>
 
 <style scoped>
+
 .page-layout {
   position: relative;
   width: 100%;
