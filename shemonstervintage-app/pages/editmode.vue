@@ -39,12 +39,38 @@ onMounted(async () => {
   }
 
   if ($three.controls) {
+  const c = $three.controls;
+
+  // Keyboardsteuerung aktivieren
+  c.enableKeys = true;        // Tastatur-Eingaben erlauben
+  c.enablePan = true;         // notwendig, damit WASD panned
+  c.keyPanSpeed = 40;         // ggf. anpassen (höher = schneller)
+
+  // Auf WASD umstellen (KeyboardEvent.code)
+  // Standard ist ArrowLeft/Up/Right/Down
+  c.keys = {
+    LEFT:  'KeyA',
+    UP:    'KeyW',
+    RIGHT: 'KeyD',
+    BOTTOM:'KeyS'
+  };
+
+  // Damit die Controls Key-Events empfangen
+  // (du kannst auch renderer.domElement nehmen, wenn du willst)
+  c.listenToKeyEvents(window);
+
+  c.update();
+}
+
+  if ($three.controls) {
     $three.controls.enableRotate = true;
     $three.controls.enableZoom = true;
     $three.controls.enablePan = true;
     $three.controls.dampingFactor = 0.05;
     $three.controls.update();
   }
+
+
   
 
 });

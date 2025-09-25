@@ -1,6 +1,6 @@
 <template>
   
-  <!--
+
    <div class="logo">SHEMONSTER</div>
     <header>
     <ul class="main-nav">
@@ -19,7 +19,7 @@
       </li>
     </ul>
   </header>
-  -->
+
  
   
 
