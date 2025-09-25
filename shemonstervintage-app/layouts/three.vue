@@ -15,6 +15,7 @@
 <style scoped>
 
 .page-layout {
+  display: none;
   position: relative;
   width: 100%;
   height: 100vh;
