@@ -1,26 +1,40 @@
 <template>
-
-  <div class="logo">SHEMONSTER</div>
-  <header>
-
+  
+  <!--
+   <div class="logo">SHEMONSTER</div>
+    <header>
     <ul class="main-nav">
       <li @click="moveCamera"><span class="num">01</span> Home</li>
-      <li><NuxtLink to="/"><span class="num">02</span> About</NuxtLink></li>
-      <li><NuxtLink to="/gallery"><span class="num">03</span> Gallery</NuxtLink></li>
-      <li><NuxtLink to="/anfahrt"><span class="num">04</span> Location</NuxtLink></li>
-      <li><NuxtLink to="/kontakt"><span class="num">05</span> Contact</NuxtLink></li>
+      <li>
+        <NuxtLink to="/"><span class="num">02</span> About</NuxtLink>
+      </li>
+      <li>
+        <NuxtLink to="/gallery"><span class="num">03</span> Gallery</NuxtLink>
+      </li>
+      <li>
+        <NuxtLink to="/anfahrt"><span class="num">04</span> Location</NuxtLink>
+      </li>
+      <li>
+        <NuxtLink to="/kontakt"><span class="num">05</span> Contact</NuxtLink>
+      </li>
     </ul>
-
   </header>
+  -->
+ 
+  
+
 
   <div id="app">
-    <div ref="scroller" class="scroller" id="scroller">
+    <div id="scroller" ref="scroller" class="scroller">
       <div id="three-root" class="three-container"></div>
     </div>
-    <button class="enter-btn" @click="moveCamera">{{ buttonText }}</button>
+  <!--
+      <button class="enter-btn" @click="moveCamera">{{ buttonText }}</button>
+    <NuxtLayout />
+  
+  -->  
     <NuxtLayout />
   </div>
-
 
   <footer>
     <ul class="footer-nav">
@@ -29,20 +43,18 @@
       <li><NuxtLink to="/editmode">Edit-Mode</NuxtLink></li>
     </ul>
   </footer>
-
-
 </template>
-
 
 <script setup>
 import gsap from "gsap";
 import { onMounted, ref } from "vue";
 const scroller = ref(null);
-const { $three } = useNuxtApp();
+
 const buttonText = ref("Enter");
 let cameraTween = null;
 
-// Helper to safely get Three.js objects
+let $three = null;
+
 function getThreeObjects() {
   const camera = $three.camera;
   const controls = $three.controls;
@@ -95,27 +107,31 @@ function moveCamera() {
 }
 
 onMounted(async () => {
-  console.log('App mounted, initializing Three.js scene...');
+  if (!import.meta.dev) {
+    $three = useNuxtApp().$three;
 
-  await $three.init();
+    console.log("App mounted, initializing Three.js scene...");
 
-  if ($three.controls) {
-    $three.controls.enableRotate = true;
-    $three.controls.enableZoom = true;
-    $three.controls.enablePan = true;
-    $three.controls.enableDamping = true;
-    $three.controls.dampingFactor = 0.05;
-    $three.controls.update();
+    console.log("Dev mode:", import.meta.dev);
+
+    await $three.init();
+
+    if ($three.controls) {
+      $three.controls.enableRotate = true;
+      $three.controls.enableZoom = true;
+      $three.controls.enablePan = true;
+      $three.controls.enableDamping = true;
+      $three.controls.dampingFactor = 0.05;
+      $three.controls.update();
+    }
+    if (scroller.value) {
+      $three.setScroller(scroller.value);
+    }
   }
-  if (scroller.value) {
-    $three.setScroller(scroller.value)
-  }
-
 });
 </script>
 
 <style scoped>
-
 *,
 *:after,
 *:before {
@@ -123,7 +139,6 @@ onMounted(async () => {
   padding: 0;
   box-sizing: border-box;
 }
-
 
 .logo {
   position: fixed;
@@ -159,27 +174,26 @@ ul.main-nav li {
   font-weight: bolder;
   color: #000;
   line-height: 2rem;
-  transition: font-size .3s, line-height .3s;
+  transition: font-size 0.3s, line-height 0.3s;
 }
-
 
 ul.main-nav li:hover {
   font-size: 5rem;
   line-height: 5rem;
-  transition: font-size .3s, line-height .3s;
+  transition: font-size 0.3s, line-height 0.3s;
 }
 
 ul.main-nav li .num {
   display: inline-block;
   font-size: 1rem;
   transform: translate(0, 0);
-  transition: font-size .3s, transform .3s;
+  transition: font-size 0.3s, transform 0.3s;
 }
 
 ul.main-nav li:hover .num {
   font-size: 2rem;
   transform: translate(0, -33px);
-  transition: font-size .3s, transform .3s;
+  transition: font-size 0.3s, transform 0.3s;
 }
 
 ul.main-nav li a {
@@ -189,12 +203,39 @@ ul.main-nav li a {
 
 ul.main-nav li:hover:after {
   content: "_";
-  animation: blink .3s infinite;
+  animation: blink 0.3s infinite;
 }
 @keyframes blink {
-  0% { opacity: 1; }
-  50% { opacity: 0; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+
+.scroller {
+  height: 200vh;        /* enough content to scroll */
+  overflow-y: auto;     /* enable scrolling */
+  overflow-x: hidden;
+  position: relative;   /* relative positioning */
+  z-index: 10;           /* above the canvas */
+  background: rgba(211, 251, 8, 1);
+}
+
+.three-container {
+  pointer-events: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  background: transparent;
 }
 
 footer {
@@ -210,30 +251,21 @@ ul.footer-nav {
 }
 
 ul.footer-nav li {
-  margin: 0 .5rem;
+  margin: 0 0.5rem;
 }
 
 ul.footer-nav li:first-child {
-  margin: 0 .5rem 0 0;
+  margin: 0 0.5rem 0 0;
 }
 
 ul.footer-nav li a {
-  font-size: .8rem;
+  font-size: 0.8rem;
   text-decoration: none;
   color: #000;
   display: block;
 }
 
-.three-container {
-  pointer-events: auto;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  background: black;
-}
+
 
 .enter-btn {
   position: absolute;
@@ -256,11 +288,10 @@ ul.footer-nav li a {
 }
 </style>
 
-
 <style>
-  .page-headline {
-    position: fixed;
-    color: #000;
-    padding: 1.25rem 1rem 0 170px;
-  }
+.page-headline {
+  position: fixed;
+  color: #000;
+  padding: 1.25rem 1rem 0 170px;
+}
 </style>

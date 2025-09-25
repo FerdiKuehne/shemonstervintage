@@ -32,8 +32,10 @@ definePageMeta({
 const { $three } = useNuxtApp();
 
 onMounted(async () => {
+if (import.meta.dev) return;
   await $three.ready;
   await nextTick();
   locationCameraShift($three.camera);
+
 });
 </script>

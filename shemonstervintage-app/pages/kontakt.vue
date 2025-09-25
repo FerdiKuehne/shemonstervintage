@@ -16,15 +16,17 @@
 
 <script setup>
 import { contactCameraShift } from "~/composables/screenplay.js";
-import { onMounted,nextTick } from "vue";
+import { onMounted, nextTick } from "vue";
 definePageMeta({
   layout: "three",
 });
 const { $three } = useNuxtApp();
 
 onMounted(async () => {
-  await $three.ready;
-  await nextTick();
-  contactCameraShift($three.camera);
+  if (!import.meta.dev) {
+    await $three.ready;
+    await nextTick();
+    contactCameraShift($three.camera);
+  }
 });
 </script>

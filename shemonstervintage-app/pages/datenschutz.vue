@@ -44,7 +44,7 @@ const { $three } = useNuxtApp();
 
 onMounted(async () => {
   // wait until scene is ready
-
+  if (import.meta.dev) return;
   await $three.ready;
 
   $three.addAnimatedCallback("sphere", (delta) => {

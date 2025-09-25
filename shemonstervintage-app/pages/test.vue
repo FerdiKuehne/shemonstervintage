@@ -16,7 +16,6 @@ const { $three } = useNuxtApp();
 onMounted(async () => {
   // wait until scene is ready
 
-
   await $three.ready;
   $three.backgroundSphere.position.set(0, 0, 0);
   $three.removeAllAnimatedCallbacks();
@@ -26,21 +25,22 @@ onMounted(async () => {
 
 onMounted(async () => {
   console.log("Gallery page mounted, waiting for Three.js...");
+  if (!import.meta.dev) {
+    await $three.ready;
 
-  await $three.ready;
+    const grid = await initGrid(
+      $three.renderer,
+      $three.camera,
+      containerHeight,
+      $three.scroller
+    );
+    $three.scene.add(grid);
 
-  const grid = await initGrid(
-    $three.renderer,
-    $three.camera,
-    containerHeight,
-    $three.scroller
-  );
-  $three.scene.add(grid);
-
-  $three.addAnimatedCallback("sphere", (delta) => {
-    if ($three.backgroundSphere) {
-      $three.backgroundSphere.position.y += delta;
-    }
-  });
+    $three.addAnimatedCallback("sphere", (delta) => {
+      if ($three.backgroundSphere) {
+        $three.backgroundSphere.position.y += delta;
+      }
+    });
+  }
 });
 </script>

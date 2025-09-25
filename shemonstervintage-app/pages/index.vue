@@ -1,16 +1,22 @@
 <script setup>
 import { onMounted, nextTick } from "vue";
 import { homeCameraShift } from "~/composables/screenplay.js";
+
 definePageMeta({
   layout: "three",
 });
 
-const { $three } = useNuxtApp();
+let $three;
 
 onMounted(async () => {
-  await $three.ready;
-  await nextTick();
-  homeCameraShift($three.camera);
+
+  if (!import.meta.dev) {
+    $three = useNuxtApp().$three;
+    await $three.ready;
+    await nextTick();
+    homeCameraShift($three.camera);
+  } 
+  
 });
 </script>
 

@@ -114,8 +114,8 @@ async function loadGridImages(grid, images, renderer) {
               uTexture: { value: texture },
               uCenter: { value: new Vector2(0.5, 0.5) },
               uRadius: { value: 0.5 },
-              uFeather: { value: 0.5 },
-              uStrength: { value: 1.0 }
+              uFeather: { value: 0.2 },
+              uStrength: { value: 0.2 }
             },
             transparent: true,
           });
@@ -198,10 +198,10 @@ function updateContainerHeight(containerHeightRef, camera) {
         console.log("ScrollerEnd:", self.end);
 
         // load more images dynamically
-        if (grid.children.length < 46 && self.progress > 0.7 && !loadingMore) {
+        if (grid.children.length < 16 && self.progress > 0.7 && !loadingMore) {
           loadingMore = true;
 
-       /*    await loadGridImages(grid, images, renderer);
+          await loadGridImages(grid, images, renderer);
 
           // update container height based on camera frustum
           updateContainerHeight(containerHeight, camera);
@@ -213,7 +213,6 @@ function updateContainerHeight(containerHeightRef, camera) {
 
           // ensure grid y is correct after refresh
           grid.position.y = self.progress * gridWorldHeight;
-*/
           loadingMore = false;
         }
       },
@@ -222,7 +221,7 @@ function updateContainerHeight(containerHeightRef, camera) {
 
 
 async function initGrid(renderer, camera, containerHeight, scrollContainer) {
-  const scrollEl = scrollContainer.value;
+  const scrollEl = scrollContainer;
   getCureentGridSize();
   /* Center mid pre init */
   const totalWidth =
