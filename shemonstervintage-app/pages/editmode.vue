@@ -24,11 +24,7 @@ onMounted(async () => {
 
   await $three.ready;
 
-  $three.addAnimatedCallback("sphere", (delta) => {
-    if ($three.backgroundSphere) {
-      $three.backgroundSphere.position.y += delta;
-    }
-  });
+
 });
 </script>
 
