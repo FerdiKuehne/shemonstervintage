@@ -37,8 +37,8 @@ function contactCameraShift(camera) {
 
 
 
-function editmodeCameraShift(camera) {
-  moveCamera(camera, new Vector3(0, 0, 0), 0.0);
+function editmodeCameraShift(camera, targeetvector) {
+  moveCamera(camera, targeetvector, 10.0);
 }
 
 export {
@@ -47,5 +47,5 @@ export {
   galleryCameraShift,
   contactCameraShift,
   locationCameraShift,
-  editmodeCameraShift,
+  editmodeCameraShift
 };
