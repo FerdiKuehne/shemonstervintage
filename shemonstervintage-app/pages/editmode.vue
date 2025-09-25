@@ -38,7 +38,13 @@ onMounted(async () => {
     await $three.ready;
   }
 
-
+  if ($three.controls) {
+    $three.controls.enableRotate = true;
+    $three.controls.enableZoom = true;
+    $three.controls.enablePan = true;
+    $three.controls.dampingFactor = 0.05;
+    $three.controls.update();
+  }
   
 
 });

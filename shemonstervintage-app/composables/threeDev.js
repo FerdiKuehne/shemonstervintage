@@ -16,7 +16,7 @@ async function init(backgroundSphereNeeded = true, orbiterControlsNeeded = true)
 
     // Camera
     const camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
-    camera.position.set(0, 0, 0)
+    camera.position.set(0, 0, 5);
 
     // Renderer
     const renderer = new WebGLRenderer({ antialias: true })
@@ -44,9 +44,7 @@ async function init(backgroundSphereNeeded = true, orbiterControlsNeeded = true)
             cb
           });
         }
-        if (controls) {
-            controls.update();
-        }
+        controls?.update();
         
         renderer.render(scene, camera);
       }

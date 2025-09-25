@@ -223,8 +223,7 @@ ul.main-nav li:hover:after {
   overflow-y: auto;     /* enable scrolling */
   overflow-x: hidden;
   position: relative;   /* relative positioning */
-  z-index: 10;           /* above the canvas */
-  background: rgba(211, 251, 8, 1);
+  z-index: 0;           /* above the canvas */
 }
 
 .three-container {
@@ -232,7 +231,7 @@ ul.main-nav li:hover:after {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
+  width: 100%;  
   height: 100%;
   z-index: 0;
   background: transparent;
