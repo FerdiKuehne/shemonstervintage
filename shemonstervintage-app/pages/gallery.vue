@@ -15,20 +15,36 @@ definePageMeta({
 
 const containerHeight = ref(100); // vh
 
-const { $three } = useNuxtApp();
+let $three;
 
 onMounted(async () => {
-  await $three.ready;
+  if (import.meta.dev) {
+    const mod = await import("~/composables/threeDev.js"); // path to your function-based file
+    const devScene = await mod.init(true, true); // returns { scene, camera, renderer, controls, backgroundSphere, animateObjects }
 
-  const grid = await initGrid(
-    $three.renderer,
-    $three.camera,
-    containerHeight,
-    $three.scroller
-  );
-  $three.scene.add(grid);
+    // wrap devScene into plugin-like API
+    $three = {
+      ...devScene,
+      init: async () => devScene, // mimic plugin init
+      setScroller: (el) => {
+        devScene.scroller = el;
+      }, // mimic plugin scroller setter
+    };
+  } else {
+    $three = useNuxtApp().$three;
+    await $three.ready;
+  }
 
-  galleryCameraShift($three.camera);
+    const grid = await initGrid(
+      $three.renderer,
+      $three.camera,
+      containerHeight,
+      $three.scroller
+    );
+    $three.scene.add(grid);
+
+    galleryCameraShift($three.camera);
+
 });
 </script>
 

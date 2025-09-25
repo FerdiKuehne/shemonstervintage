@@ -5,6 +5,11 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { createBackgroundSphereFromAPI } from '@/composables/backgroundsphere.js'
 
 export default defineNuxtPlugin((nuxtApp) => {
+  if (import.meta.dev) {
+    // 🚫 Skip providing $three in dev mode
+    return
+  }
+  
   if (!import.meta.client) return
 
   const state = {
@@ -58,6 +63,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     state.controls.target.set(0, 0, 0)
     state.controls.update()
 
+    
     // Add background sphere
     if (state.backgroundSphere) state.scene.add(state.backgroundSphere)
 
