@@ -1,6 +1,6 @@
 <template>
   
-  <!--
+
    <div class="logo">SHEMONSTER</div>
     <header>
     <ul class="main-nav">
@@ -19,7 +19,7 @@
       </li>
     </ul>
   </header>
-  -->
+
  
   
 
@@ -40,7 +40,7 @@
     <ul class="footer-nav">
       <li><NuxtLink to="/Datenschutz">Privacy Policy</NuxtLink></li>
       <li><NuxtLink to="/impressum">Imprint </NuxtLink></li>
-      <li><NuxtLink to="/test">test reset</NuxtLink></li>
+      <li><NuxtLink to="/editmode">Edit-Mode</NuxtLink></li>
     </ul>
   </footer>
 </template>
@@ -241,6 +241,7 @@ footer {
   position: fixed;
   bottom: 1rem;
   right: 1rem;
+  z-index: 20;
 }
 
 ul.footer-nav {
