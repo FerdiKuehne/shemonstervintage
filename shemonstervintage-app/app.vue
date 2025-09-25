@@ -1,6 +1,8 @@
 <template>
-  <div class="logo">SHEMONSTER</div>
-  <header>
+  
+  <!--
+   <div class="logo">SHEMONSTER</div>
+    <header>
     <ul class="main-nav">
       <li @click="moveCamera"><span class="num">01</span> Home</li>
       <li>
@@ -17,12 +19,20 @@
       </li>
     </ul>
   </header>
+  -->
+ 
+  
+
 
   <div id="app">
-    <div ref="scroller" class="scroller" id="scroller">
+    <div id="scroller" ref="scroller" class="scroller">
       <div id="three-root" class="three-container"></div>
     </div>
-    <button class="enter-btn" @click="moveCamera">{{ buttonText }}</button>
+  <!--
+      <button class="enter-btn" @click="moveCamera">{{ buttonText }}</button>
+    <NuxtLayout />
+  
+  -->  
     <NuxtLayout />
   </div>
 
@@ -207,6 +217,27 @@ ul.main-nav li:hover:after {
   }
 }
 
+
+.scroller {
+  height: 200vh;        /* enough content to scroll */
+  overflow-y: auto;     /* enable scrolling */
+  overflow-x: hidden;
+  position: relative;   /* relative positioning */
+  z-index: 10;           /* above the canvas */
+  background: rgba(211, 251, 8, 1);
+}
+
+.three-container {
+  pointer-events: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  background: transparent;
+}
+
 footer {
   position: fixed;
   bottom: 1rem;
@@ -233,16 +264,7 @@ ul.footer-nav li a {
   display: block;
 }
 
-.three-container {
-  pointer-events: auto;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  background: black;
-}
+
 
 .enter-btn {
   position: absolute;

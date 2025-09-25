@@ -20,7 +20,7 @@ let $three;
 onMounted(async () => {
   if (import.meta.dev) {
     const mod = await import("~/composables/threeDev.js"); // path to your function-based file
-    const devScene = await mod.init(true, true); // returns { scene, camera, renderer, controls, backgroundSphere, animateObjects }
+    const devScene = await mod.init(false, false); // returns { scene, camera, renderer, controls, backgroundSphere, animateObjects }
 
     // wrap devScene into plugin-like API
     $three = {
@@ -34,16 +34,19 @@ onMounted(async () => {
     $three = useNuxtApp().$three;
     await $three.ready;
   }
+  $three.camera.position.set(0, 0, 5);
+
+  console.log(document.getElementById("scroller").scrollHeight)
 
     const grid = await initGrid(
       $three.renderer,
       $three.camera,
       containerHeight,
-      $three.scroller
+      document.getElementById("scroller")
     );
+
     $three.scene.add(grid);
 
-    galleryCameraShift($three.camera);
 
 });
 </script>

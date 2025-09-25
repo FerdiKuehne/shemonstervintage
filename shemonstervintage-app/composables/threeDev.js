@@ -36,7 +36,7 @@ async function init(backgroundSphereNeeded = true, orbiterControlsNeeded = true)
         controls.target.set(0, 0, 0);
         controls.update();
     }
-    
+
 
     function animate() {
         if (animateObjects.length > 0) {
@@ -44,7 +44,10 @@ async function init(backgroundSphereNeeded = true, orbiterControlsNeeded = true)
             cb
           });
         }
-        controls.update();
+        if (controls) {
+            controls.update();
+        }
+        
         renderer.render(scene, camera);
       }
     
