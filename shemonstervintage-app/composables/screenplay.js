@@ -35,6 +35,12 @@ function contactCameraShift(camera) {
   moveCamera(camera, new Vector3(-2, 0, -2), 10.0);
 }
 
+
+
+function editmodeCameraShift(camera) {
+  moveCamera(camera, new Vector3(0, 0, 0), 10.0);
+}
+
 export {
   homeCameraShift,
   aboutCameraShift,
