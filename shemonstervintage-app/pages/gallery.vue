@@ -20,7 +20,7 @@ let $three;
 onMounted(async () => {
   if (import.meta.dev) {
     const mod = await import("~/composables/threeDev.js"); // path to your function-based file
-    const devScene = await mod.init(false, false, true); // returns { scene, camera, renderer, controls, backgroundSphere, animateObjects }
+    const devScene = await mod.init(false, false, false,true); // returns { scene, camera, renderer, controls, backgroundSphere, animateObjects }
 
     // wrap devScene into plugin-like API
     $three = {
@@ -35,7 +35,7 @@ onMounted(async () => {
     await $three.ready;
   }
 
-/*
+
     const grid = await initGrid(
       $three.renderer,
       $three.camera,
@@ -45,7 +45,7 @@ onMounted(async () => {
 
     $three.scene.add(grid);
 
-*/
+
 });
 </script>
 

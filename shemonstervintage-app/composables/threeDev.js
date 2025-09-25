@@ -2,6 +2,8 @@ import { Scene, PerspectiveCamera, WebGLRenderer, Color, Group, BoxGeometry, Mes
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createBackgroundSphereFromAPI } from "@/composables/backgroundsphere.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
+
 import {
   ArToolkitContext,
   ArToolkitSource,
@@ -11,7 +13,8 @@ import {
 async function init(
   backgroundSphereNeeded = true,
   orbiterControlsNeeded = true,
-  trackerNeeded = false
+  trackerNeeded = false,
+  arNeeded = false
 ) {
   let controls, backgroundSphere, arToolkitSource, arToolkitContext;
   const animateObjects = [];
@@ -20,7 +23,6 @@ async function init(
   // Scene
   const scene = new Scene();
  
-
   scene.add(new AmbientLight(0xffffff, 0.5));
   const dirLight = new DirectionalLight(0xffffff, 0.8);
   dirLight.position.set(1, 1, 1);
@@ -39,6 +41,12 @@ async function init(
   const renderer = new WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio || 1);
+
+  if(arNeeded){
+    renderer.xr.enabled = true;
+    container.appendChild(ARButton.createButton(renderer));
+  }
+
   container.appendChild(renderer.domElement);
 
   if (trackerNeeded) {
@@ -64,8 +72,6 @@ async function init(
       detectionMode: "mono",
     });
 
-    console.log("AR Toolkit Context initialized", arToolkitContext);
-
     arToolkitContext.init(() => {
       camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
     });
@@ -84,6 +90,7 @@ async function init(
 
     marker.add(new Mesh(geometry,material))
   }
+
 
   if (backgroundSphereNeeded) {
     backgroundSphere = await createBackgroundSphereFromAPI();

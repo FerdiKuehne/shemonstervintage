@@ -3,6 +3,7 @@ import { defineNuxtPlugin } from '#app'
 import { Scene, PerspectiveCamera, WebGLRenderer, Color } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { createBackgroundSphereFromAPI } from '@/composables/backgroundsphere.js'
+import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 
 export default defineNuxtPlugin((nuxtApp) => {
   if (import.meta.dev) {
@@ -32,7 +33,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   const backgroundSpherePromise = createBackgroundSphereFromAPI(window.devicePixelRatio || 1)
     .then(mesh => { state.backgroundSphere = mesh })
 
-  async function init() {
+  async function init(arNeeded = false) {
     await backgroundSpherePromise
     if (state.initialized) return
 
@@ -54,6 +55,11 @@ export default defineNuxtPlugin((nuxtApp) => {
     state.renderer.setSize(window.innerWidth, window.innerHeight)
     state.renderer.setPixelRatio(window.devicePixelRatio || 1)
     container.appendChild(state.renderer.domElement)
+
+    if(arNeeded){
+      state.renderer.xr.enabled = true;
+      container.appendChild(ARButton.createButton(state.renderer));
+    }
 
     // OrbitControls
     state.controls = new OrbitControls(state.camera, state.renderer.domElement)
