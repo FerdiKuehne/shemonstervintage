@@ -8,6 +8,7 @@
 import { onMounted, watchEffect, ref } from "vue";
 import { initGrid, updateContainerHeight } from "@/composables/grid.js";
 import { galleryCameraShift } from "~/composables/screenplay.js";
+import { scrollerRef } from "@/composables/scroller.js";
 
 definePageMeta({
   layout: "three",
@@ -20,7 +21,7 @@ let $three;
 onMounted(async () => {
   if (import.meta.dev) {
     const mod = await import("~/composables/threeDev.js"); // path to your function-based file
-    const devScene = await mod.init(false, false, false,true); // returns { scene, camera, renderer, controls, backgroundSphere, animateObjects }
+    const devScene = await mod.init(false, false, false, false, false); // returns { scene, camera, renderer, controls, backgroundSphere, animateObjects }
 
     // wrap devScene into plugin-like API
     $three = {
@@ -40,7 +41,7 @@ onMounted(async () => {
       $three.renderer,
       $three.camera,
       containerHeight,
-      document.getElementById("scroller")
+      scrollerRef
     );
 
     $three.scene.add(grid);

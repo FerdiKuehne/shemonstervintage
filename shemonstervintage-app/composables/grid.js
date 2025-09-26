@@ -221,7 +221,13 @@ function updateContainerHeight(containerHeightRef, camera) {
 
 
 async function initGrid(renderer, camera, containerHeight, scrollContainer) {
-  const scrollEl = scrollContainer;
+  const scrollEl = scrollContainer.value;
+  
+  console.log("------------------------------");
+  console.log(containerHeight,scrollContainer)
+  console.log("------------------------------");
+
+  
   getCureentGridSize();
   /* Center mid pre init */
   const totalWidth =

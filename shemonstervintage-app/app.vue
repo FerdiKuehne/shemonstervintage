@@ -47,10 +47,12 @@
 
 <script setup>
 import gsap from "gsap";
+import { scrollerRef } from "@/composables/scroller.js";
 import { onMounted, ref } from "vue";
-const scroller = ref(null);
 
 const buttonText = ref("Enter");
+const scroller = scrollerRef;
+
 let cameraTween = null;
 
 let $three = null;
