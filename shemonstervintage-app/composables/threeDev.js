@@ -2,6 +2,7 @@ import { Scene, PerspectiveCamera, WebGLRenderer, Color, Group, BoxGeometry, Mes
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createBackgroundSphereFromAPI } from "@/composables/backgroundsphere.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { XRButton } from 'three/examples/jsm/webxr/XRButton.js';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 
 import {
@@ -14,7 +15,8 @@ async function init(
   backgroundSphereNeeded = true,
   orbiterControlsNeeded = true,
   trackerNeeded = false,
-  arNeeded = false
+  arNeeded = false,
+  xrNeeded = false, 
 ) {
   let controls, backgroundSphere, arToolkitSource, arToolkitContext;
   const animateObjects = [];
@@ -42,7 +44,12 @@ async function init(
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio || 1);
 
-  if(arNeeded){
+  if(xrNeeded){
+    renderer.xr.enabled = true;
+    container.appendChild(XRButton.createButton(renderer));
+  }
+
+  if(arNeeded) {
     renderer.xr.enabled = true;
     container.appendChild(ARButton.createButton(renderer));
   }
@@ -96,6 +103,7 @@ async function init(
     backgroundSphere = await createBackgroundSphereFromAPI();
     scene.add(backgroundSphere);
   }
+
   if (orbiterControlsNeeded) {
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
