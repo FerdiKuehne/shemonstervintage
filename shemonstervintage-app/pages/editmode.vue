@@ -1,22 +1,26 @@
 <template>
   <div class="page-content">
     <div class="container-fluid p-0">
-      <div class="cameraPos"> 
+      <div class="cameraPos">
         <div>
-          {{ cameraHUD.x }} // {{ cameraHUD.y }} // {{ cameraHUD.z }} 
-        </div> 
-        <div>
-          {{ cameraHUD.rx }} // {{ cameraHUD.ry }} // {{ cameraHUD.rz }} 
+          {{ cameraHUD.x.toFixed(2) }} // {{ cameraHUD.y.toFixed(2) }} // {{ cameraHUD.z.toFixed(2) }}
         </div>
-    </div>
+        <div>
+          {{ cameraHUD.rx.toFixed(1) }} // {{ cameraHUD.ry.toFixed(1) }} // {{ cameraHUD.rz.toFixed(1) }}
+        </div>
+      </div>
+
       <div class="page-headline flex items-center justify-between">
         <span>EDITMODE</span>
         <button class="btn-reset" @click="resetCamera">Reset Position</button>
       </div>
+
       <div class="row">
         <div class="col-12 col-sm-12 col-md-10 col-lg-6 offset-0 offset-sm-0 offset-md-1 offset-lg-3">
           <p class="mb-2">
-            W/S: vor &amp; zurück · A/D: strafe · Mausrad: Distanz des gehaltenen Würfels · +: Würfel ablegen · Reset: Kamera auf Ursprung
+            W/S: vor &amp; zurück · A/D: strafe ·
+            <strong>Shift+Mausrad: Distanz des gehaltenen Würfels</strong> ·
+            +: Würfel ablegen · Reset: Kamera auf Ursprung
           </p>
         </div>
       </div>
@@ -28,62 +32,56 @@
 
     <!-- Rechte Sidebar: Container für alle Cube-Panels -->
     <div class="panel-stack" ref="panelStack"></div>
-    
   </div>
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { onMounted, onBeforeUnmount, ref } from "vue";
 import * as THREE from "three";
 
 definePageMeta({ layout: "three" });
 
 let $three;
-let cameraHUD = ref({x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0})
 
-let cameraPanelContainer = null;
-let cameraGui = null;
-const camAngles = { yawDeg: 0, pitchDeg: 90 }; // OrbitControls-Winkel in Grad
-let camYawCtrl = null;
-let camPitchCtrl = null;
+// HUD
+const cameraHUD = ref({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
 
-// — Vorschauwürfel —
+// TransformControls / GUI
+let TransformControlsClass = null;
+let GUIClass = null;
+let transform = null;
+
+// Preview cube
 let cube = null;
 let previewDist = 1.5;
-const minDist = 0.2;
-const maxDist = 20;
+const minDist = 0.2, maxDist = 20;
 
-// — Kamera-Flight (WASD) —
+// WASD flight
 const pressed = new Set();
 const WASD = new Set(["KeyW", "KeyA", "KeyS", "KeyD"]);
 const tmpForward = new THREE.Vector3();
 const tmpRight   = new THREE.Vector3();
 let lastTime = 0;
-const MOVE_SPEED = 2.5; // m/s
+const MOVE_SPEED = 2.5;
 
-// — Auswahl / Raycast —
+// Selection
 const placed = [];
 const selected = ref(null);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
-// — TransformControls + lil-gui —
-let TransformControlsClass = null;
-let GUIClass = null;
-let transform = null;
-
-// — Panel-Container (DOM) —
+// Right panel
 const panelStack = ref(null);
-// Map: Object3D -> { id, container, header, body, gui, rotProxy }
 const cubeUI = new Map();
 let nextId = 1;
 
-// — Helpers —
+/* ---------- Helpers ---------- */
 function makeCube() {
   const size = 0.2;
-  const geom = new THREE.BoxGeometry(size, size, size);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x00aaff, metalness: 0.2, roughness: 0.7 });
-  const mesh = new THREE.Mesh(geom, mat);
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(size, size, size),
+    new THREE.MeshStandardMaterial({ color: 0x00aaff, metalness: 0.2, roughness: 0.7 })
+  );
   mesh.frustumCulled = false;
   mesh.userData.kind = "cube";
   return mesh;
@@ -93,54 +91,89 @@ function ensureCameraInScene() {
 }
 function spawnCubeAttached() {
   const newCube = makeCube();
-  newCube.position.set(0, 0, -previewDist);
-  $three.camera.add(newCube);
-  ensureCameraInScene();
+  if (newCube instanceof THREE.Object3D && $three?.camera instanceof THREE.Object3D) {
+    newCube.position.set(0, 0, -previewDist);
+    $three.camera.add(newCube);
+    ensureCameraInScene();
+  }
   return newCube;
 }
 function addGridHelper() {
-  const size = 20, divisions = size;
-  const grid = new THREE.GridHelper(size, divisions, 0x888888, 0x444444);
-  grid.material.opacity = 0.5; grid.material.transparent = true;
+  // Basisraster: 1 m Raster, hohe Sichtbarkeit
+  const size = 100;                 // Ausdehnung (m)
+  const divisions = size;           // 1 m Abstand
+  const grid = new THREE.GridHelper(size, divisions, 0xffffff, 0x707070);
+  grid.position.y = 0;
+
+  // deutlich sichtbar machen
+  grid.material.transparent = true;
+  grid.material.opacity = 0.95;
+  grid.material.depthTest = false;   // immer sichtbar
+  grid.material.depthWrite = false;
+  grid.renderOrder = 1;
+
   $three.scene.add(grid);
+
+  // Major-Grid: jede 10. Linie betonen
+  const majorDivisions = size / 10;  // 10 m Abstand
+  const major = new THREE.GridHelper(size, majorDivisions, 0xffffff, 0xffffff);
+  major.position.y = 0;
+  major.material.transparent = true;
+  major.material.opacity = 1.0;
+  major.material.depthTest = false;
+  major.material.depthWrite = false;
+  major.renderOrder = 2;
+
+  $three.scene.add(major);
+
+  // (Optional) Achsenhilfe zur Orientierung
+  const axes = new THREE.AxesHelper(1.5);
+  axes.renderOrder = 3;
+  // sicherstellen, dass auch Achsen immer sichtbar sind
+  if (Array.isArray(axes.material)) {
+    axes.material.forEach(m => { m.depthTest = false; m.depthWrite = false; });
+  } else {
+    axes.material.depthTest = false;
+    axes.material.depthWrite = false;
+  }
+  $three.scene.add(axes);
 }
+
 function resetCamera() {
   if (!$three?.camera || !$three?.controls) return;
-
   const cam = $three.camera;
   const controls = $three.controls;
-
-  // Kamera an den Ursprung setzen und Standardausrichtung herstellen (Blick entlang -Z)
   cam.position.set(0, 0, 0);
-  cam.quaternion.set(0, 0, 0, 1); // Identitätsrotation
+  cam.quaternion.set(0, 0, 0, 1);
   cam.updateMatrixWorld(true);
-
-  // OrbitControls-Target NICHT auf die Kamera setzen (sonst Distanz = 0!)
-  // Stattdessen leicht nach vorn (-Z), damit Orbit sauber arbeitet.
   controls.target.set(0, 0, -1);
   controls.update();
-
-  // Wichtig: Den Vorschauwürfel NICHT anfassen.
-  // Wenn er an der Kamera hängt (local z = -previewDist), bleibt er automatisch vorne.
+}
+function safeDetachToScene(obj) {
+  if (!(obj instanceof THREE.Object3D)) return;
+  $three.camera.updateMatrixWorld(true);
+  obj.updateMatrixWorld(true);
+  if (typeof $three.scene.attach === "function") {
+    $three.scene.attach(obj);
+  } else {
+    const m = new THREE.Matrix4().copy(obj.matrixWorld);
+    $three.scene.add(obj);
+    const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+    m.decompose(p, q, s);
+    obj.position.copy(p); obj.quaternion.copy(q); obj.scale.copy(s);
+    obj.updateMatrixWorld(true);
+  }
 }
 
-// — Auswahl —
+/* ---------- Selection ---------- */
 function setSelected(obj) {
   selected.value = obj || null;
-  if (transform) {
-    if (obj) transform.attach(obj); else transform.detach();
-  }
-  // Panels optisch markieren
-  cubeUI.forEach((ui, o) => {
-    if (!ui.header) return;
-    ui.header.classList.toggle("active", o === obj);
-  });
+  if (transform) obj ? transform.attach(obj) : transform.detach();
+  cubeUI.forEach((ui, o) => ui.header?.classList.toggle("active", o === obj));
 }
-
 function onPointerDown(e) {
   if (!$three?.camera) return;
-  const wrapper = e.currentTarget;
-  const rect = wrapper.getBoundingClientRect();
+  const rect = e.currentTarget.getBoundingClientRect();
   pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(pointer, $three.camera);
@@ -148,43 +181,27 @@ function onPointerDown(e) {
   setSelected(hits[0]?.object ?? null);
 }
 
-// — Würfel ablegen (+) —
+/* ---------- Drop Cube ---------- */
 function dropAndSpawnNew() {
-  $three.camera.updateMatrixWorld(true);
-  cube.updateMatrixWorld(true);
-
-  if (typeof $three.scene.attach === "function") {
-    $three.scene.attach(cube);
-  } else {
-    const saved = new THREE.Matrix4().copy(cube.matrixWorld);
-    $three.scene.add(cube);
-    const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
-    saved.decompose(pos, quat, scl);
-    cube.position.copy(pos); cube.quaternion.copy(quat); cube.scale.copy(scl);
-    cube.updateMatrixWorld(true);
-  }
+  safeDetachToScene(cube);
   placed.push(cube);
-  createPanelForCube(cube);   // <<< eigenes Panel erzeugen
-  setSelected(cube);          // Gizmo dran
+  createPanelForCube(cube);
+  setSelected(cube);
   cube = spawnCubeAttached();
 }
 
-// — Keyboard / Wheel —
+/* ---------- Keyboard / Wheel ---------- */
 function onKeyDown(e) {
   if (!$three?.controls) return;
-
   if (WASD.has(e.code)) {
     pressed.add(e.code);
     $three.controls.enableZoom = false;
   }
-
-  // TransformControls Mode-Shortcuts (W/E/R)
-  if (transform) {
+  if (transform && pressed.size === 0) {
     if (e.code === "KeyW") transform.setMode("translate");
     if (e.code === "KeyE") transform.setMode("rotate");
     if (e.code === "KeyR") transform.setMode("scale");
   }
-
   if (e.key === "+" || e.code === "NumpadAdd") {
     if (!cube) return;
     dropAndSpawnNew();
@@ -194,20 +211,27 @@ function onKeyUp(e) {
   if (!$three?.controls) return;
   if (WASD.has(e.code)) {
     pressed.delete(e.code);
-    if ([...pressed].every(k => !WASD.has(k))) $three.controls.enableZoom = true;
+    if (pressed.size === 0) $three.controls.enableZoom = true;
   }
 }
 function onWheel(e) {
-  if ([...pressed].some(k => WASD.has(k))) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+  // Während WASD → Blockieren
+  if (pressed.size > 0) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+
+  // Nur mit Shift die Würfel-Distanz ändern
+  if (!e.shiftKey) return;
+
+  e.preventDefault();
+  e.stopImmediatePropagation();
+
   if (!cube) return;
   const step = THREE.MathUtils.clamp(previewDist * 0.1, 0.05, 1);
   previewDist += (e.deltaY > 0 ? 1 : -1) * step;
   previewDist = THREE.MathUtils.clamp(previewDist, minDist, maxDist);
   cube.position.set(0, 0, -previewDist);
-  cube.updateMatrixWorld();
 }
 
-// — Tick / Flight —
+/* ---------- Tick / Flight ---------- */
 function tick(now) {
   if (!$three?.controls || !$three?.camera) return;
   const dt = lastTime ? (now - lastTime) / 1000 : 0; lastTime = now;
@@ -228,12 +252,11 @@ function tick(now) {
   requestAnimationFrame(tick);
 }
 
-// — Panel-Erzeugung pro Würfel —
+/* ---------- Cube Panel ---------- */
 function createPanelForCube(obj) {
   const id = nextId++;
   const cont = document.createElement("div");
   cont.className = "cube-panel";
-
   const header = document.createElement("div");
   header.className = "cube-panel__header";
   header.innerHTML = `<span>Würfel #${id}</span>`;
@@ -242,33 +265,21 @@ function createPanelForCube(obj) {
   closeBtn.textContent = "✕";
   header.appendChild(closeBtn);
   cont.appendChild(header);
-
   const body = document.createElement("div");
   body.className = "cube-panel__body";
   cont.appendChild(body);
-
-  // Klick auf Header → selektiert den Würfel
   header.addEventListener("click", () => setSelected(obj));
-
-  // Close löscht den zugehörigen Würfel + Panel
-  closeBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    deleteCubeAndPanel(obj);
-  });
-
+  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); deleteCubeAndPanel(obj); });
   panelStack.value?.appendChild(cont);
 
-  // lil-gui im Body mounten
   const gui = new GUIClass({ container: body, title: "Eigenschaften" });
 
-  // Position (live listen)
   const posFolder = gui.addFolder("Position (m)");
   posFolder.add(obj.position, "x", -50, 50, 0.01).listen().onChange(()=>obj.updateMatrixWorld(true));
   posFolder.add(obj.position, "y", -50, 50, 0.01).listen().onChange(()=>obj.updateMatrixWorld(true));
   posFolder.add(obj.position, "z", -50, 50, 0.01).listen().onChange(()=>obj.updateMatrixWorld(true));
   posFolder.open();
 
-  // Rotation in Grad (Proxy + listen via change)
   const rotProxy = {
     rx: THREE.MathUtils.radToDeg(obj.rotation.x),
     ry: THREE.MathUtils.radToDeg(obj.rotation.y),
@@ -278,55 +289,35 @@ function createPanelForCube(obj) {
     rotProxy.rx = THREE.MathUtils.radToDeg(obj.rotation.x);
     rotProxy.ry = THREE.MathUtils.radToDeg(obj.rotation.y);
     rotProxy.rz = THREE.MathUtils.radToDeg(obj.rotation.z);
-    // Controllers updaten:
-    rotXCtrl.updateDisplay(); rotYCtrl.updateDisplay(); rotZCtrl.updateDisplay();
+    rxCtrl.updateDisplay(); ryCtrl.updateDisplay(); rzCtrl.updateDisplay();
   };
   const rotFolder = gui.addFolder("Rotation (°)");
-  const rotXCtrl = rotFolder.add(rotProxy, "rx", -180, 180, 1).onChange((v)=>{ obj.rotation.x = THREE.MathUtils.degToRad(v); obj.updateMatrixWorld(true); });
-  const rotYCtrl = rotFolder.add(rotProxy, "ry", -180, 180, 1).onChange((v)=>{ obj.rotation.y = THREE.MathUtils.degToRad(v); obj.updateMatrixWorld(true); });
-  const rotZCtrl = rotFolder.add(rotProxy, "rz", -180, 180, 1).onChange((v)=>{ obj.rotation.z = THREE.MathUtils.degToRad(v); obj.updateMatrixWorld(true); });
+  const rxCtrl = rotFolder.add(rotProxy, "rx", -180, 180, 1).onChange(v=>{ obj.rotation.x = THREE.MathUtils.degToRad(v); obj.updateMatrixWorld(true); });
+  const ryCtrl = rotFolder.add(rotProxy, "ry", -180, 180, 1).onChange(v=>{ obj.rotation.y = THREE.MathUtils.degToRad(v); obj.updateMatrixWorld(true); });
+  const rzCtrl = rotFolder.add(rotProxy, "rz", -180, 180, 1).onChange(v=>{ obj.rotation.z = THREE.MathUtils.degToRad(v); obj.updateMatrixWorld(true); });
 
-  // Aktionen
-  const actions = {
-    "Rotation 0°": ()=>{ obj.rotation.set(0,0,0); obj.updateMatrixWorld(true); syncProxyFromObj(); },
-    "Auf Boden (Y=0)": ()=>{ obj.position.y = 0; obj.updateMatrixWorld(true); },
-    "Auswählen": ()=> setSelected(obj),
-  };
-  gui.add(actions, "Rotation 0°");
-  gui.add(actions, "Auf Boden (Y=0)");
-  gui.add(actions, "Auswählen");
-
-  // Bei TransformControls-Bewegung die GUI-Proxywerte nachziehen
   transform?.addEventListener("change", () => {
     if (selected.value === obj) {
+      posFolder.controllers.forEach(c => c.updateDisplay?.());
       syncProxyFromObj();
     }
   });
 
   cubeUI.set(obj, { id, container: cont, header, body, gui, rotProxy });
 }
-
 function deleteCubeAndPanel(obj) {
-  // Szene
   const idx = placed.indexOf(obj);
   if (idx >= 0) placed.splice(idx, 1);
   $three.scene.remove(obj);
   if (selected.value === obj) setSelected(null);
-
-  // Panel
   const info = cubeUI.get(obj);
-  if (info) {
-    info.gui?.destroy();
-    info.container?.remove();
-    cubeUI.delete(obj);
-  }
+  info?.gui?.destroy();
+  info?.container?.remove();
+  cubeUI.delete(obj);
 }
 
-
-
-// — Lifecycle —
+/* ---------- Lifecycle ---------- */
 onMounted(async () => {
-  // $three holen
   if (import.meta.dev) {
     const mod = await import("~/composables/threeDev.js");
     const devScene = await mod.init(true, true);
@@ -336,37 +327,12 @@ onMounted(async () => {
     await $three.ready;
   }
 
-  cameraHUD.value.x = $three.camera.position.x;
-  cameraHUD.value.y = $three.camera.position.y;
-  cameraHUD.value.z = $three.camera.position.z;
-
-  cameraHUD.value.rx = $three.camera.rotation.x;
-  cameraHUD.value.ry = $three.camera.rotation.y;
-  cameraHUD.value.rz = $three.camera.rotation.z;
-
-
-
-
-
-  // OrbitControls Basis
   if ($three?.controls) {
     const c = $three.controls;
     c.enableRotate = true; c.enableZoom = true; c.enablePan = true;
     c.dampingFactor = 0.05; c.enableKeys = false; c.update();
   }
 
-  $three.controls.addEventListener("change", () => {
-  cameraHUD.value = {
-    x: $three.camera.position.x,
-    y: $three.camera.position.y,
-    z: $three.camera.position.z,
-    rx: $three.camera.rotation.x,
-    ry: $three.camera.rotation.y,
-    rz: $three.camera.rotation.z
-  };
-});
-
-  // Examples dynamisch importieren
   const [{ TransformControls }, { GUI }] = await Promise.all([
     import("three/examples/jsm/controls/TransformControls.js"),
     import("three/examples/jsm/libs/lil-gui.module.min.js"),
@@ -374,27 +340,42 @@ onMounted(async () => {
   TransformControlsClass = TransformControls;
   GUIClass = GUI;
 
-  // TransformControls
   transform = new TransformControlsClass($three.camera, $three.renderer.domElement);
   transform.setMode("translate");
   transform.addEventListener("dragging-changed", (e) => {
     if ($three?.controls) $three.controls.enabled = !e.value;
   });
-  $three.scene.add(transform);
+  if (!$three.scene.children.includes(transform)) $three.scene.add(transform);
 
-  // Szene vorbereiten
   addGridHelper();
   cube = spawnCubeAttached();
 
-  // Events
+  const updateHUD = () => {
+    cameraHUD.value = {
+      x: $three.camera.position.x,
+      y: $three.camera.position.y,
+      z: $three.camera.position.z,
+      rx: THREE.MathUtils.radToDeg($three.camera.rotation.x),
+      ry: THREE.MathUtils.radToDeg($three.camera.rotation.y),
+      rz: THREE.MathUtils.radToDeg($three.camera.rotation.z),
+    };
+  };
+  updateHUD();
+  $three.controls.addEventListener("change", updateHUD);
+
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
   window.addEventListener("wheel", onWheel, { passive: false });
 
-  const wrapper = document.querySelector(".three-wrapper");
-  wrapper?.addEventListener("pointerdown", onPointerDown);
+  document.querySelector(".three-wrapper")?.addEventListener("pointerdown", onPointerDown);
 
-  // Loop
+  const panelEl = panelStack.value;
+  if (panelEl) {
+    const stop = (e) => e.stopPropagation();
+    ["wheel","touchstart","touchmove","pointerdown","pointermove","pointerup","mousedown","mousemove","mouseup"]
+      .forEach(ev => panelEl.addEventListener(ev, stop, { passive: true }));
+  }
+
   requestAnimationFrame(tick);
 });
 
@@ -402,93 +383,56 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeyDown);
   window.removeEventListener("keyup", onKeyUp);
   window.removeEventListener("wheel", onWheel);
-  const wrapper = document.querySelector(".three-wrapper");
-  wrapper?.removeEventListener("pointerdown", onPointerDown);
-  // Panels & GUIs aufräumen
-  cubeUI.forEach((ui) => ui.gui?.destroy());
+  document.querySelector(".three-wrapper")?.removeEventListener("pointerdown", onPointerDown);
+  cubeUI.forEach(ui => ui.gui?.destroy());
 });
 </script>
 
 <style>
-
 .cameraPos {
   position: fixed;
-  top: 1%;
-  left: 25%;
-
+  bottom: 1rem;
+  left: 50%;
+  transform: translate(-50%, 0);
+  color: white;
+  background: rgba(0,0,0,.5);
+  padding: .25rem .5rem;
+  border-radius: .25rem;
+  font-size: .875rem;
 }
-
 
 .page-content { padding-bottom: 1rem; }
 .three-wrapper { position: relative; min-height: 1px; }
 .page-headline { font-weight: 700; font-size: 1.25rem; padding: .75rem 1rem; }
-.btn-reset { background: #0af; color: white; font-size: 0.875rem; padding: 0.25rem 0.75rem; border-radius: 0.375rem; border: none; cursor: pointer; }
+
+.btn-reset {
+  background: #0af; color: #fff; font-size: .875rem;
+  padding: .25rem .75rem; border-radius: .375rem; border: none; cursor: pointer;
+}
 .btn-reset:hover { background: #0080c0; }
 
-/* Rechte Sidebar: Stack der Panels */
 .panel-stack {
-  position: fixed;
-  top:0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  gap: .75rem;
-  overflow: auto;
-  pointer-events: auto;
-  z-index: 20;
+  position: fixed; top: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column;
+  overflow: auto; pointer-events: auto; z-index: 20;
+  overscroll-behavior: contain;
 }
-
-
-
-/* Einzelnes Panel */
 
 .cube-panel__header {
-  display: flex;
-  color: #fff;
-  background: #000000;
-  justify-content: space-between;
-  align-items: center;
-  justify-content: space-between;
-  gap: .5rem;
-  padding: .5rem .75rem;
-  font-weight: 700;
-  user-select: none;
-  cursor: pointer;
+  display: flex; color: #fff; background: #000;
+  justify-content: space-between; align-items: center;
+  gap: .5rem; padding: .5rem .75rem; font-weight: 700;
+  user-select: none; cursor: pointer;
 }
-.cube-panel__header.active {
-  outline: 2px solid #0af;
-}
-
-.cube-panel__header span {
-  color: #fff;
-}
+.cube-panel__header.active { outline: 2px solid #0af; }
+.cube-panel__header span { color: #fff; }
 .cube-panel__close {
-  background: transparent;
-  color: #fff;
-  border: none;
-  font-size: 1rem;
-  cursor: pointer;
-  opacity: .85;
+  background: transparent; color: #fff; border: none;
+  font-size: 1rem; cursor: pointer; opacity: .85;
 }
 .cube-panel__close:hover { opacity: 1; }
 
-
 button.btn-reset {
-  position: fixed;
-  bottom: 1rem;
-  left: 1rem;
-  z-index: 1000;
-}
-
-
-</style>
-
-
-<style>
-
-.page-layout {
-  display: block !important;
+  position: fixed; bottom: 1rem; left: 1rem; z-index: 1000;
 }
 </style>
-
