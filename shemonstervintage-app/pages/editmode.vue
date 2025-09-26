@@ -77,15 +77,19 @@ const pointer = new THREE.Vector2();
 const panelStack = ref(null);
 const cubeUI = new Map();
 let nextId = 1;
+let overPanel = false; // NEU: Cursor über Panel-Spalte?
 
 // Background sphere
 let bgParams = { panoramaDeg: 0, panoramaAmp: 0, autoRotate: false, speedDegPerSec: 6 };
 
-// ---------- Grid-Refs + Params (NEU) ----------
+// ---------- Grid-Refs + Params ----------
 let grid = null;
 let gridMajor = null;
 let axesHelper = null;
-const gridParams = { y: 0 }; // Höhe in Metern
+const gridParams = { y: 0 }; // Höhe in Metern (Start 0,0,0)
+
+// ---------- Clipping-Toggle ----------
+const gridClip = { insideSphereOnly: true };
 
 /* ---------- Helpers ---------- */
 function makeCube() {
@@ -117,8 +121,9 @@ function addGridHelper() {
   grid.position.y = gridParams.y;
   grid.material.transparent = true;
   grid.material.opacity = 0.95;
-  grid.material.depthTest = false;
+  grid.material.depthTest = true;             // wichtig fürs Clipping
   grid.material.depthWrite = false;
+  grid.material.depthFunc = THREE.LessEqualDepth; // nur innerhalb der Sphere sichtbar
   grid.renderOrder = 1;
   $three.scene.add(grid);
 
@@ -126,8 +131,9 @@ function addGridHelper() {
   gridMajor.position.y = gridParams.y;
   gridMajor.material.transparent = true;
   gridMajor.material.opacity = 1.0;
-  gridMajor.material.depthTest = false;
+  gridMajor.material.depthTest = true;
   gridMajor.material.depthWrite = false;
+  gridMajor.material.depthFunc = THREE.LessEqualDepth;
   gridMajor.renderOrder = 2;
   $three.scene.add(gridMajor);
 
@@ -135,9 +141,13 @@ function addGridHelper() {
   axesHelper.position.y = gridParams.y;
   axesHelper.renderOrder = 3;
   if (Array.isArray(axesHelper.material)) {
-    axesHelper.material.forEach(m => { m.depthTest = false; m.depthWrite = false; });
-  } else {
-    axesHelper.material.depthTest = false; axesHelper.material.depthWrite = false;
+    axesHelper.material.forEach(m => {
+      m.depthTest = true; m.depthWrite = false; m.depthFunc = THREE.LessEqualDepth;
+    });
+  } else if (axesHelper.material) {
+    axesHelper.material.depthTest = true;
+    axesHelper.material.depthWrite = false;
+    axesHelper.material.depthFunc = THREE.LessEqualDepth;
   }
   $three.scene.add(axesHelper);
 }
@@ -218,10 +228,10 @@ function onKeyUp(e) {
   }
 }
 function onWheel(e) {
-  // Während WASD → blockieren (kein Orbit)
-  if (pressed.size > 0) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+  // NEU: Wenn Cursor über Panels, nie in die Preview-Distanz eingreifen
+  if (overPanel) return;
 
-  // Nur mit Shift die Würfel-Distanz ändern
+  if (pressed.size > 0) { e.preventDefault(); e.stopImmediatePropagation(); return; }
   if (!e.shiftKey) return;
 
   e.preventDefault();
@@ -347,12 +357,29 @@ function createBackgroundPanel() {
       bgSphere.material.uniforms.uAmplitude.value = v;
     }
   });
-  // optional: Auto-Rotate
   gui.add(bgParams, "autoRotate").name("Auto-Rotate");
   gui.add(bgParams, "speedDegPerSec", 0, 60, 0.1).name("Speed (°/s)");
 }
 
-// ---------- NEU: Grid-Panel ----------
+// ---------- Grid-Panel inkl. Clipping-Toggle ----------
+function applyGridClipping(v) {
+  // Sphere muss Depth schreiben, damit sie das Grid "abschneidet"
+  if (bgSphere?.material) bgSphere.material.depthWrite = v;
+  if (bgSphere) bgSphere.renderOrder = 0; // zuerst rendern
+
+  // Grid/Axis Depth-Test an/aus; depthFunc bleibt LessEqualDepth wenn aktiv
+  if (grid?.material) grid.material.depthTest = v;
+  if (gridMajor?.material) gridMajor.material.depthTest = v;
+
+  if (axesHelper) {
+    if (Array.isArray(axesHelper.material)) {
+      axesHelper.material.forEach(m => m.depthTest = v);
+    } else if (axesHelper.material) {
+      axesHelper.material.depthTest = v;
+    }
+  }
+}
+
 function createGridPanel() {
   if (!GUIClass || !panelStack.value) return;
 
@@ -377,6 +404,11 @@ function createGridPanel() {
       if (gridMajor) gridMajor.position.y = v;
       if (axesHelper) axesHelper.position.y = v;
     });
+
+  // Nur innerhalb Sphere sichtbar
+  gui.add(gridClip, "insideSphereOnly")
+    .name("Nur innerhalb Sphere")
+    .onChange(applyGridClipping);
 
   // Optional: Sichtbarkeit/Opazität
   const vis = {
@@ -438,8 +470,19 @@ onMounted(async () => {
   });
   if (!$three.scene.children.includes(transform)) $three.scene.add(transform);
 
+  // Background-Sphere: Depth schreiben & früh rendern
+  if (bgSphere?.material) bgSphere.material.depthWrite = true;
+  if (bgSphere) bgSphere.renderOrder = 0;
+
   addGridHelper();
-  createGridPanel();          // <- NEU: Grid-Panel erzeugen
+  // RenderOrder für Hilfen hintereinander
+  if (grid) grid.renderOrder = 1;
+  if (gridMajor) gridMajor.renderOrder = 2;
+  if (axesHelper) axesHelper.renderOrder = 3;
+
+  createGridPanel();
+  // initial Clipping anwenden
+  applyGridClipping(gridClip.insideSphereOnly);
 
   // Preview-Cube
   cube = spawnCubeAttached();
@@ -464,12 +507,17 @@ onMounted(async () => {
   window.addEventListener("wheel", onWheel, { passive: false });
   document.querySelector(".three-wrapper")?.addEventListener("pointerdown", onPointerDown);
 
-  // OrbitControls blocken wenn in Panel-Stack interagiert wird
+  // OrbitControls beim Hover über Panels deaktivieren (statt Events zu blocken)
   const panelEl = panelStack.value;
   if (panelEl) {
-    const stop = (e) => e.stopPropagation();
-    ["wheel","touchstart","touchmove","pointerdown","pointermove","pointerup","mousedown","mousemove","mouseup"]
-      .forEach(ev => panelEl.addEventListener(ev, stop, { passive: true }));
+    panelEl.addEventListener("mouseenter", () => {
+      overPanel = true;
+      if ($three?.controls) $three.controls.enabled = false;
+    });
+    panelEl.addEventListener("mouseleave", () => {
+      overPanel = false;
+      if ($three?.controls) $three.controls.enabled = true;
+    });
   }
 
   // Background-Panel erzeugen (falls vorhanden)
