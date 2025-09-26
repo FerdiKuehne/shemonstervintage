@@ -285,10 +285,19 @@ function isEditable(el) {
 function onKeyDown(e) {
   if (!$three?.controls) return;
 
-  // wenn im Eingabefeld: nix kapern
+  // 1) Drop-Shortcut zuerst & immer erlauben (auch wenn ein Input fokussiert ist)
+  if (e.key === "+" || e.code === "NumpadAdd") {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!cube) cube = spawnCubeAttached();
+    dropAndSpawnNew();
+    return;
+  }
+
+  // 2) Wenn im Eingabefeld: restliche Shortcuts ignorieren
   if (isEditable(document.activeElement)) return;
 
-  // WASD greift immer (vor lil-gui), Scroll verhindern
+  // 3) WASD greift immer (vor lil-gui), Scroll verhindern
   if (WASD.has(e.code)) {
     e.preventDefault();
     pressed.add(e.code);
@@ -296,13 +305,14 @@ function onKeyDown(e) {
     return;
   }
 
-  // W/E/R nur, wenn NICHT im Flugmodus
+  // 4) W/E/R nur, wenn NICHT im Flugmodus
   if (transform && pressed.size === 0) {
     if (e.code === "KeyW") transform.setMode("translate");
     if (e.code === "KeyE") transform.setMode("rotate");
     if (e.code === "KeyR") transform.setMode("scale");
   }
 }
+
 function onKeyUp(e) {
   if (!$three?.controls) return;
   if (WASD.has(e.code)) {
