@@ -106,6 +106,19 @@ const gridParams = { y: 0 }; // Höhe in Metern (Start 0,0,0)
 // ---------- Clipping-Toggle ----------
 const gridClip = { insideSphereOnly: true };
 
+/* ---------- Sphere-Outline (Schnittkreis als dünner Ring) ---------- */
+let boundaryRing = null;        // Mesh (RingGeometry)
+const ringSegs = 128;
+const RING_THICKNESS = 0.02;
+const ringMat = new THREE.MeshBasicMaterial({
+  color: 0x00ff00,              // grün
+  transparent: true,
+  opacity: 1.0,
+  depthTest: true,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+});
+
 /* ---------- Helpers ---------- */
 function makeCube(material = SOLID_MAT) {
   const size = 0.2;
@@ -165,6 +178,9 @@ function addGridHelper() {
     axesHelper.material.depthFunc = THREE.LessEqualDepth;
   }
   $three.scene.add(axesHelper);
+
+  // Ring initial aktualisieren
+  updateBoundaryRing();
 }
 
 function resetCamera() {
@@ -211,14 +227,12 @@ function onPointerDown(e) {
 
 /* ---------- Drop Cube ---------- */
 function dropAndSpawnNew() {
-  // Vor dem Ablösen: Material auf solide wechseln
   if (cube) cube.material = SOLID_MAT.clone();
-
   safeDetachToScene(cube);
   placed.push(cube);
   createPanelForCube(cube);
   setSelected(cube);
-  cube = spawnCubeAttached(); // neuer halbtransparenter Preview-Würfel
+  cube = spawnCubeAttached();
 }
 
 /* ---------- Keyboard / Wheel ---------- */
@@ -246,9 +260,7 @@ function onKeyUp(e) {
   }
 }
 function onWheel(e) {
-  // Wenn Cursor über Panels, nie in die Preview-Distanz eingreifen
   if (overPanel) return;
-
   if (pressed.size > 0) { e.preventDefault(); e.stopImmediatePropagation(); return; }
   if (!e.shiftKey) return;
 
@@ -260,6 +272,65 @@ function onWheel(e) {
   previewDist += (e.deltaY > 0 ? 1 : -1) * step;
   previewDist = THREE.MathUtils.clamp(previewDist, minDist, maxDist);
   cube.position.set(0, 0, -previewDist);
+}
+
+/* ---------- Schnittkreis-Helper ---------- */
+function getSphereRadiusWorld() {
+  if (!bgSphere?.geometry) return null;
+  let R = bgSphere.geometry.parameters?.radius ?? null;
+  if (R == null) {
+    bgSphere.geometry.computeBoundingSphere?.();
+    R = bgSphere.geometry.boundingSphere?.radius ?? 1;
+  }
+  const s = bgSphere.scale?.x ?? 1; // uniforme Skalierung angenommen
+  return R * s;
+}
+
+function updateBoundaryRing() {
+  if (!$three || !bgSphere) return;
+
+  const gridY   = gridParams.y;
+  const sphereY = bgSphere.position?.y ?? 0;
+  const R       = getSphereRadiusWorld();
+  if (R == null) return;
+
+  const dy = gridY - sphereY;
+  const r2 = R*R - dy*dy;
+
+  // kein Schnitt -> Ring ausblenden
+  if (r2 <= 0) {
+    if (boundaryRing) boundaryRing.visible = false;
+    return;
+  }
+
+  const r = Math.sqrt(r2);
+  // Dicke adaptiv, damit bei großem r sichtbar bleibt
+  const thickness = Math.max(RING_THICKNESS, r * 0.005);
+  const inner = Math.max(0, r - thickness * 0.5);
+  const outer = r + thickness * 0.5;
+
+  const geom = new THREE.RingGeometry(inner, outer, ringSegs);
+
+  if (!boundaryRing) {
+    boundaryRing = new THREE.Mesh(geom, ringMat);
+    boundaryRing.rotation.x = -Math.PI / 2;         // XZ-Ebene
+    boundaryRing.renderOrder = 2.5;                 // über Grid (1/2)
+    $three.scene.add(boundaryRing);
+  } else {
+    boundaryRing.geometry.dispose?.();
+    boundaryRing.geometry = geom;
+    boundaryRing.visible = true;
+  }
+
+  // Position (XZ um Sphere-Center, Y auf Grid, minimal Offset über Grid)
+  boundaryRing.position.set(
+    bgSphere.position?.x ?? 0,
+    gridY + 1e-4,
+    bgSphere.position?.z ?? 0
+  );
+
+  // gleiche Clip-Logik wie Grid
+  boundaryRing.material.depthTest = gridClip.insideSphereOnly;
 }
 
 /* ---------- Tick / Flight ---------- */
@@ -396,6 +467,8 @@ function applyGridClipping(v) {
       axesHelper.material.depthTest = v;
     }
   }
+
+  if (boundaryRing?.material) boundaryRing.material.depthTest = v; // Ring konsistent clippen
 }
 
 function createGridPanel() {
@@ -421,12 +494,15 @@ function createGridPanel() {
       if (grid) grid.position.y = v;
       if (gridMajor) gridMajor.position.y = v;
       if (axesHelper) axesHelper.position.y = v;
+      updateBoundaryRing(); // Ring nachziehen
     });
 
   // Nur innerhalb Sphere sichtbar
   gui.add(gridClip, "insideSphereOnly")
     .name("Nur innerhalb Sphere")
-    .onChange(applyGridClipping);
+    .onChange((v) => {
+      applyGridClipping(v);
+    });
 
   // Optional: Sichtbarkeit/Opazität
   const vis = {
@@ -486,7 +562,10 @@ onMounted(async () => {
   transform.addEventListener("dragging-changed", (e) => {
     if ($three?.controls) $three.controls.enabled = !e.value;
   });
-  if (!$three.scene.children.includes(transform)) $three.scene.add(transform);
+  // Add nur, wenn wirklich ein Object3D (fix für "object not an instance...")
+  if (transform && (transform instanceof THREE.Object3D || transform.isObject3D)) {
+    if (!$three.scene.children.includes(transform)) $three.scene.add(transform);
+  }
 
   // Background-Sphere: Depth schreiben & früh rendern
   if (bgSphere?.material) bgSphere.material.depthWrite = true;
@@ -540,6 +619,9 @@ onMounted(async () => {
 
   // Background-Panel erzeugen (falls vorhanden)
   if (bgSphere) createBackgroundPanel();
+
+  // Ring initial ziehen (falls Sphere/Scale ≠ default)
+  updateBoundaryRing();
 
   requestAnimationFrame(tick);
 });
