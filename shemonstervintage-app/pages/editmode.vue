@@ -111,7 +111,7 @@ let boundaryRing = null;        // Mesh (RingGeometry)
 const ringSegs = 128;
 const RING_THICKNESS = 0.02;
 const ringMat = new THREE.MeshBasicMaterial({
-  color: 0x00ff00,              // grün
+  color: 0xff0000,           // rot ✅
   transparent: true,
   opacity: 1.0,
   depthTest: true,
@@ -183,16 +183,31 @@ function addGridHelper() {
   updateBoundaryRing();
 }
 
+function getSphereWorldCenter() {
+  const c = new THREE.Vector3();
+  if (bgSphere) bgSphere.getWorldPosition(c); else c.set(0,0,0);
+  return c;
+}
+
 function resetCamera() {
   if (!$three?.camera || !$three?.controls) return;
   const cam = $three.camera;
   const controls = $three.controls;
-  cam.position.set(0, 0, 0);
-  cam.quaternion.set(0, 0, 0, 1);
+
+  const center = getSphereWorldCenter();
+
+  // winziger Offset, damit OrbitControls nicht exakt im Target sitzt
+  const EPS = 1e-4;
+  cam.position.copy(center).addScalar(EPS);
+
+  controls.target.copy(center);
+  cam.lookAt(center.clone().add(new THREE.Vector3(0, 0, -1)));
+
   cam.updateMatrixWorld(true);
-  controls.target.set(0, 0, -1);
   controls.update();
 }
+
+
 function safeDetachToScene(obj) {
   if (!(obj instanceof THREE.Object3D)) return;
   $three.camera.updateMatrixWorld(true);
