@@ -31,6 +31,13 @@ definePageMeta({ layout: "three" });
 
 let $three;
 
+
+let cameraPanelContainer = null;
+let cameraGui = null;
+const camAngles = { yawDeg: 0, pitchDeg: 90 }; // OrbitControls-Winkel in Grad
+let camYawCtrl = null;
+let camPitchCtrl = null;
+
 // — Vorschauwürfel —
 let cube = null;
 let previewDist = 1.5;
@@ -431,9 +438,9 @@ onBeforeUnmount(() => {
 
 button.btn-reset {
   position: fixed;
-   top: 0;
-   left: 0;
-   z-index: 1000;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 1000;
 }
 
 
