@@ -194,18 +194,32 @@ function resetCamera() {
   const cam = $three.camera;
   const controls = $three.controls;
 
+  // Zentrum & sinnvolle Distanz aus Sphere ableiten
   const center = getSphereWorldCenter();
+  const R = getSphereRadiusWorld() ?? 5;         // fallback
+  const dist = Math.max(2, R * 0.6);             // ~60% des Sphere-Radius
 
-  // winziger Offset, damit OrbitControls nicht exakt im Target sitzt
-  const EPS = 1e-4;
-  cam.position.copy(center).addScalar(EPS);
+  // angenehmer Startblick: leichte Höhe + schräg (elevation ~20°, azimuth -30°)
+  const elevDeg = 20;                             // 0..90 (0 = auf Höhe, 90 = von oben)
+  const azimDeg = -30;
+  const phi   = THREE.MathUtils.degToRad(90 - elevDeg); // polar
+  const theta = THREE.MathUtils.degToRad(azimDeg);      // azimuth um Y
 
+  const offset = new THREE.Vector3().setFromSpherical(
+    new THREE.Spherical(dist, phi, theta)
+  );
+
+  cam.position.copy(center).add(offset);
   controls.target.copy(center);
-  cam.lookAt(center.clone().add(new THREE.Vector3(0, 0, -1)));
 
+  // keine Änderung von controls.enabled! (Hover über Panel bleibt intakt)
   cam.updateMatrixWorld(true);
   controls.update();
+
+  // OrbitControls „entspannen“ (stellt internen Zustand auf NONE)
+  controls.dispatchEvent({ type: 'end' });
 }
+
 
 
 function safeDetachToScene(obj) {
