@@ -1,26 +1,31 @@
+// fragment.glsl
+precision mediump float;
+
 uniform sampler2D uTexture;
 uniform float uTime;
-uniform float uAmplitude; // 0.0 = clean pano, 1.0 = warp drive
+uniform float uAmplitude;   // 0.0 = clean pano, 1.0 = warp drive
+uniform float uOffset;      // NEU: 0..1 (entspricht 0..360°)
 
 varying vec3 vNormal;
 varying vec2 vUv;
 
 void main() {
-    vec2 uv = vUv;
-
-    // Flip horizontally if needed (inside sphere)
+    // Basis-UV (inkl. Flip für inside sphere)
+    vec2 uv0 = vUv;
     if (vNormal.z > 0.0) {
-        uv.x = 1.0 - uv.x;
+        uv0.x = 1.0 - uv0.x;
     }
 
-    // If amplitude is 0.0 → render normal pano
+    // --- Kein Warp: nur Panorama-Offset zyklisch in X ---
     if (uAmplitude < 0.001) {
-        gl_FragColor = texture2D(uTexture, uv);
+        vec2 uvClean = uv0;
+        uvClean.x = fract(uvClean.x + uOffset);   // zyklischer Shift
+        gl_FragColor = texture2D(uTexture, uvClean);
         return;
     }
 
-    // --- Warp Drive Effect ---
-    vec2 center = uv - 0.5;
+    // -------- Warp-Drive (Geometrie unabhängig vom Offset berechnen) --------
+    vec2 center = uv0 - 0.5;
     float radius = length(center);
     float angle = atan(center.y, center.x);
 
@@ -30,14 +35,28 @@ void main() {
     radius += uAmplitude * 0.3 * sin(speed + radius * 5.0);
     angle  += uAmplitude * 0.5 * sin(speed * 0.5 + radius * 20.0);
 
-    // Convert back
+    // Zurück in UV
     vec2 warped = vec2(cos(angle), sin(angle)) * radius;
+    vec2 uvWarp = warped + 0.5;
 
     // Chromatic aberration
     vec2 shift = 0.002 * center * uAmplitude;
-    vec4 texR = texture2D(uTexture, warped + 0.5 + shift);
-    vec4 texG = texture2D(uTexture, warped + 0.5);
-    vec4 texB = texture2D(uTexture, warped + 0.5 - shift);
+
+    // Panorama-Offset NACH der Verzerrung addieren (nur X zyklisch)
+    vec2 uvR = uvWarp + shift;
+    vec2 uvG = uvWarp;
+    vec2 uvB = uvWarp - shift;
+
+    uvR.x = fract(uvR.x + uOffset);
+    uvG.x = fract(uvG.x + uOffset);
+    uvB.x = fract(uvB.x + uOffset);
+
+    // (Y lassen wir unclamped, da 0..1 ohnehin nicht verlassen wird; sonst clampen:)
+    // uvR.y = clamp(uvR.y, 0.0, 1.0); uvG.y = clamp(uvG.y, 0.0, 1.0); uvB.y = clamp(uvB.y, 0.0, 1.0);
+
+    vec4 texR = texture2D(uTexture, uvR);
+    vec4 texG = texture2D(uTexture, uvG);
+    vec4 texB = texture2D(uTexture, uvB);
 
     gl_FragColor = vec4(texR.r, texG.g, texB.b, 1.0);
 }

@@ -10,9 +10,26 @@
         </div>
       </div>
 
+
+      <div class="offset-sphere">
+        <div class="row">
+          <label for="offset">Offset</label>
+          <strong>{{ (offset*360).toFixed(1) }}°</strong>
+        </div>
+
+        <input id="offset" type="range" min="0" max="1" step="0.001" v-model.number="offset" aria-label="uOffset (0..1)" />
+
+        <div class="row" style="margin-top:8px">
+          <span>uOffset</span>
+          <input type="number" min="0" max="1" step="0.001" v-model.number="offset" style="width: 7.5ch; text-align: right;" aria-label="uOffset numerisch" />
+        </div>
+
+        <pre>gl.uniform1f(uOffsetLoc, {{ offset.toFixed(3) }})</pre>
+      </div>
+
       <div class="page-headline flex items-center justify-between">
         <span>EDITMODE</span>
-        <button class="btn-reset" @click="resetCamera">Reset Position</button>
+        <button class="btn-reset" @click="resetCamera">Reset CAM-Position</button>
       </div>
 
       <div class="row">
@@ -30,14 +47,15 @@
       <div class="three-wrapper"></div>
     </ClientOnly>
 
-    <!-- Rechte Sidebar: Container für alle Cube-Panels -->
+    <!-- Rechte Sidebar: Container für alle Panels -->
     <div class="panel-stack" ref="panelStack"></div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, ref } from "vue";
+import { onMounted, onBeforeUnmount, ref, watch } from "vue";
 import * as THREE from "three";
+import { createBackgroundSphereFromAPI } from "../composables/backgroundsphere.js";
 
 definePageMeta({ layout: "three" });
 
@@ -75,6 +93,17 @@ const panelStack = ref(null);
 const cubeUI = new Map();
 let nextId = 1;
 
+// Offset panel
+
+const offset = ref(0.0) 
+const uAmplitude = ref(0.0);  
+let 
+
+
+// Background sphere
+let bgSphere = null;
+const bgParams = { panoramaDeg: 0, autoRotate: false, speedDegPerSec: 10 };
+
 /* ---------- Helpers ---------- */
 function makeCube() {
   const size = 0.2;
@@ -99,42 +128,31 @@ function spawnCubeAttached() {
   return newCube;
 }
 function addGridHelper() {
-  // Basisraster: 1 m Raster, hohe Sichtbarkeit
-  const size = 100;                 // Ausdehnung (m)
-  const divisions = size;           // 1 m Abstand
+  const size = 100, divisions = size;
   const grid = new THREE.GridHelper(size, divisions, 0xffffff, 0x707070);
   grid.position.y = 0;
-
-  // deutlich sichtbar machen
   grid.material.transparent = true;
   grid.material.opacity = 0.95;
-  grid.material.depthTest = false;   // immer sichtbar
+  grid.material.depthTest = false;
   grid.material.depthWrite = false;
   grid.renderOrder = 1;
-
   $three.scene.add(grid);
 
-  // Major-Grid: jede 10. Linie betonen
-  const majorDivisions = size / 10;  // 10 m Abstand
-  const major = new THREE.GridHelper(size, majorDivisions, 0xffffff, 0xffffff);
+  const major = new THREE.GridHelper(size, size / 10, 0xffffff, 0xffffff);
   major.position.y = 0;
   major.material.transparent = true;
   major.material.opacity = 1.0;
   major.material.depthTest = false;
   major.material.depthWrite = false;
   major.renderOrder = 2;
-
   $three.scene.add(major);
 
-  // (Optional) Achsenhilfe zur Orientierung
   const axes = new THREE.AxesHelper(1.5);
   axes.renderOrder = 3;
-  // sicherstellen, dass auch Achsen immer sichtbar sind
   if (Array.isArray(axes.material)) {
     axes.material.forEach(m => { m.depthTest = false; m.depthWrite = false; });
   } else {
-    axes.material.depthTest = false;
-    axes.material.depthWrite = false;
+    axes.material.depthTest = false; axes.material.depthWrite = false;
   }
   $three.scene.add(axes);
 }
@@ -215,7 +233,7 @@ function onKeyUp(e) {
   }
 }
 function onWheel(e) {
-  // Während WASD → Blockieren
+  // Während WASD → blockieren (kein Orbit)
   if (pressed.size > 0) { e.preventDefault(); e.stopImmediatePropagation(); return; }
 
   // Nur mit Shift die Würfel-Distanz ändern
@@ -236,6 +254,7 @@ function tick(now) {
   if (!$three?.controls || !$three?.camera) return;
   const dt = lastTime ? (now - lastTime) / 1000 : 0; lastTime = now;
 
+  // WASD-Flight
   if (pressed.size > 0) {
     const cam = $three.camera, c = $three.controls;
     cam.getWorldDirection(tmpForward).normalize();
@@ -248,11 +267,22 @@ function tick(now) {
     if (move.lengthSq() > 0) { cam.position.add(move); c.target.add(move); c.update(); }
   }
 
+  // Shader-Time & Auto-Rotate für Background
+  if (bgSphere?.material?.uniforms) {
+    if (bgSphere.material.uniforms.uTime) {
+      bgSphere.material.uniforms.uTime.value += dt;
+    }
+    if (bgParams.autoRotate && bgSphere.material.uniforms.uOffset) {
+      bgParams.panoramaDeg = (bgParams.panoramaDeg + bgParams.speedDegPerSec * dt) % 360;
+      bgSphere.material.uniforms.uOffset.value = bgParams.panoramaDeg / 360;
+    }
+  }
+
   $three.controls.update?.();
   requestAnimationFrame(tick);
 }
 
-/* ---------- Cube Panel ---------- */
+/* ---------- Panels ---------- */
 function createPanelForCube(obj) {
   const id = nextId++;
   const cont = document.createElement("div");
@@ -305,6 +335,32 @@ function createPanelForCube(obj) {
 
   cubeUI.set(obj, { id, container: cont, header, body, gui, rotProxy });
 }
+
+function createBackgroundPanel() {
+  if (!GUIClass || !panelStack.value || !bgSphere?.material?.uniforms) return;
+
+  const cont = document.createElement("div");
+  cont.className = "cube-panel";
+  const header = document.createElement("div");
+  header.className = "cube-panel__header";
+  header.innerHTML = `<span>Background</span>`;
+  cont.appendChild(header);
+  const body = document.createElement("div");
+  body.className = "cube-panel__body";
+  cont.appendChild(body);
+  panelStack.value.appendChild(cont);
+
+  const gui = new GUIClass({ container: body, title: "Panorama" });
+
+  gui.add(bgParams, "panoramaDeg", 0, 360, 1).name("Offset (°)").onChange((deg) => {
+    if (bgSphere.material.uniforms.uOffset) {
+      bgSphere.material.uniforms.uOffset.value = (deg % 360) / 360;
+    }
+  });
+  gui.add(bgParams, "autoRotate").name("Auto-Scroll");
+  gui.add(bgParams, "speedDegPerSec", 1, 90, 1).name("Speed (°/s)");
+}
+
 function deleteCubeAndPanel(obj) {
   const idx = placed.indexOf(obj);
   if (idx >= 0) placed.splice(idx, 1);
@@ -318,6 +374,7 @@ function deleteCubeAndPanel(obj) {
 
 /* ---------- Lifecycle ---------- */
 onMounted(async () => {
+  // Three-Komponenten aus Nuxt holen
   if (import.meta.dev) {
     const mod = await import("~/composables/threeDev.js");
     const devScene = await mod.init(true, true);
@@ -326,6 +383,8 @@ onMounted(async () => {
     $three = useNuxtApp().$three;
     await $three.ready;
   }
+
+bgSphere = $three.backgroundSphere;
 
   if ($three?.controls) {
     const c = $three.controls;
@@ -348,8 +407,11 @@ onMounted(async () => {
   if (!$three.scene.children.includes(transform)) $three.scene.add(transform);
 
   addGridHelper();
+
+  // Preview-Cube
   cube = spawnCubeAttached();
 
+  // HUD sync
   const updateHUD = () => {
     cameraHUD.value = {
       x: $three.camera.position.x,
@@ -363,18 +425,22 @@ onMounted(async () => {
   updateHUD();
   $three.controls.addEventListener("change", updateHUD);
 
+  // Events
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
   window.addEventListener("wheel", onWheel, { passive: false });
-
   document.querySelector(".three-wrapper")?.addEventListener("pointerdown", onPointerDown);
 
+  // OrbitControls blocken wenn in Panel-Stack interagiert wird
   const panelEl = panelStack.value;
   if (panelEl) {
     const stop = (e) => e.stopPropagation();
     ["wheel","touchstart","touchmove","pointerdown","pointermove","pointerup","mousedown","mousemove","mouseup"]
       .forEach(ev => panelEl.addEventListener(ev, stop, { passive: true }));
   }
+
+  // Background-Panel erzeugen
+  if (bgSphere) createBackgroundPanel();
 
   requestAnimationFrame(tick);
 });
@@ -391,13 +457,13 @@ onBeforeUnmount(() => {
 <style>
 .cameraPos {
   position: fixed;
-  bottom: 1rem;
-  left: 50%;
-  transform: translate(-50%, 0);
+  bottom: 3rem;
+  left: 1rem;
   color: white;
+  width: 154px;
   background: rgba(0,0,0,.5);
   padding: .25rem .5rem;
-  border-radius: .25rem;
+  border-radius: 0;
   font-size: .875rem;
 }
 
