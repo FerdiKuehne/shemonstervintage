@@ -12,7 +12,7 @@ export async function createBackgroundSphereFromAPI(dpr = window.devicePixelRati
   const data = await res.json();
 
   // Geometry
-  const geom = new SphereGeometry(10, 60, 40);
+  const geom = new SphereGeometry(5, 60, 40);
   geom.scale(-1, 1, 1); // inside-out sphere
 
   /*let textureUrl = `/test${data.texture}`; // prepend /test */
