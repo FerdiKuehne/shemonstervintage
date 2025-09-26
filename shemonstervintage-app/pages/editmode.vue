@@ -1,6 +1,14 @@
 <template>
   <div class="page-content">
     <div class="container-fluid p-0">
+      <div class="cameraPos"> 
+        <div>
+          {{ cameraHUD.x }} // {{ cameraHUD.y }} // {{ cameraHUD.z }} 
+        </div> 
+        <div>
+          {{ cameraHUD.rx }} // {{ cameraHUD.ry }} // {{ cameraHUD.rz }} 
+        </div>
+    </div>
       <div class="page-headline flex items-center justify-between">
         <span>EDITMODE</span>
         <button class="btn-reset" @click="resetCamera">Reset Position</button>
@@ -20,17 +28,18 @@
 
     <!-- Rechte Sidebar: Container für alle Cube-Panels -->
     <div class="panel-stack" ref="panelStack"></div>
+    
   </div>
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, ref } from "vue";
+import { onMounted, onBeforeUnmount, ref, watch } from "vue";
 import * as THREE from "three";
 
 definePageMeta({ layout: "three" });
 
 let $three;
-
+let cameraHUD = ref({x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0})
 
 let cameraPanelContainer = null;
 let cameraGui = null;
@@ -327,12 +336,35 @@ onMounted(async () => {
     await $three.ready;
   }
 
+  cameraHUD.value.x = $three.camera.position.x;
+  cameraHUD.value.y = $three.camera.position.y;
+  cameraHUD.value.z = $three.camera.position.z;
+
+  cameraHUD.value.rx = $three.camera.rotation.x;
+  cameraHUD.value.ry = $three.camera.rotation.y;
+  cameraHUD.value.rz = $three.camera.rotation.z;
+
+
+
+
+
   // OrbitControls Basis
   if ($three?.controls) {
     const c = $three.controls;
     c.enableRotate = true; c.enableZoom = true; c.enablePan = true;
     c.dampingFactor = 0.05; c.enableKeys = false; c.update();
   }
+
+  $three.controls.addEventListener("change", () => {
+  cameraHUD.value = {
+    x: $three.camera.position.x,
+    y: $three.camera.position.y,
+    z: $three.camera.position.z,
+    rx: $three.camera.rotation.x,
+    ry: $three.camera.rotation.y,
+    rz: $three.camera.rotation.z
+  };
+});
 
   // Examples dynamisch importieren
   const [{ TransformControls }, { GUI }] = await Promise.all([
@@ -379,6 +411,12 @@ onBeforeUnmount(() => {
 
 <style>
 
+.cameraPos {
+  position: fixed;
+  top: 1%;
+  left: 25%;
+
+}
 
 
 .page-content { padding-bottom: 1rem; }
