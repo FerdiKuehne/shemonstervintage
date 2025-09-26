@@ -54,6 +54,21 @@ let TransformControlsClass = null;
 let GUIClass = null;
 let transform = null;
 
+// Preview/Solid Materialien — nur Preview halbtransparent
+const baseMatProps = { color: 0x00aaff, metalness: 0.2, roughness: 0.7 };
+const SOLID_MAT = new THREE.MeshStandardMaterial({
+  ...baseMatProps,
+  transparent: false,
+  opacity: 1,
+  depthWrite: true,
+});
+const PREVIEW_MAT = new THREE.MeshStandardMaterial({
+  ...baseMatProps,
+  transparent: true,
+  opacity: 0.5,
+  depthWrite: false,
+});
+
 // Preview cube
 let cube = null;
 let previewDist = 1.5;
@@ -77,7 +92,7 @@ const pointer = new THREE.Vector2();
 const panelStack = ref(null);
 const cubeUI = new Map();
 let nextId = 1;
-let overPanel = false; // NEU: Cursor über Panel-Spalte?
+let overPanel = false; // Cursor über Panel-Spalte?
 
 // Background sphere
 let bgParams = { panoramaDeg: 0, panoramaAmp: 0, autoRotate: false, speedDegPerSec: 6 };
@@ -92,11 +107,11 @@ const gridParams = { y: 0 }; // Höhe in Metern (Start 0,0,0)
 const gridClip = { insideSphereOnly: true };
 
 /* ---------- Helpers ---------- */
-function makeCube() {
+function makeCube(material = SOLID_MAT) {
   const size = 0.2;
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(size, size, size),
-    new THREE.MeshStandardMaterial({ color: 0x00aaff, metalness: 0.2, roughness: 0.7 })
+    material
   );
   mesh.frustumCulled = false;
   mesh.userData.kind = "cube";
@@ -106,7 +121,7 @@ function ensureCameraInScene() {
   if (!$three.scene.children.includes($three.camera)) $three.scene.add($three.camera);
 }
 function spawnCubeAttached() {
-  const newCube = makeCube();
+  const newCube = makeCube(PREVIEW_MAT); // Preview halbtransparent
   if (newCube instanceof THREE.Object3D && $three?.camera instanceof THREE.Object3D) {
     newCube.position.set(0, 0, -previewDist);
     $three.camera.add(newCube);
@@ -196,11 +211,14 @@ function onPointerDown(e) {
 
 /* ---------- Drop Cube ---------- */
 function dropAndSpawnNew() {
+  // Vor dem Ablösen: Material auf solide wechseln
+  if (cube) cube.material = SOLID_MAT.clone();
+
   safeDetachToScene(cube);
   placed.push(cube);
   createPanelForCube(cube);
   setSelected(cube);
-  cube = spawnCubeAttached();
+  cube = spawnCubeAttached(); // neuer halbtransparenter Preview-Würfel
 }
 
 /* ---------- Keyboard / Wheel ---------- */
@@ -228,7 +246,7 @@ function onKeyUp(e) {
   }
 }
 function onWheel(e) {
-  // NEU: Wenn Cursor über Panels, nie in die Preview-Distanz eingreifen
+  // Wenn Cursor über Panels, nie in die Preview-Distanz eingreifen
   if (overPanel) return;
 
   if (pressed.size > 0) { e.preventDefault(); e.stopImmediatePropagation(); return; }
