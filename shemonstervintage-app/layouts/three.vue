@@ -15,17 +15,13 @@
 <style scoped>
 
 .page-layout {
-  display: none;
-  position: relative;
+  position: fixed;
   width: 100%;
   height: 100vh;
   overflow: hidden;
-}
-
-.page-content {
-  position: relative;
   z-index: 10; /* above the Three.js canvas */
 }
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 1s ease;

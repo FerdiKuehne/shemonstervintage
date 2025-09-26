@@ -1,7 +1,7 @@
 import { Vector3 } from "three";
 import gsap from "gsap";
 
-function moveCamera(camera, toPos, duration = 2, lookAtTarget = new Vector3(0, 0, 0)) {
+function moveCamera(camera, toPos, duration = 1, lookAtTarget = new Vector3(0, 0, 0)) {
 
   gsap.to(camera.position, {
     x: toPos.x,
@@ -16,29 +16,29 @@ function moveCamera(camera, toPos, duration = 2, lookAtTarget = new Vector3(0, 0
 }
 
 function homeCameraShift(camera) {
-  moveCamera(camera, new Vector3(2, 0, 0), 1.0);
+  moveCamera(camera, new Vector3(2, 0, 0), 1.0, new Vector3(0, 0, 0));
 }
 
 function aboutCameraShift(camera) {
-  moveCamera(camera, new Vector3(-2, 0, 0), 10.0);
+  moveCamera(camera, new Vector3(-2, 0, 0), 1.0, new Vector3(0, 0, 0));
 }
 
 function galleryCameraShift(camera) {
-  moveCamera(camera, new Vector3(2, 0, 2), 10.0);
+  moveCamera(camera, new Vector3(2, 0, 2), 1.0, new Vector3(0, 0, 0));
 }
 
 function locationCameraShift(camera) {
-  moveCamera(camera, new Vector3(2, 0, -2), 10.0);
+  moveCamera(camera, new Vector3(2, 0, -2), 1.0, new Vector3(0, 0, 0));
 }
 
 function contactCameraShift(camera) {
-  moveCamera(camera, new Vector3(-2, 0, -2), 10.0);
+  moveCamera(camera, new Vector3(-2, 0, -2), 1.0, new Vector3(0, 0, 0));
 }
 
 
 
 function editmodeCameraShift(camera, targeetvector) {
-  moveCamera(camera, targeetvector, 10.0);
+  moveCamera(camera, targeetvector, 1.0);
 }
 
 export {
