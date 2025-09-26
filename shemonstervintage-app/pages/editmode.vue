@@ -3,49 +3,34 @@
     <div class="container-fluid p-0">
       <div class="cameraPos">
         <div>
-          {{ cameraHUD.x.toFixed(2) }} // {{ cameraHUD.y.toFixed(2) }} // {{ cameraHUD.z.toFixed(2) }}
+          {{ cameraHUD.x.toFixed(2) }} // {{ cameraHUD.y.toFixed(2) }} //
+          {{ cameraHUD.z.toFixed(2) }}
         </div>
         <div>
-          {{ cameraHUD.rx.toFixed(1) }} // {{ cameraHUD.ry.toFixed(1) }} // {{ cameraHUD.rz.toFixed(1) }}
+          {{ cameraHUD.rx.toFixed(1) }} // {{ cameraHUD.ry.toFixed(1) }} //
+          {{ cameraHUD.rz.toFixed(1) }}
         </div>
-      </div>
-
-
-      <div class="offset-sphere">
-        <div class="row">
-          <label for="offset">Offset</label>
-          <strong>{{ (offset*360).toFixed(1) }}°</strong>
-        </div>
-
-        <input id="offset" type="range" min="0" max="1" step="0.001" v-model.number="offset" aria-label="uOffset (0..1)" />
-
-        <div class="row" style="margin-top:8px">
-          <span>uOffset</span>
-          <input type="number" min="0" max="1" step="0.001" v-model.number="offset" style="width: 7.5ch; text-align: right;" aria-label="uOffset numerisch" />
-        </div>
-
-        <pre>gl.uniform1f(uOffsetLoc, {{ offset.toFixed(3) }})</pre>
       </div>
 
       <div class="page-headline flex items-center justify-between">
         <span>EDITMODE</span>
-        <button class="btn-reset" @click="resetCamera">Reset CAM-Position</button>
+        <button class="btn-reset" @click="resetCamera">
+          Reset CAM-Position
+        </button>
       </div>
 
       <div class="row">
-        <div class="col-12 col-sm-12 col-md-10 col-lg-6 offset-0 offset-sm-0 offset-md-1 offset-lg-3">
+        <div
+          class="col-12 col-sm-12 col-md-10 col-lg-6 offset-0 offset-sm-0 offset-md-1 offset-lg-3"
+        >
           <p class="mb-2">
             W/S: vor &amp; zurück · A/D: strafe ·
-            <strong>Shift+Mausrad: Distanz des gehaltenen Würfels</strong> ·
-            +: Würfel ablegen · Reset: Kamera auf Ursprung
+            <strong>Shift+Mausrad: Distanz des gehaltenen Würfels</strong> · +:
+            Würfel ablegen · Reset: Kamera auf Ursprung
           </p>
         </div>
       </div>
     </div>
-
-    <ClientOnly placeholder="<div style='height:1px'></div>">
-      <div class="three-wrapper"></div>
-    </ClientOnly>
 
     <!-- Rechte Sidebar: Container für alle Panels -->
     <div class="panel-stack" ref="panelStack"></div>
@@ -60,7 +45,7 @@ import { createBackgroundSphereFromAPI } from "../composables/backgroundsphere.j
 definePageMeta({ layout: "three" });
 
 let $three;
-
+let bgSphere = null;
 // HUD
 const cameraHUD = ref({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
 
@@ -93,16 +78,9 @@ const panelStack = ref(null);
 const cubeUI = new Map();
 let nextId = 1;
 
-// Offset panel
-
-const offset = ref(0.0) 
-const uAmplitude = ref(0.0);  
-let 
-
-
 // Background sphere
-let bgSphere = null;
-const bgParams = { panoramaDeg: 0, autoRotate: false, speedDegPerSec: 10 };
+
+let bgParams = { panoramaDeg: 0, panoramaAmp: 0};
 
 /* ---------- Helpers ---------- */
 function makeCube() {
@@ -186,6 +164,7 @@ function safeDetachToScene(obj) {
 /* ---------- Selection ---------- */
 function setSelected(obj) {
   selected.value = obj || null;
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   if (transform) obj ? transform.attach(obj) : transform.detach();
   cubeUI.forEach((ui, o) => ui.header?.classList.toggle("active", o === obj));
 }
@@ -353,12 +332,18 @@ function createBackgroundPanel() {
   const gui = new GUIClass({ container: body, title: "Panorama" });
 
   gui.add(bgParams, "panoramaDeg", 0, 360, 1).name("Offset (°)").onChange((deg) => {
+
     if (bgSphere.material.uniforms.uOffset) {
       bgSphere.material.uniforms.uOffset.value = (deg % 360) / 360;
     }
   });
-  gui.add(bgParams, "autoRotate").name("Auto-Scroll");
-  gui.add(bgParams, "speedDegPerSec", 1, 90, 1).name("Speed (°/s)");
+  gui.add(bgParams, "panoramaAmp", 0, 100, 0.1).name("Amplitude").onChange((v) => {
+ 
+    if (bgSphere.material.uniforms.uAmplitude) {
+      bgSphere.material.uniforms.uAmplitude.value = v;
+    }
+  });
+  
 }
 
 function deleteCubeAndPanel(obj) {
@@ -461,44 +446,85 @@ onBeforeUnmount(() => {
   left: 1rem;
   color: white;
   width: 154px;
-  background: rgba(0,0,0,.5);
-  padding: .25rem .5rem;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0.25rem 0.5rem;
   border-radius: 0;
-  font-size: .875rem;
+  font-size: 0.875rem;
 }
 
-.page-content { padding-bottom: 1rem; }
-.three-wrapper { position: relative; min-height: 1px; }
-.page-headline { font-weight: 700; font-size: 1.25rem; padding: .75rem 1rem; }
+.page-content {
+  padding-bottom: 1rem;
+}
+.three-wrapper {
+  position: relative;
+  min-height: 1px;
+}
+.page-headline {
+  font-weight: 700;
+  font-size: 1.25rem;
+  padding: 0.75rem 1rem;
+}
 
 .btn-reset {
-  background: #0af; color: #fff; font-size: .875rem;
-  padding: .25rem .75rem; border-radius: .375rem; border: none; cursor: pointer;
+  background: #0af;
+  color: #fff;
+  font-size: 0.875rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
 }
-.btn-reset:hover { background: #0080c0; }
+.btn-reset:hover {
+  background: #0080c0;
+}
 
 .panel-stack {
-  position: fixed; top: 0; right: 0; bottom: 0;
-  display: flex; flex-direction: column;
-  overflow: auto; pointer-events: auto; z-index: 20;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  pointer-events: auto;
+  z-index: 20;
   overscroll-behavior: contain;
 }
 
 .cube-panel__header {
-  display: flex; color: #fff; background: #000;
-  justify-content: space-between; align-items: center;
-  gap: .5rem; padding: .5rem .75rem; font-weight: 700;
-  user-select: none; cursor: pointer;
+  display: flex;
+  color: #fff;
+  background: #000;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-weight: 700;
+  user-select: none;
+  cursor: pointer;
 }
-.cube-panel__header.active { outline: 2px solid #0af; }
-.cube-panel__header span { color: #fff; }
+.cube-panel__header.active {
+  outline: 2px solid #0af;
+}
+.cube-panel__header span {
+  color: #fff;
+}
 .cube-panel__close {
-  background: transparent; color: #fff; border: none;
-  font-size: 1rem; cursor: pointer; opacity: .85;
+  background: transparent;
+  color: #fff;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0.85;
 }
-.cube-panel__close:hover { opacity: 1; }
+.cube-panel__close:hover {
+  opacity: 1;
+}
 
 button.btn-reset {
-  position: fixed; bottom: 1rem; left: 1rem; z-index: 1000;
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 1000;
 }
 </style>

@@ -33,6 +33,7 @@ export async function createBackgroundSphereFromAPI(dpr = window.devicePixelRati
       uTexture: { value: texture },
       uTime: { value: 0 },
       uAmplitude: { value: 0 },
+      uOffset: { value: 0}
     },
     vertexShader,
     fragmentShader,
