@@ -194,33 +194,25 @@ function resetCamera() {
   const cam = $three.camera;
   const controls = $three.controls;
 
-  // Zentrum & sinnvolle Distanz aus Sphere ableiten
   const center = getSphereWorldCenter();
-  const R = getSphereRadiusWorld() ?? 5;         // fallback
-  const dist = Math.max(2, R * 0.6);             // ~60% des Sphere-Radius
+  const R = getSphereRadiusWorld() ?? 5;
+  const dist = Math.max(2, R * 0.6);
 
-  // angenehmer Startblick: leichte Höhe + schräg (elevation ~20°, azimuth -30°)
-  const elevDeg = 20;                             // 0..90 (0 = auf Höhe, 90 = von oben)
-  const azimDeg = -30;
-  const phi   = THREE.MathUtils.degToRad(90 - elevDeg); // polar
-  const theta = THREE.MathUtils.degToRad(azimDeg);      // azimuth um Y
-
-  const offset = new THREE.Vector3().setFromSpherical(
-    new THREE.Spherical(dist, phi, theta)
-  );
+  // angenehme Startpose: leicht erhöht & schräg
+  const elevDeg = 20, azimDeg = -30;
+  const phi   = THREE.MathUtils.degToRad(90 - elevDeg);
+  const theta = THREE.MathUtils.degToRad(azimDeg);
+  const offset = new THREE.Vector3().setFromSpherical(new THREE.Spherical(dist, phi, theta));
 
   cam.position.copy(center).add(offset);
   controls.target.copy(center);
 
-  // keine Änderung von controls.enabled! (Hover über Panel bleibt intakt)
   cam.updateMatrixWorld(true);
   controls.update();
 
-  // OrbitControls „entspannen“ (stellt internen Zustand auf NONE)
+  // OrbitControls-State sauber beenden
   controls.dispatchEvent({ type: 'end' });
 }
-
-
 
 function safeDetachToScene(obj) {
   if (!(obj instanceof THREE.Object3D)) return;
@@ -264,21 +256,36 @@ function dropAndSpawnNew() {
   cube = spawnCubeAttached();
 }
 
+/* ---------- Editable Guard ---------- */
+function isEditable(el) {
+  if (!el) return false;
+  const tag = el.tagName?.toLowerCase();
+  return (
+    tag === 'input' || tag === 'textarea' || tag === 'select' ||
+    el.isContentEditable
+  );
+}
+
 /* ---------- Keyboard / Wheel ---------- */
 function onKeyDown(e) {
   if (!$three?.controls) return;
+
+  // wenn im Eingabefeld: nix kapern
+  if (isEditable(document.activeElement)) return;
+
+  // WASD greift immer (vor lil-gui), Scroll verhindern
   if (WASD.has(e.code)) {
+    e.preventDefault();
     pressed.add(e.code);
     $three.controls.enableZoom = false;
+    return;
   }
+
+  // W/E/R nur, wenn NICHT im Flugmodus
   if (transform && pressed.size === 0) {
     if (e.code === "KeyW") transform.setMode("translate");
     if (e.code === "KeyE") transform.setMode("rotate");
     if (e.code === "KeyR") transform.setMode("scale");
-  }
-  if (e.key === "+" || e.code === "NumpadAdd") {
-    if (!cube) return;
-    dropAndSpawnNew();
   }
 }
 function onKeyUp(e) {
@@ -302,6 +309,20 @@ function onWheel(e) {
   previewDist = THREE.MathUtils.clamp(previewDist, minDist, maxDist);
   cube.position.set(0, 0, -previewDist);
 }
+
+/* ---------- OrbitControls Stabilisierung ---------- */
+function finalizeOrbitControls() {
+  if (!$three?.controls) return;
+  const c = $three.controls;
+  c.dispatchEvent({ type: 'end' }); // beendet hängende ROTATE/DOLLY/PAN-States
+  c.update();
+  if (!overPanel) c.enabled = true; // nicht über Panel? sicher aktiv
+}
+function resetZoomIfStuck() {
+  if ($three?.controls) $three.controls.enableZoom = true;
+}
+// Listener-Refs für sauberes removeEventListener
+let _onPointerUp, _onPointerLeave, _onPointerCancel, _onContextMenu, _onBlur, _onKeyUpWin;
 
 /* ---------- Schnittkreis-Helper ---------- */
 function getSphereRadiusWorld() {
@@ -577,6 +598,13 @@ onMounted(async () => {
     const c = $three.controls;
     c.enableRotate = true; c.enableZoom = true; c.enablePan = true;
     c.dampingFactor = 0.05; c.enableKeys = false; c.update();
+
+    // Maus-Buttons explizit mappen (robuste Defaults)
+    c.mouseButtons = {
+      LEFT:   THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT:  THREE.MOUSE.PAN,
+    };
   }
 
   const [{ TransformControls }, { GUI }] = await Promise.all([
@@ -591,7 +619,7 @@ onMounted(async () => {
   transform.addEventListener("dragging-changed", (e) => {
     if ($three?.controls) $three.controls.enabled = !e.value;
   });
-  // Add nur, wenn wirklich ein Object3D (fix für "object not an instance...")
+  // Add nur, wenn wirklich ein Object3D
   if (transform && (transform instanceof THREE.Object3D || transform.isObject3D)) {
     if (!$three.scene.children.includes(transform)) $three.scene.add(transform);
   }
@@ -601,13 +629,11 @@ onMounted(async () => {
   if (bgSphere) bgSphere.renderOrder = 0;
 
   addGridHelper();
-  // RenderOrder für Hilfen hintereinander
   if (grid) grid.renderOrder = 1;
   if (gridMajor) gridMajor.renderOrder = 2;
   if (axesHelper) axesHelper.renderOrder = 3;
 
   createGridPanel();
-  // initial Clipping anwenden
   applyGridClipping(gridClip.insideSphereOnly);
 
   // Preview-Cube
@@ -628,8 +654,8 @@ onMounted(async () => {
   $three.controls.addEventListener("change", updateHUD);
 
   // Events
-  window.addEventListener("keydown", onKeyDown);
-  window.addEventListener("keyup", onKeyUp);
+  window.addEventListener("keydown", onKeyDown, { capture: true });
+  window.addEventListener("keyup", onKeyUp, { capture: true });
   window.addEventListener("wheel", onWheel, { passive: false });
   document.querySelector(".three-wrapper")?.addEventListener("pointerdown", onPointerDown);
 
@@ -649,6 +675,24 @@ onMounted(async () => {
   // Background-Panel erzeugen (falls vorhanden)
   if (bgSphere) createBackgroundPanel();
 
+  // Stabilitäts-Listener (saubere Referenzen)
+  const canvas = $three.renderer?.domElement;
+  _onPointerUp     = () => finalizeOrbitControls();
+  _onPointerLeave  = () => finalizeOrbitControls();
+  _onPointerCancel = () => finalizeOrbitControls();
+  _onContextMenu   = (e) => e.preventDefault();
+  _onBlur          = () => { pressed.clear(); finalizeOrbitControls(); resetZoomIfStuck(); };
+  _onKeyUpWin      = () => { if (pressed.size === 0) resetZoomIfStuck(); };
+
+  if (canvas) {
+    canvas.addEventListener('pointerup', _onPointerUp);
+    canvas.addEventListener('pointerleave', _onPointerLeave);
+    canvas.addEventListener('pointercancel', _onPointerCancel);
+    canvas.addEventListener('contextmenu', _onContextMenu);
+  }
+  window.addEventListener('blur', _onBlur);
+  window.addEventListener('keyup', _onKeyUpWin);
+
   // Ring initial ziehen (falls Sphere/Scale ≠ default)
   updateBoundaryRing();
 
@@ -656,11 +700,22 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener("keydown", onKeyDown);
-  window.removeEventListener("keyup", onKeyUp);
+  window.removeEventListener("keydown", onKeyDown, { capture: true });
+  window.removeEventListener("keyup", onKeyUp, { capture: true });
   window.removeEventListener("wheel", onWheel);
   document.querySelector(".three-wrapper")?.removeEventListener("pointerdown", onPointerDown);
   cubeUI.forEach(ui => ui.gui?.destroy());
+
+  // Stabilitäts-Listener sauber entfernen
+  const canvas = $three?.renderer?.domElement;
+  if (canvas) {
+    if (_onPointerUp)     canvas.removeEventListener('pointerup', _onPointerUp);
+    if (_onPointerLeave)  canvas.removeEventListener('pointerleave', _onPointerLeave);
+    if (_onPointerCancel) canvas.removeEventListener('pointercancel', _onPointerCancel);
+    if (_onContextMenu)   canvas.removeEventListener('contextmenu', _onContextMenu);
+  }
+  if (_onBlur)    window.removeEventListener('blur', _onBlur);
+  if (_onKeyUpWin) window.removeEventListener('keyup', _onKeyUpWin);
 });
 </script>
 
@@ -748,7 +803,7 @@ onBeforeUnmount(() => {
 
 button.btn-reset {
   position: fixed;
-  bottom: 1rem;
+  bottom: 1rem;  /* fix: ; statt , */
   left: 1rem;
   z-index: 1000;
 }
