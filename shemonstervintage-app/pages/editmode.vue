@@ -38,7 +38,7 @@
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { onMounted, onBeforeUnmount, ref } from "vue";
 import * as THREE from "three";
 import { createBackgroundSphereFromAPI } from "../composables/backgroundsphere.js";
 
@@ -79,8 +79,13 @@ const cubeUI = new Map();
 let nextId = 1;
 
 // Background sphere
+let bgParams = { panoramaDeg: 0, panoramaAmp: 0, autoRotate: false, speedDegPerSec: 6 };
 
-let bgParams = { panoramaDeg: 0, panoramaAmp: 0};
+// ---------- Grid-Refs + Params (NEU) ----------
+let grid = null;
+let gridMajor = null;
+let axesHelper = null;
+const gridParams = { y: 0 }; // Höhe in Metern
 
 /* ---------- Helpers ---------- */
 function makeCube() {
@@ -107,8 +112,9 @@ function spawnCubeAttached() {
 }
 function addGridHelper() {
   const size = 100, divisions = size;
-  const grid = new THREE.GridHelper(size, divisions, 0xffffff, 0x707070);
-  grid.position.y = 0;
+
+  grid = new THREE.GridHelper(size, divisions, 0xffffff, 0x707070);
+  grid.position.y = gridParams.y;
   grid.material.transparent = true;
   grid.material.opacity = 0.95;
   grid.material.depthTest = false;
@@ -116,23 +122,24 @@ function addGridHelper() {
   grid.renderOrder = 1;
   $three.scene.add(grid);
 
-  const major = new THREE.GridHelper(size, size / 10, 0xffffff, 0xffffff);
-  major.position.y = 0;
-  major.material.transparent = true;
-  major.material.opacity = 1.0;
-  major.material.depthTest = false;
-  major.material.depthWrite = false;
-  major.renderOrder = 2;
-  $three.scene.add(major);
+  gridMajor = new THREE.GridHelper(size, size / 10, 0xffffff, 0xffffff);
+  gridMajor.position.y = gridParams.y;
+  gridMajor.material.transparent = true;
+  gridMajor.material.opacity = 1.0;
+  gridMajor.material.depthTest = false;
+  gridMajor.material.depthWrite = false;
+  gridMajor.renderOrder = 2;
+  $three.scene.add(gridMajor);
 
-  const axes = new THREE.AxesHelper(1.5);
-  axes.renderOrder = 3;
-  if (Array.isArray(axes.material)) {
-    axes.material.forEach(m => { m.depthTest = false; m.depthWrite = false; });
+  axesHelper = new THREE.AxesHelper(1.5);
+  axesHelper.position.y = gridParams.y;
+  axesHelper.renderOrder = 3;
+  if (Array.isArray(axesHelper.material)) {
+    axesHelper.material.forEach(m => { m.depthTest = false; m.depthWrite = false; });
   } else {
-    axes.material.depthTest = false; axes.material.depthWrite = false;
+    axesHelper.material.depthTest = false; axesHelper.material.depthWrite = false;
   }
-  $three.scene.add(axes);
+  $three.scene.add(axesHelper);
 }
 
 function resetCamera() {
@@ -164,7 +171,6 @@ function safeDetachToScene(obj) {
 /* ---------- Selection ---------- */
 function setSelected(obj) {
   selected.value = obj || null;
-  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   if (transform) obj ? transform.attach(obj) : transform.detach();
   cubeUI.forEach((ui, o) => ui.header?.classList.toggle("active", o === obj));
 }
@@ -332,18 +338,59 @@ function createBackgroundPanel() {
   const gui = new GUIClass({ container: body, title: "Panorama" });
 
   gui.add(bgParams, "panoramaDeg", 0, 360, 1).name("Offset (°)").onChange((deg) => {
-
     if (bgSphere.material.uniforms.uOffset) {
       bgSphere.material.uniforms.uOffset.value = (deg % 360) / 360;
     }
   });
   gui.add(bgParams, "panoramaAmp", 0, 100, 0.1).name("Amplitude").onChange((v) => {
- 
     if (bgSphere.material.uniforms.uAmplitude) {
       bgSphere.material.uniforms.uAmplitude.value = v;
     }
   });
-  
+  // optional: Auto-Rotate
+  gui.add(bgParams, "autoRotate").name("Auto-Rotate");
+  gui.add(bgParams, "speedDegPerSec", 0, 60, 0.1).name("Speed (°/s)");
+}
+
+// ---------- NEU: Grid-Panel ----------
+function createGridPanel() {
+  if (!GUIClass || !panelStack.value) return;
+
+  const cont = document.createElement("div");
+  cont.className = "cube-panel";
+  const header = document.createElement("div");
+  header.className = "cube-panel__header";
+  header.innerHTML = `<span>Grid</span>`;
+  cont.appendChild(header);
+  const body = document.createElement("div");
+  body.className = "cube-panel__body";
+  cont.appendChild(body);
+  panelStack.value.appendChild(cont);
+
+  const gui = new GUIClass({ container: body, title: "Einstellungen" });
+
+  // Höhe (Y)
+  gui.add(gridParams, "y", -50, 50, 0.01)
+    .name("Höhe (Y)")
+    .onChange((v) => {
+      if (grid) grid.position.y = v;
+      if (gridMajor) gridMajor.position.y = v;
+      if (axesHelper) axesHelper.position.y = v;
+    });
+
+  // Optional: Sichtbarkeit/Opazität
+  const vis = {
+    grid: true,
+    major: true,
+    axes: true,
+    opacity: grid?.material?.opacity ?? 0.95,
+    majorOpacity: gridMajor?.material?.opacity ?? 1.0
+  };
+  gui.add(vis, "grid").name("Fein-Grid sichtbar").onChange(v => { if (grid) grid.visible = v; });
+  gui.add(vis, "major").name("Haupt-Grid sichtbar").onChange(v => { if (gridMajor) gridMajor.visible = v; });
+  gui.add(vis, "axes").name("Achsen sichtbar").onChange(v => { if (axesHelper) axesHelper.visible = v; });
+  gui.add(vis, "opacity", 0, 1, 0.01).name("Fein-Grid Opazität").onChange(v => { if (grid && grid.material) grid.material.opacity = v; });
+  gui.add(vis, "majorOpacity", 0, 1, 0.01).name("Haupt-Grid Opazität").onChange(v => { if (gridMajor && gridMajor.material) gridMajor.material.opacity = v; });
 }
 
 function deleteCubeAndPanel(obj) {
@@ -369,7 +416,7 @@ onMounted(async () => {
     await $three.ready;
   }
 
-bgSphere = $three.backgroundSphere;
+  bgSphere = $three.backgroundSphere;
 
   if ($three?.controls) {
     const c = $three.controls;
@@ -392,6 +439,7 @@ bgSphere = $three.backgroundSphere;
   if (!$three.scene.children.includes(transform)) $three.scene.add(transform);
 
   addGridHelper();
+  createGridPanel();          // <- NEU: Grid-Panel erzeugen
 
   // Preview-Cube
   cube = spawnCubeAttached();
@@ -424,7 +472,7 @@ bgSphere = $three.backgroundSphere;
       .forEach(ev => panelEl.addEventListener(ev, stop, { passive: true }));
   }
 
-  // Background-Panel erzeugen
+  // Background-Panel erzeugen (falls vorhanden)
   if (bgSphere) createBackgroundPanel();
 
   requestAnimationFrame(tick);
