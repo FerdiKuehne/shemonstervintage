@@ -194,25 +194,40 @@ function resetCamera() {
   const cam = $three.camera;
   const controls = $three.controls;
 
+  // Zielpunkt = Sphere-Center (oder 0,0,0-Fallback)
   const center = getSphereWorldCenter();
+
+  // Distanz an Sphere-Radius koppeln (oder 5 als Fallback)
   const R = getSphereRadiusWorld() ?? 5;
   const dist = Math.max(2, R * 0.6);
 
-  // angenehme Startpose: leicht erhöht & schräg
-  const elevDeg = 20, azimDeg = -30;
+  // Gitter-parallel: Azimut = 0° (Blick entlang -Z), Up = +Y, leichte Elevation
+  const elevDeg = 20;                 // 0 = auf Grid-Höhe, 90 = Top-Down
+  const azimDeg = 0;                  // exakt an X/Z-Grid-Linien ausgerichtet
   const phi   = THREE.MathUtils.degToRad(90 - elevDeg);
   const theta = THREE.MathUtils.degToRad(azimDeg);
-  const offset = new THREE.Vector3().setFromSpherical(new THREE.Spherical(dist, phi, theta));
 
+  const offset = new THREE.Vector3().setFromSpherical(
+    new THREE.Spherical(dist, phi, theta)
+  );
+
+  // Up-Achse sicherstellen (kein Roll)
+  cam.up.set(0, 1, 0);
+
+  // Position & Target setzen
   cam.position.copy(center).add(offset);
   controls.target.copy(center);
+
+  // Blick exakt auf Target richten (eliminiert Roll vollständig)
+  cam.lookAt(center);
 
   cam.updateMatrixWorld(true);
   controls.update();
 
-  // OrbitControls-State sauber beenden
+  // evtl. hängende Orbit-States beenden (sanfter UX-Fix)
   controls.dispatchEvent({ type: 'end' });
 }
+
 
 function safeDetachToScene(obj) {
   if (!(obj instanceof THREE.Object3D)) return;
