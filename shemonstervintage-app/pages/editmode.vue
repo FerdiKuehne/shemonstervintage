@@ -3,12 +3,10 @@
     <div class="container-fluid p-0">
       <div class="cameraPos">
         <div>
-          {{ cameraHUD.x.toFixed(2) }} // {{ cameraHUD.y.toFixed(2) }} //
-          {{ cameraHUD.z.toFixed(2) }}
+         x {{ cameraHUD.x.toFixed(2) }} / y {{ cameraHUD.y.toFixed(2) }} / z {{ cameraHUD.z.toFixed(2) }}
         </div>
         <div>
-          {{ cameraHUD.rx.toFixed(1) }} // {{ cameraHUD.ry.toFixed(1) }} //
-          {{ cameraHUD.rz.toFixed(1) }}
+         rx {{ cameraHUD.rx.toFixed(1) }} / ry {{ cameraHUD.ry.toFixed(1) }} / rz {{ cameraHUD.rz.toFixed(1) }}
         </div>
       </div>
 
@@ -516,6 +514,7 @@ function createBackgroundPanel() {
       bgSphere.material.uniforms.uOffset.value = (deg % 360) / 360;
     }
   });
+
   gui.add(bgParams, "autoRotate").name("Auto-Rotate");
 }
 
@@ -744,7 +743,6 @@ onBeforeUnmount(() => {
   bottom: 3rem;
   left: 1rem;
   color: white;
-  width: 154px;
   background: rgba(0, 0, 0, 0.5);
   padding: 0.25rem 0.5rem;
   border-radius: 0;
