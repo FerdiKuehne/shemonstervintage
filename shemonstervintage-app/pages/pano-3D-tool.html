@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<title>Pano + Grid-Scan · Axis + Robust Picking + Wheel-FOV</title>
+<title>Pano + Grid-Scan · Axis + Robust Picking + Wheel-FOV (Stable Move)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   html,body { height:100%; margin:0; background:#0b0b0b; overflow:hidden; }
@@ -78,7 +78,7 @@ camera.position.set(0,0,CAMERA_RADIUS);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enablePan = false;
-controls.enableZoom = false;          // wir zoomen per FOV-Wheel
+controls.enableZoom = false;          // FOV-Wheel
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
 controls.rotateSpeed = 0.9;
@@ -392,18 +392,13 @@ function activateCubeById(id){
   params.activeId = id;
   cubes.forEach((c)=>{
     const isActive = c.id === id;
-
-    // GUI-Highlight & Rays
     c.gui.domElement.classList.toggle('active-cube', isActive);
     if (c.rays) c.rays.visible = isActive;
-
-    // Inputs sperren/öffnen
     c.inputControllers.forEach(ctrl=>{
       const el = ctrl.domElement.querySelector('input');
       if(el) el.disabled = !isActive;
     });
-
-    // >>> Neu: aktiven Würfel sichtbar heller machen (emissive glow)
+    // Glow für aktiven
     const mat = c.mesh.material;
     if (mat && 'emissive' in mat) {
       mat.emissive.setHex(isActive ? 0x4466ff : 0x000000);
@@ -416,8 +411,6 @@ function activateCubeById(id){
 
 function spawnCube(){
   const id = nextCubeId++;
-
-  // Material mit emissive vorbereitet (Glow für aktiven Würfel)
   const mat = new THREE.MeshStandardMaterial({
     color: 0x3366ff,
     roughness: 0.45,
@@ -425,7 +418,6 @@ function spawnCube(){
     emissive: 0x000000,
     emissiveIntensity: 0.0
   });
-
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE), mat);
   mesh.position.set(0,0,0);
   mesh.rotation.set(0,0,0);
@@ -531,33 +523,56 @@ renderer.domElement.addEventListener('pointerdown', (ev)=>{
   pickAtClient(ev.clientX, ev.clientY);
 });
 
-/* ---------- Tastatur Move ---------- */
+/* ---------- Tastatur Move (stabil & GUI-safe) ---------- */
+function isGuiInputFocused(){
+  const active = document.activeElement;
+  if(!active) return false;
+  if(active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA') {
+    // nur wenn das Input im lil-gui sitzt, blockieren
+    return !!active.closest('.lil-gui');
+  }
+  return false;
+}
+function snapToGrid(v, s){
+  const snapped = Math.round(v / s) * s;
+  // epsilon gegen Binärbrüche:
+  return Math.abs(snapped) < 1e-10 ? 0 : +snapped.toFixed(6);
+}
+
 window.addEventListener('keydown', (e)=>{
+  // Wenn ein GUI-Input aktiv ist → keine Pfeilsteuerung
+  if (isGuiInputFocused()) return;
+
   const rec = cubes.find(c=> c.id === params.activeId);
   if(!rec) return;
+
   if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown'].includes(e.code) || e.key==='+' || e.key==='#') {
     e.preventDefault();
   }
+
   const s = params.gridSpacing;
-  const snap = v => Math.round(v / s) * s;
-  const fwd = new THREE.Vector3();
-  camera.getWorldDirection(fwd);
-  const upWorld = new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion);
-  const right = new THREE.Vector3().crossVectors(fwd, upWorld).normalize();
+
+  // Stabile Kamera-basiert-aber-auf-XZ:
+  const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+  const right = new THREE.Vector3(1,0, 0).applyQuaternion(camera.quaternion);
   fwd.y = 0; right.y = 0;
-  if (fwd.lengthSq() > 0) fwd.normalize();
-  if (right.lengthSq() > 0) right.normalize();
+  if (fwd.lengthSq() < 1e-8) fwd.set(0,0,-1);
+  if (right.lengthSq() < 1e-8) right.set(1,0,0);
+  fwd.normalize(); right.normalize();
+
   let moved = false;
   if(e.code === 'ArrowUp')    { rec.mesh.position.addScaledVector(fwd,  s); moved = true; }
   if(e.code === 'ArrowDown')  { rec.mesh.position.addScaledVector(fwd, -s); moved = true; }
   if(e.code === 'ArrowLeft')  { rec.mesh.position.addScaledVector(right, -s); moved = true; }
   if(e.code === 'ArrowRight') { rec.mesh.position.addScaledVector(right,  s); moved = true; }
+
   if(e.key === '+' || e.code === 'NumpadAdd' || e.code === 'PageUp'){ rec.mesh.position.y += s; moved = true; }
   if(e.key === '#' || e.code === 'PageDown'){ rec.mesh.position.y -= s; moved = true; }
+
   if(moved){
-    rec.mesh.position.x = snap(rec.mesh.position.x);
-    rec.mesh.position.y = snap(rec.mesh.position.y);
-    rec.mesh.position.z = snap(rec.mesh.position.z);
+    rec.mesh.position.x = snapToGrid(rec.mesh.position.x, s);
+    rec.mesh.position.y = snapToGrid(rec.mesh.position.y, s);
+    rec.mesh.position.z = snapToGrid(rec.mesh.position.z, s);
     updateRaysFor(rec.mesh, rec.rays);
     rec.syncFromMesh();
   }
