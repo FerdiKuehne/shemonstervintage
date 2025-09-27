@@ -2,13 +2,12 @@
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<title>Pano + Grid-Scan · Axis + Robust Picking</title>
+<title>Pano + Grid-Scan · Axis + Robust Picking + Wheel-FOV</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   html,body { height:100%; margin:0; background:#0b0b0b; overflow:hidden; }
   #ui { position:fixed; top:10px; left:10px; z-index:1000; display:flex; gap:.5rem; align-items:center; }
 
-  /* Fancy Buttons */
   .btn {
     --bg1:#1a2740; --bg2:#0f172a; --border:#2b3b6b; --hover:#243b74; --active:#162452;
     color:#e6ebff; font:600 13px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -22,7 +21,6 @@
 
   canvas { display:block; }
 
-  /* Minimap unten links */
   #minimap {
     position: fixed; left: 10px; bottom: 10px; z-index: 10000;
     width: 220px; height: 220px;
@@ -31,7 +29,6 @@
     box-shadow: 0 6px 18px rgba(0,0,0,.35);
   }
 
-  /* Aktives Würfel-Panel highlighten (lil-gui) */
   .lil-gui .folder.active-cube > .title {
     background: linear-gradient(90deg, #244cff, #0f1a3a) !important;
     color: #fff !important;
@@ -42,9 +39,9 @@
     border-radius: 6px;
   }
   .lil-gui.autoPlace {
-    top: 0;
-    right: 0;
-}
+      top: 0;
+      right: 0;
+  }
 </style>
 
 <script type="importmap">
@@ -69,7 +66,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GUI } from 'https://unpkg.com/lil-gui@0.19/dist/lil-gui.esm.js';
 
-/* ---------- Renderer & Kamera (immer zentriert) ---------- */
+/* ---------- Renderer & Kamera ---------- */
 const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -84,40 +81,36 @@ camera.position.set(0,0,CAMERA_RADIUS);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enablePan = false;
-controls.enableZoom = false;
+controls.enableZoom = false;          // wir zoomen per FOV-Wheel
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
 controls.rotateSpeed = 0.9;
 controls.target.set(0,0,0);
-/* Startzustand merken für Reset */
 controls.saveState();
 
-/* ---------- Szene ---------- */
+/* ---------- Szene / Grid / Shader (unverändert) ---------- */
 const sceneObjects = new THREE.Scene();
 sceneObjects.add(new THREE.HemisphereLight(0xffffff, 0x222233, 1.0));
 const dl = new THREE.DirectionalLight(0xffffff, 0.7); dl.position.set(1,1,1); sceneObjects.add(dl);
 
-const SPHERE_RADIUS = 2.0;   // m
-const CUBE_SIZE = 0.3;       // m
-const CUBE_RANGE = 5.0;      // ±5 m GUI-Sliderbereich
+const SPHERE_RADIUS = 2.0, CUBE_SIZE = 0.3, CUBE_RANGE = 5.0;
 
-/* ---------- Grid (dynamischer Schnitt der Sphere, inkl. Mittelkreuz) ---------- */
 const gridGeom = new THREE.PlaneGeometry(200, 200, 1, 1);
 gridGeom.rotateX(-Math.PI/2);
 const gridMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false,
   uniforms: {
     color: { value: new THREE.Color(0x00ffcc) },
-    spacing: { value: 0.1 },                // via GUI
+    spacing: { value: 0.1 },
     thickness:{ value: 0.015 },
     clipToSphere:{ value: true },
     sphereRadius:{ value: SPHERE_RADIUS },
     planeY: { value: 0.0 },
     ringColor: { value: new THREE.Color(0x4ea1ff) },
     ringOpacity: { value: 1.0 },
-    axisColor:   { value: new THREE.Color(0xffe28a) }, // Mittelkreuz
+    axisColor:   { value: new THREE.Color(0xffe28a) },
     axisAlpha:   { value: 1.0 },
-    axisThickness:{ value: 1.5 } // px
+    axisThickness:{ value: 1.5 }
   },
   vertexShader: /* glsl */`
     varying vec3 vWorldPos;
@@ -155,21 +148,17 @@ const gridMat = new THREE.ShaderMaterial({
       float r = length(vWorldPos.xz);
       if (clipToSphere && r > rEff + 1e-4) discard;
 
-      // Grid
       float m = gridMask(vWorldPos.xz, spacing, thickness);
 
-      // Fade zur Schnittkante
       float fade = 1.0;
       if (clipToSphere){
         float d = clamp((rEff - r) / 0.2, 0.0, 1.0);
         fade = d;
       }
 
-      // Ring am Schnittkreis
       float w = fwidth(r) * 1.5;
       float ring = 1.0 - smoothstep(w, w*2.0, abs(r - rEff));
 
-      // --- Mittelkreuz (X-/Z-Achse) ---
       float fx = fwidth(vWorldPos.x);
       float fz = fwidth(vWorldPos.z);
       float halfW_x = max(axisThickness * fx, 1e-6);
@@ -178,7 +167,6 @@ const gridMat = new THREE.ShaderMaterial({
       float lineZ = 1.0 - smoothstep(0.0, halfW_z, abs(vWorldPos.z));
       float axisMask = max(lineX, lineZ);
 
-      // Mischen
       vec3 finalCol = color;
       float finalAlpha = m * 0.85 * fade;
 
@@ -196,7 +184,7 @@ const gridMat = new THREE.ShaderMaterial({
 const gridMesh = new THREE.Mesh(gridGeom, gridMat);
 sceneObjects.add(gridMesh);
 
-/* ---------- Pano + Post ---------- */
+/* ---------- Pano + Post Pass (unverändert) ---------- */
 const db = new THREE.Vector2(); renderer.getDrawingBufferSize(db);
 let rtObjects  = new THREE.WebGLRenderTarget(db.x, db.y, { depthBuffer:true });
 let rtCombined = new THREE.WebGLRenderTarget(db.x, db.y, { depthBuffer:false });
@@ -218,7 +206,7 @@ const passAMat = new THREE.ShaderMaterial({
     fovY:   { value: THREE.MathUtils.degToRad(camera.fov) },
     aspect: { value: camera.aspect },
     camBasis: { value: new THREE.Matrix3() },
-    rotXYZ: { value: new THREE.Vector3(0,0,0) } // initial 0/0/0
+    rotXYZ: { value: new THREE.Vector3(0,0,0) }
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -307,12 +295,12 @@ screenSceneB.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), passBMat));
 /* ---------- GUI ---------- */
 const gui = new GUI({ title: 'Controls' });
 const params = {
-  rotX_deg: 0, rotY_deg: 0, rotZ_deg: 0,  // initial 0/0/0
+  rotX_deg: 0, rotY_deg: 0, rotZ_deg: 0,
   k1: -0.25, k2: 0.0,
   cameraFov: camera.fov,
   gridHeight: 0.0, gridClip: true, gridVisible: true,
-  gridSpacing: 0.1,   // Feldgröße [m]
-  activeId: -1        // stabiler Identifier statt Index
+  gridSpacing: 0.1,
+  activeId: -1
 };
 const updateRot = ()=>{
   passAMat.uniforms.rotXYZ.value.set(
@@ -326,8 +314,10 @@ gui.add(params, 'rotY_deg', -180, 180, 0.1).name('Textur Rot Y°').onChange(upda
 gui.add(params, 'rotZ_deg', -180, 180, 0.1).name('Textur Rot Z°').onChange(updateRot);
 gui.add(params, 'k1', -0.6, 0.6, 0.005).name('De-Fisheye k1').onChange(v=> passBMat.uniforms.k1.value = v);
 gui.add(params, 'k2', -0.6, 0.6, 0.005).name('Fein k2').onChange(v=> passBMat.uniforms.k2.value = v);
-gui.add(params, 'cameraFov', 40, 140, 0.1).name('Kamera FOV')
+
+const cameraFovCtrl = gui.add(params, 'cameraFov', 40, 140, 0.1).name('Kamera FOV')
   .onChange(v=>{ camera.fov = v; camera.updateProjectionMatrix(); passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(v); });
+
 gui.add(params, 'gridVisible').name('Grid sichtbar').onChange(v=> gridMesh.visible = v);
 gui.add(params, 'gridHeight', -5, 5, 0.01).name('Grid Höhe (Y)').onChange(v=>{
   gridMesh.position.y = v;
@@ -344,7 +334,7 @@ gridFolder.add(gridMat.uniforms.axisThickness, 'value', 0.5, 3.0, 0.1).name('Ach
 gridMat.uniforms.spacing.value = params.gridSpacing;
 updateRot();
 
-/* ---------- Kamera · Info (Yaw/Pitch/Roll/FOV) ---------- */
+/* ---------- Kamera · Info ---------- */
 const camInfo = { yaw: 0, pitch: 0, roll: 0, fov: camera.fov };
 const infoFolder = gui.addFolder('Kamera · Info');
 const yawCtrl   = infoFolder.add(camInfo, 'yaw').name('Yaw [°]').listen();
@@ -355,10 +345,10 @@ const fovCtrl   = infoFolder.add(camInfo, 'fov').name('FOV [°]').listen();
   const input = c.domElement.querySelector('input'); if(input){ input.readOnly = true; input.style.opacity = .85; }
 });
 
-/* ---------- Würfel & Panels (robuste Aktivierung mit IDs) ---------- */
+/* ---------- Würfel / Picking (robust mit IDs) ---------- */
 const cubesFolder = gui.addFolder('Würfel');
 const cubes = [];     // { id, mesh, rays, gui, state, inputControllers, setPosStep }
-const pickables = []; // Meshes für Raycaster
+const pickables = [];
 let nextCubeId = 1;
 
 function makeRayGroup(color=0x00ff00){
@@ -427,10 +417,8 @@ function spawnCube(){
   const rays = makeRayGroup(0x00ff00);
   sceneObjects.add(rays);
 
-  // GUI
   const f = cubesFolder.addFolder(`Würfel ${cubes.length+1}`);
   const state = { x:0, y:0, z:0, rx:0, ry:0, rz:0 };
-
   const toDeg = r => THREE.MathUtils.radToDeg(r);
   const toRad = d => THREE.MathUtils.degToRad(d);
 
@@ -442,35 +430,22 @@ function spawnCube(){
   const rotY = f.add(state, 'ry', -180, 180, 0.1).name('Rot Y [°]').onChange(v=>{ mesh.rotation.y = toRad(v); updateRaysFor(mesh, rays); });
   const rotZ = f.add(state, 'rz', -180, 180, 0.1).name('Rot Z [°]').onChange(v=>{ mesh.rotation.z = toRad(v); updateRaysFor(mesh, rays); });
 
-  // Entfernen (robust: per ID)
   f.add({Entfernen:()=>{
     const idx = cubes.findIndex(cc => cc.id === id);
     f.destroy();
-
-    // Remove visuals
     if(rays){ rays.traverse(o=>{ if(o.geometry) o.geometry.dispose?.(); }); sceneObjects.remove(rays); }
     if(mesh){
       mesh.geometry.dispose?.(); mesh.material.dispose?.(); sceneObjects.remove(mesh);
       const pi = pickables.indexOf(mesh); if (pi>=0) pickables.splice(pi,1);
     }
-
     if(idx>=0) cubes.splice(idx,1);
-
-    // Re-titeln
     cubes.forEach((c, i)=> c.gui.title(`Würfel ${i+1}`));
-
-    // Aktive Auswahl korrigieren
     if (params.activeId === id){
-      if (cubes.length){
-        activateCubeById(cubes[Math.min(idx, cubes.length-1)].id);
-      } else {
-        activateCubeById(-1);
-      }
+      if (cubes.length) activateCubeById(cubes[Math.min(idx, cubes.length-1)].id);
+      else activateCubeById(-1);
     } else {
-      // Falls activeId weiterhin existiert, State refreshen; sonst -1
-      const stillExists = cubes.some(c=> c.id === params.activeId);
-      if (!stillExists) activateCubeById(-1);
-      else activateCubeById(params.activeId);
+      const still = cubes.some(c=> c.id === params.activeId);
+      activateCubeById(still ? params.activeId : -1);
     }
   }}, 'Entfernen').name('✖ Entfernen');
 
@@ -483,7 +458,6 @@ function spawnCube(){
     state.rz = +toDeg(mesh.rotation.z).toFixed(1);
     [posX,posY,posZ,rotX,rotY,rotZ].forEach(c=> c.updateDisplay());
   }
-
   const setPosStep = (s)=>{
     [posX,posY,posZ].forEach(ctrl=>{
       const input = ctrl.domElement.querySelector('input');
@@ -491,14 +465,12 @@ function spawnCube(){
     });
   };
 
-  const record = {
-    id, mesh, rays, gui:f, state,
+  const record = { id, mesh, rays, gui:f, state,
     inputControllers: [posX,posY,posZ,rotX,rotY,rotZ],
     syncFromMesh, setPosStep
   };
   cubes.push(record);
 
-  // Initial
   setPosStep(params.gridSpacing);
   syncFromMesh();
   updateRaysFor(mesh, rays);
@@ -510,10 +482,7 @@ function updateAllCubePositionSteps(){
   cubes.forEach(c => c.setPosStep?.(params.gridSpacing));
 }
 
-// Spawn-Button
-document.getElementById('spawn').addEventListener('click', spawnCube);
-
-/* ---------- Picking (Klick in Szene; robust über IDs) ---------- */
+/* ---------- Picking ---------- */
 const raycaster = new THREE.Raycaster();
 const mouseNDC = new THREE.Vector2();
 function pickAtClient(x, y){
@@ -521,7 +490,6 @@ function pickAtClient(x, y){
   const mx = ((x - rect.left) / rect.width) * 2 - 1;
   const my = -((y - rect.top) / rect.height) * 2 + 1;
   mouseNDC.set(mx, my);
-
   raycaster.setFromCamera(mouseNDC, camera);
   const hits = raycaster.intersectObjects(pickables, false);
   if (hits.length){
@@ -540,24 +508,20 @@ renderer.domElement.addEventListener('pointerdown', (ev)=>{
   const uiRect = document.querySelector('.lil-gui')?.getBoundingClientRect();
   if (uiRect && ev.clientX >= uiRect.left && ev.clientX <= uiRect.right &&
       ev.clientY >= uiRect.top  && ev.clientY <= uiRect.bottom){
-    return; // Klick ins Panel ignorieren
+    return;
   }
   pickAtClient(ev.clientX, ev.clientY);
 });
 
-/* ---------- Tastatursteuerung (kamera-relativ, Schritt = Feldgröße) ---------- */
+/* ---------- Tastatur Move (wie gehabt) ---------- */
 window.addEventListener('keydown', (e)=>{
   const rec = cubes.find(c=> c.id === params.activeId);
   if(!rec) return;
-
   if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown'].includes(e.code) || e.key==='+' || e.key==='#') {
     e.preventDefault();
   }
-
-  const s = params.gridSpacing;                   // Schrittweite = Feldgröße
-  const snap = v => Math.round(v / s) * s;       // Snap aufs Zellraster
-
-  // Kamera-Basis (vorwärts/rechts) auf XZ projizieren
+  const s = params.gridSpacing;
+  const snap = v => Math.round(v / s) * s;
   const fwd = new THREE.Vector3();
   camera.getWorldDirection(fwd);
   const upWorld = new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion);
@@ -565,7 +529,6 @@ window.addEventListener('keydown', (e)=>{
   fwd.y = 0; right.y = 0;
   if (fwd.lengthSq() > 0) fwd.normalize();
   if (right.lengthSq() > 0) right.normalize();
-
   let moved = false;
   if(e.code === 'ArrowUp')    { rec.mesh.position.addScaledVector(fwd,  s); moved = true; }
   if(e.code === 'ArrowDown')  { rec.mesh.position.addScaledVector(fwd, -s); moved = true; }
@@ -573,7 +536,6 @@ window.addEventListener('keydown', (e)=>{
   if(e.code === 'ArrowRight') { rec.mesh.position.addScaledVector(right,  s); moved = true; }
   if(e.key === '+' || e.code === 'NumpadAdd' || e.code === 'PageUp'){ rec.mesh.position.y += s; moved = true; }
   if(e.key === '#' || e.code === 'PageDown'){ rec.mesh.position.y -= s; moved = true; }
-
   if(moved){
     rec.mesh.position.x = snap(rec.mesh.position.x);
     rec.mesh.position.y = snap(rec.mesh.position.y);
@@ -583,7 +545,7 @@ window.addEventListener('keydown', (e)=>{
   }
 });
 
-/* ---------- Minimap ---------- */
+/* ---------- Minimap (wie gehabt) ---------- */
 const mini = document.getElementById('minimap');
 const mctx = mini.getContext('2d');
 function drawMinimap(){
@@ -596,13 +558,12 @@ function drawMinimap(){
   mctx.fillRect(0,0,W,H);
 
   mctx.save();
-  mctx.translate(cx, cy); // kein Y-Flip
+  mctx.translate(cx, cy);
 
   const h = gridMesh.position.y;
   const rEff = Math.max(0, Math.sqrt(Math.max(SPHERE_RADIUS*SPHERE_RADIUS - h*h, 0)));
   const rPx = rEff * pxPerMeter;
 
-  // Grid im Abstand gridSpacing
   const stepPx = Math.max(1, params.gridSpacing * pxPerMeter);
   const count = Math.floor(rPx / stepPx);
 
@@ -610,30 +571,26 @@ function drawMinimap(){
   mctx.lineWidth = 1;
   for(let i=-count; i<=count; i++){
     const x = i * stepPx;
-    mctx.beginPath(); mctx.moveTo(x, -rPx); mctx.lineTo(x,  rPx); mctx.stroke(); // vertikal
+    mctx.beginPath(); mctx.moveTo(x, -rPx); mctx.lineTo(x,  rPx); mctx.stroke();
     const z = i * stepPx;
-    mctx.beginPath(); mctx.moveTo(-rPx, z); mctx.lineTo( rPx, z); mctx.stroke(); // horizontal
+    mctx.beginPath(); mctx.moveTo(-rPx, z); mctx.lineTo( rPx, z); mctx.stroke();
   }
 
-  // Achsen (Mittelkreuz)
   mctx.strokeStyle = '#ffe28a';
   mctx.lineWidth = 2;
-  mctx.beginPath(); mctx.moveTo(-rPx,0); mctx.lineTo(rPx,0); mctx.stroke();  // X
-  mctx.beginPath(); mctx.moveTo(0,-rPx); mctx.lineTo(0,rPx); mctx.stroke();  // Z
+  mctx.beginPath(); mctx.moveTo(-rPx,0); mctx.lineTo(rPx,0); mctx.stroke();
+  mctx.beginPath(); mctx.moveTo(0,-rPx); mctx.lineTo(0,rPx); mctx.stroke();
 
-  // Sphere-Schnittkreis
   mctx.strokeStyle = '#4ea1ff';
   mctx.lineWidth = 2;
   mctx.beginPath(); mctx.arc(0, 0, rPx, 0, Math.PI*2); mctx.stroke();
 
-  // Ursprung
   mctx.fillStyle = '#ffffff';
   mctx.beginPath(); mctx.arc(0, 0, 3, 0, Math.PI*2); mctx.fill();
 
-  // Würfel
   cubes.forEach((c)=>{
     const x = c.mesh.position.x * pxPerMeter;
-    const y = c.mesh.position.z * pxPerMeter; // Z nach unten
+    const y = c.mesh.position.z * pxPerMeter;
     const s = CUBE_SIZE * pxPerMeter;
     mctx.fillStyle = '#3366ff';
     mctx.strokeStyle = (c.id === params.activeId) ? '#ffd400' : '#222';
@@ -646,10 +603,9 @@ function drawMinimap(){
   mctx.restore();
 }
 
-/* ---------- Kamerabasis -> Shader + Kamera-Info ---------- */
+/* ---------- Kamera-Basis & Info ---------- */
 const _tmpEuler = new THREE.Euler(0,0,0,'YXZ');
 function updateCamBasis(){
-  // Kamera nah am Target halten
   const dir = camera.position.clone().sub(controls.target);
   if (dir.lengthSq() === 0) dir.set(0,0,1);
   dir.normalize().multiplyScalar(CAMERA_RADIUS);
@@ -667,7 +623,6 @@ function updateCamBasis(){
   passAMat.uniforms.camBasis.value.copy(m);
   passAMat.uniforms.aspect.value = camera.aspect;
 
-  // Kamera-Info aktualisieren (Yaw/Pitch/Roll in Grad)
   _tmpEuler.setFromQuaternion(camera.quaternion, 'YXZ');
   camInfo.yaw   = +(THREE.MathUtils.radToDeg(_tmpEuler.y)).toFixed(2);
   camInfo.pitch = +(THREE.MathUtils.radToDeg(_tmpEuler.x)).toFixed(2);
@@ -675,11 +630,50 @@ function updateCamBasis(){
   camInfo.fov   = +camera.fov.toFixed(2);
 }
 
-/* ---------- Reset-View Button ---------- */
+/* ---------- Reset ---------- */
 document.getElementById('resetView').addEventListener('click', ()=>{
-  controls.reset();            // auf gespeicherten Startzustand
-  renderer.domElement.focus(); // Keys weiter an Canvas
+  controls.reset();
+  renderer.domElement.focus();
 });
+
+/* ---------- Wheel → FOV (nur auf Canvas, ohne Panel-Konflikt) ---------- */
+function applyFovDelta(deltaY){
+  // Delta in „Zoomgeschwindigkeit“ (logarithmisch sanft)
+  const scale = Math.exp(deltaY * -0.001);               // negativ = reinzoomen
+  const newFov = THREE.MathUtils.clamp(camera.fov * scale, 40, 140);
+  if (newFov !== camera.fov){
+    camera.fov = newFov;
+    camera.updateProjectionMatrix();
+    passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(newFov);
+    params.cameraFov = newFov;
+    cameraFovCtrl.updateDisplay();
+  }
+}
+// Standard-Wheel (Maus/Touchpad, inkl. Pinch->Wheel auf macOS)
+renderer.domElement.addEventListener('wheel', (e)=>{
+  // wenn über GUI oder UI-Bar → ignorieren
+  const guiEl = document.querySelector('.lil-gui');
+  const uiBar = document.getElementById('ui');
+  const within = el => el && el.contains(e.target);
+  if (within(guiEl) || within(uiBar)) return;
+
+  e.preventDefault(); // verhindert Scrollen/Page-Zoom-Konflikte
+  e.stopPropagation();
+  applyFovDelta(e.deltaY);
+}, { passive:false });
+
+// Safari iOS „gesturechange“ (optional fallback)
+let baseFov = camera.fov;
+renderer.domElement.addEventListener('gesturestart', (e)=>{ baseFov = camera.fov; }, { passive:true });
+renderer.domElement.addEventListener('gesturechange', (e)=>{
+  // e.scale >1 = rein; mappe linear -> logarithmisch
+  const target = THREE.MathUtils.clamp(baseFov / e.scale, 40, 140);
+  camera.fov = target;
+  camera.updateProjectionMatrix();
+  passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(target);
+  params.cameraFov = target;
+  cameraFovCtrl.updateDisplay();
+}, { passive:true });
 
 /* ---------- Resize ---------- */
 function resizeAll(){
@@ -713,31 +707,26 @@ function render(){
 
   gridMat.uniforms.planeY.value = gridMesh.position.y;
 
-  // (1) Objekte -> RT
   const prev = renderer.getRenderTarget();
   renderer.setRenderTarget(rtObjects);
   renderer.clear(true,true,true);
   renderer.render(sceneObjects, camera);
   renderer.setRenderTarget(prev);
 
-  // (2) Pass A -> Combined
   renderer.setRenderTarget(rtCombined);
   renderer.clear(true,true,true);
   renderer.render(screenSceneA, fsCam);
   renderer.setRenderTarget(null);
 
-  // (3) Pass B
   passBMat.uniforms.src.value = rtCombined.texture;
   renderer.render(screenSceneB, fsCam);
 
-  // (4) Minimap
   drawMinimap();
-
   requestAnimationFrame(render);
 }
 render();
 
-/* ---------- Panorama Upload ---------- */
+/* ---------- Upload & Spawn ---------- */
 document.getElementById('file').addEventListener('change', (e)=>{
   const file = e.target.files?.[0]; if(!file) return;
   const url = URL.createObjectURL(file);
@@ -750,8 +739,6 @@ document.getElementById('file').addEventListener('change', (e)=>{
     URL.revokeObjectURL(url);
   });
 });
-
-/* ---------- Buttons ---------- */
 document.getElementById('spawn').addEventListener('click', spawnCube);
 </script>
 </body>
