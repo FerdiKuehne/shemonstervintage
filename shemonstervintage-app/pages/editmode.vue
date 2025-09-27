@@ -3,10 +3,12 @@
     <div class="container-fluid p-0">
       <div class="cameraPos">
         <div>
-         x {{ cameraHUD.x.toFixed(2) }} / y {{ cameraHUD.y.toFixed(2) }} / z {{ cameraHUD.z.toFixed(2) }}
+          {{ cameraHUD.x.toFixed(2) }} // {{ cameraHUD.y.toFixed(2) }} //
+          {{ cameraHUD.z.toFixed(2) }}
         </div>
         <div>
-         rx {{ cameraHUD.rx.toFixed(1) }} / ry {{ cameraHUD.ry.toFixed(1) }} / rz {{ cameraHUD.rz.toFixed(1) }}
+          {{ cameraHUD.rx.toFixed(1) }} // {{ cameraHUD.ry.toFixed(1) }} //
+          {{ cameraHUD.rz.toFixed(1) }}
         </div>
       </div>
 
@@ -514,8 +516,13 @@ function createBackgroundPanel() {
       bgSphere.material.uniforms.uOffset.value = (deg % 360) / 360;
     }
   });
-
+  gui.add(bgParams, "panoramaAmp", 0, 100, 0.1).name("Amplitude").onChange((v) => {
+    if (bgSphere.material.uniforms.uAmplitude) {
+      bgSphere.material.uniforms.uAmplitude.value = v;
+    }
+  });
   gui.add(bgParams, "autoRotate").name("Auto-Rotate");
+  gui.add(bgParams, "speedDegPerSec", 0, 60, 0.1).name("Speed (°/s)");
 }
 
 // ---------- Grid-Panel inkl. Clipping-Toggle ----------
@@ -743,6 +750,7 @@ onBeforeUnmount(() => {
   bottom: 3rem;
   left: 1rem;
   color: white;
+  width: 154px;
   background: rgba(0, 0, 0, 0.5);
   padding: 0.25rem 0.5rem;
   border-radius: 0;

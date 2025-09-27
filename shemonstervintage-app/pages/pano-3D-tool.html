@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Pano + Grid-Scan · Axis + Robust Picking</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html,body { height:100%; margin:0; background:#0b0b0b; overflow:hidden; }
+  #ui { position:fixed; top:10px; left:10px; z-index:1000; display:flex; gap:.5rem; align-items:center; }
+
+  /* Fancy Buttons */
+  .btn {
+    --bg1:#1a2740; --bg2:#0f172a; --border:#2b3b6b; --hover:#243b74; --active:#162452;
+    color:#e6ebff; font:600 13px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    padding:.6rem .9rem; border-radius:10px; border:1px solid var(--border);
+    background: linear-gradient(180deg, var(--bg1), var(--bg2));
+    box-shadow: 0 4px 12px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.05);
+    cursor:pointer; transition: all .15s ease;
+  }
+  .btn:hover { background: linear-gradient(180deg, var(--hover), var(--bg2)); transform: translateY(-1px); }
+  .btn:active { background: linear-gradient(180deg, var(--active), var(--bg2)); transform: translateY(0); }
+
+  canvas { display:block; }
+
+  /* Minimap unten links */
+  #minimap {
+    position: fixed; left: 10px; bottom: 10px; z-index: 10000;
+    width: 220px; height: 220px;
+    border: 1px solid #2a2a2a; border-radius: 8px; background: #0e0e10;
+    pointer-events: none;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  }
+
+  /* Aktives Würfel-Panel highlighten (lil-gui) */
+  .lil-gui .folder.active-cube > .title {
+    background: linear-gradient(90deg, #244cff, #0f1a3a) !important;
+    color: #fff !important;
+    text-shadow: 0 1px 0 rgba(0,0,0,.25);
+  }
+  .lil-gui .folder.active-cube {
+    box-shadow: 0 0 0 2px #244cff inset;
+    border-radius: 6px;
+  }
+  .lil-gui.autoPlace {
+    top: 0;
+    right: 0;
+}
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="ui">
+    <input id="file" type="file" accept="image/*"  />
+    <button id="spawn" class="btn">＋ Neuer Würfel (0.3 m)</button>
+    <button id="resetView" class="btn">↺ Reset Position</button>
+  </div>
+  <canvas id="minimap" width="440" height="440"></canvas>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GUI } from 'https://unpkg.com/lil-gui@0.19/dist/lil-gui.esm.js';
+
+/* ---------- Renderer & Kamera (immer zentriert) ---------- */
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+renderer.domElement.setAttribute('tabindex','0');
+renderer.domElement.addEventListener('click', ()=> renderer.domElement.focus());
+
+const CAMERA_RADIUS = 1e-4;
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.001, 1000);
+camera.position.set(0,0,CAMERA_RADIUS);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enablePan = false;
+controls.enableZoom = false;
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.rotateSpeed = 0.9;
+controls.target.set(0,0,0);
+/* Startzustand merken für Reset */
+controls.saveState();
+
+/* ---------- Szene ---------- */
+const sceneObjects = new THREE.Scene();
+sceneObjects.add(new THREE.HemisphereLight(0xffffff, 0x222233, 1.0));
+const dl = new THREE.DirectionalLight(0xffffff, 0.7); dl.position.set(1,1,1); sceneObjects.add(dl);
+
+const SPHERE_RADIUS = 2.0;   // m
+const CUBE_SIZE = 0.3;       // m
+const CUBE_RANGE = 5.0;      // ±5 m GUI-Sliderbereich
+
+/* ---------- Grid (dynamischer Schnitt der Sphere, inkl. Mittelkreuz) ---------- */
+const gridGeom = new THREE.PlaneGeometry(200, 200, 1, 1);
+gridGeom.rotateX(-Math.PI/2);
+const gridMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false,
+  uniforms: {
+    color: { value: new THREE.Color(0x00ffcc) },
+    spacing: { value: 0.1 },                // via GUI
+    thickness:{ value: 0.015 },
+    clipToSphere:{ value: true },
+    sphereRadius:{ value: SPHERE_RADIUS },
+    planeY: { value: 0.0 },
+    ringColor: { value: new THREE.Color(0x4ea1ff) },
+    ringOpacity: { value: 1.0 },
+    axisColor:   { value: new THREE.Color(0xffe28a) }, // Mittelkreuz
+    axisAlpha:   { value: 1.0 },
+    axisThickness:{ value: 1.5 } // px
+  },
+  vertexShader: /* glsl */`
+    varying vec3 vWorldPos;
+    void main(){
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vWorldPos = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: /* glsl */`
+    precision highp float;
+    varying vec3 vWorldPos;
+    uniform vec3  color;
+    uniform float spacing, thickness, sphereRadius, planeY;
+    uniform bool  clipToSphere;
+    uniform vec3  ringColor;
+    uniform float ringOpacity;
+    uniform vec3  axisColor;
+    uniform float axisAlpha;
+    uniform float axisThickness;
+
+    float gridMask(vec2 p, float s, float t){
+      vec2 c = p / s;
+      vec2 fw = max(fwidth(c), vec2(1e-6));
+      vec2 g = abs(fract(c) - 0.5) / fw;
+      float line = 1.0 - min(min(g.x, g.y) * (t*50.0), 1.0);
+      return line;
+    }
+
+    void main(){
+      float h = planeY;
+      float rEff2 = max(sphereRadius*sphereRadius - h*h, 0.0);
+      float rEff  = sqrt(rEff2);
+
+      float r = length(vWorldPos.xz);
+      if (clipToSphere && r > rEff + 1e-4) discard;
+
+      // Grid
+      float m = gridMask(vWorldPos.xz, spacing, thickness);
+
+      // Fade zur Schnittkante
+      float fade = 1.0;
+      if (clipToSphere){
+        float d = clamp((rEff - r) / 0.2, 0.0, 1.0);
+        fade = d;
+      }
+
+      // Ring am Schnittkreis
+      float w = fwidth(r) * 1.5;
+      float ring = 1.0 - smoothstep(w, w*2.0, abs(r - rEff));
+
+      // --- Mittelkreuz (X-/Z-Achse) ---
+      float fx = fwidth(vWorldPos.x);
+      float fz = fwidth(vWorldPos.z);
+      float halfW_x = max(axisThickness * fx, 1e-6);
+      float halfW_z = max(axisThickness * fz, 1e-6);
+      float lineX = 1.0 - smoothstep(0.0, halfW_x, abs(vWorldPos.x));
+      float lineZ = 1.0 - smoothstep(0.0, halfW_z, abs(vWorldPos.z));
+      float axisMask = max(lineX, lineZ);
+
+      // Mischen
+      vec3 finalCol = color;
+      float finalAlpha = m * 0.85 * fade;
+
+      finalCol = mix(finalCol, ringColor, clamp(ring * ringOpacity, 0.0, 1.0));
+      finalAlpha = max(finalAlpha, ring * ringOpacity);
+
+      finalCol = mix(finalCol, axisColor, clamp(axisMask * axisAlpha, 0.0, 1.0));
+      finalAlpha = max(finalAlpha, axisMask * axisAlpha);
+
+      if (finalAlpha <= 0.0) discard;
+      gl_FragColor = vec4(finalCol, finalAlpha);
+    }
+  `
+});
+const gridMesh = new THREE.Mesh(gridGeom, gridMat);
+sceneObjects.add(gridMesh);
+
+/* ---------- Pano + Post ---------- */
+const db = new THREE.Vector2(); renderer.getDrawingBufferSize(db);
+let rtObjects  = new THREE.WebGLRenderTarget(db.x, db.y, { depthBuffer:true });
+let rtCombined = new THREE.WebGLRenderTarget(db.x, db.y, { depthBuffer:false });
+
+let panoTex = new THREE.Texture();
+panoTex.colorSpace = THREE.SRGBColorSpace;
+panoTex.wrapS = THREE.RepeatWrapping;
+panoTex.wrapT = THREE.ClampToEdgeWrapping;
+
+const fsCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+const screenSceneA = new THREE.Scene();
+const screenSceneB = new THREE.Scene();
+
+const passAMat = new THREE.ShaderMaterial({
+  uniforms:{
+    objTex: { value: rtObjects.texture },
+    pano:   { value: panoTex },
+    resolution: { value: db.clone() },
+    fovY:   { value: THREE.MathUtils.degToRad(camera.fov) },
+    aspect: { value: camera.aspect },
+    camBasis: { value: new THREE.Matrix3() },
+    rotXYZ: { value: new THREE.Vector3(0,0,0) } // initial 0/0/0
+  },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main(){ vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy,0.0,1.0); }
+  `,
+  fragmentShader: /* glsl */`
+    precision highp float;
+    uniform sampler2D objTex, pano;
+    uniform vec2  resolution;
+    uniform float fovY, aspect;
+    uniform mat3  camBasis;
+    uniform vec3  rotXYZ;
+    const float PI = 3.141592653589793;
+    vec3 rayFromNDC(vec2 ndc){
+      float t = tan(0.5*fovY);
+      vec3 dCam = normalize(vec3(ndc.x * aspect * t, ndc.y * t, -1.0));
+      return normalize(camBasis * dCam);
+    }
+    vec3 applyEulerXYZ(vec3 v, vec3 r){
+      float cx=cos(r.x), sx=sin(r.x), cy=cos(r.y), sy=sin(r.y), cz=cos(r.z), sz=sin(r.z);
+      v = vec3( v.x, cx*v.y - sx*v.z, sx*v.y + cx*v.z );
+      v = vec3(  cy*v.x + sy*v.z, v.y, -sy*v.x + cy*v.z );
+      v = vec3(  cz*v.x - sz*v.y, sz*v.x + cz*v.y, v.z );
+      return v;
+    }
+    vec3 samplePano(vec3 dir, vec3 rot){
+      dir = normalize(applyEulerXYZ(dir, rot));
+      float u = fract(atan(dir.z, dir.x)/(2.0*PI) + 0.5);
+      float v = clamp(asin(clamp(dir.y,-1.0,1.0))/PI + 0.5, 0.0, 1.0);
+      return texture2D(pano, vec2(u,v)).rgb;
+    }
+    void main(){
+      vec2 ndc = (gl_FragCoord.xy / resolution) * 2.0 - 1.0;
+      vec3 dir = rayFromNDC(ndc);
+      vec3 panoCol = samplePano(dir, rotXYZ);
+      vec2 uvRect = ndc*0.5 + 0.5;
+      vec4 objCol = vec4(0.0);
+      if(all(greaterThanEqual(uvRect, vec2(0.0))) && all(lessThanEqual(uvRect, vec2(1.0)))){
+        objCol = texture2D(objTex, uvRect);
+      }
+      gl_FragColor = vec4(mix(panoCol, objCol.rgb, objCol.a), 1.0);
+    }
+  `,
+  depthTest:false, depthWrite:false
+});
+screenSceneA.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), passAMat));
+
+const passBMat = new THREE.ShaderMaterial({
+  uniforms:{
+    src: { value: rtCombined.texture },
+    resolution: { value: db.clone() },
+    k1: { value: -0.25 },
+    k2: { value: 0.0 }
+  },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main(){ vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy,0.0,1.0); }
+  `,
+  fragmentShader: /* glsl */`
+    precision highp float;
+    varying vec2 vUv;
+    uniform sampler2D src;
+    uniform vec2  resolution;
+    uniform float k1, k2;
+    void main(){
+      vec2 center = vec2(0.5);
+      vec2 xy = vUv - center;
+      float aspect = resolution.x / max(resolution.y, 1.0);
+      xy.x *= aspect;
+      float r2 = dot(xy,xy);
+      float f  = 1.0 + k1*r2 + k2*r2*r2;
+      vec2 warped = xy * f;
+      warped.x /= aspect;
+      vec2 uvSrc = center + warped;
+      if(any(lessThan(uvSrc, vec2(0.0))) || any(greaterThan(uvSrc, vec2(1.0)))){
+        gl_FragColor = vec4(0.0);
+      } else {
+        gl_FragColor = texture2D(src, uvSrc);
+      }
+    }
+  `,
+  depthTest:false, depthWrite:false
+});
+screenSceneB.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), passBMat));
+
+/* ---------- GUI ---------- */
+const gui = new GUI({ title: 'Controls' });
+const params = {
+  rotX_deg: 0, rotY_deg: 0, rotZ_deg: 0,  // initial 0/0/0
+  k1: -0.25, k2: 0.0,
+  cameraFov: camera.fov,
+  gridHeight: 0.0, gridClip: true, gridVisible: true,
+  gridSpacing: 0.1,   // Feldgröße [m]
+  activeId: -1        // stabiler Identifier statt Index
+};
+const updateRot = ()=>{
+  passAMat.uniforms.rotXYZ.value.set(
+    THREE.MathUtils.degToRad(params.rotX_deg),
+    THREE.MathUtils.degToRad(params.rotY_deg),
+    THREE.MathUtils.degToRad(params.rotZ_deg)
+  );
+};
+gui.add(params, 'rotX_deg', -180, 180, 0.1).name('Textur Rot X°').onChange(updateRot);
+gui.add(params, 'rotY_deg', -180, 180, 0.1).name('Textur Rot Y°').onChange(updateRot);
+gui.add(params, 'rotZ_deg', -180, 180, 0.1).name('Textur Rot Z°').onChange(updateRot);
+gui.add(params, 'k1', -0.6, 0.6, 0.005).name('De-Fisheye k1').onChange(v=> passBMat.uniforms.k1.value = v);
+gui.add(params, 'k2', -0.6, 0.6, 0.005).name('Fein k2').onChange(v=> passBMat.uniforms.k2.value = v);
+gui.add(params, 'cameraFov', 40, 140, 0.1).name('Kamera FOV')
+  .onChange(v=>{ camera.fov = v; camera.updateProjectionMatrix(); passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(v); });
+gui.add(params, 'gridVisible').name('Grid sichtbar').onChange(v=> gridMesh.visible = v);
+gui.add(params, 'gridHeight', -5, 5, 0.01).name('Grid Höhe (Y)').onChange(v=>{
+  gridMesh.position.y = v;
+  gridMat.uniforms.planeY.value = v;
+});
+const gridFolder = gui.addFolder('Grid-Style');
+gridFolder.add(params, 'gridSpacing', 0.01, 1.0, 0.01).name('Feldgröße [m]').onChange(v=>{
+  gridMat.uniforms.spacing.value = v;
+  updateAllCubePositionSteps();
+});
+gridFolder.addColor({ axis:'#ffe28a' }, 'axis').name('Achsenfarbe')
+  .onChange(v => gridMat.uniforms.axisColor.value.set(v));
+gridFolder.add(gridMat.uniforms.axisThickness, 'value', 0.5, 3.0, 0.1).name('Achsendicke [px]');
+gridMat.uniforms.spacing.value = params.gridSpacing;
+updateRot();
+
+/* ---------- Kamera · Info (Yaw/Pitch/Roll/FOV) ---------- */
+const camInfo = { yaw: 0, pitch: 0, roll: 0, fov: camera.fov };
+const infoFolder = gui.addFolder('Kamera · Info');
+const yawCtrl   = infoFolder.add(camInfo, 'yaw').name('Yaw [°]').listen();
+const pitchCtrl = infoFolder.add(camInfo, 'pitch').name('Pitch [°]').listen();
+const rollCtrl  = infoFolder.add(camInfo, 'roll').name('Roll [°]').listen();
+const fovCtrl   = infoFolder.add(camInfo, 'fov').name('FOV [°]').listen();
+[yawCtrl, pitchCtrl, rollCtrl, fovCtrl].forEach(c=>{
+  const input = c.domElement.querySelector('input'); if(input){ input.readOnly = true; input.style.opacity = .85; }
+});
+
+/* ---------- Würfel & Panels (robuste Aktivierung mit IDs) ---------- */
+const cubesFolder = gui.addFolder('Würfel');
+const cubes = [];     // { id, mesh, rays, gui, state, inputControllers, setPosStep }
+const pickables = []; // Meshes für Raycaster
+let nextCubeId = 1;
+
+function makeRayGroup(color=0x00ff00){
+  const g = new THREE.Group();
+  const mat = new THREE.LineBasicMaterial({ color, transparent:true, opacity:0.95 });
+  for(let i=0;i<6;i++){
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    g.add(new THREE.Line(geo, mat));
+  }
+  return g;
+}
+function updateRaysFor(mesh, rays){
+  const normals = [
+    new THREE.Vector3( 1, 0, 0), new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3( 0, 1, 0), new THREE.Vector3( 0,-1, 0),
+    new THREE.Vector3( 0, 0, 1), new THREE.Vector3( 0, 0,-1)
+  ];
+  const pos = mesh.position.clone();
+  const q   = mesh.quaternion.clone();
+  const half = CUBE_SIZE*0.5;
+  for(let i=0;i<6;i++){
+    const n = normals[i].clone().applyQuaternion(q).normalize();
+    const faceCenter = pos.clone().addScaledVector(n, half);
+    const b = 2.0 * faceCenter.dot(n);
+    const c = faceCenter.lengthSq() - SPHERE_RADIUS*SPHERE_RADIUS;
+    const disc = b*b - 4.0*c;
+    let t = 0.0;
+    if (disc >= 0.0){
+      const sqrtD = Math.sqrt(disc);
+      const t1 = (-b + sqrtD) * 0.5;
+      const t2 = (-b - sqrtD) * 0.5;
+      t = Math.max(t1, t2);
+      if (t < 0.0) t = 0.0;
+    }
+    const end = faceCenter.clone().addScaledVector(n, t);
+    const line = rays.children[i];
+    const arr = new Float32Array([faceCenter.x, faceCenter.y, faceCenter.z, end.x, end.y, end.z]);
+    line.geometry.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    line.geometry.computeBoundingSphere();
+  }
+}
+
+function activateCubeById(id){
+  params.activeId = id;
+  cubes.forEach((c)=>{
+    const isActive = c.id === id;
+    c.gui.domElement.classList.toggle('active-cube', isActive);
+    if (c.rays) c.rays.visible = isActive;
+    c.inputControllers.forEach(ctrl=>{
+      const el = ctrl.domElement.querySelector('input');
+      if(el) el.disabled = !isActive;
+    });
+  });
+  if (id !== -1) renderer.domElement.focus();
+}
+
+function spawnCube(){
+  const id = nextCubeId++;
+  const mat = new THREE.MeshStandardMaterial({ color:0x3366ff, roughness:0.45, metalness:0.05 });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE), mat);
+  mesh.position.set(0,0,0);
+  mesh.rotation.set(0,0,0);
+  sceneObjects.add(mesh);
+  pickables.push(mesh);
+
+  const rays = makeRayGroup(0x00ff00);
+  sceneObjects.add(rays);
+
+  // GUI
+  const f = cubesFolder.addFolder(`Würfel ${cubes.length+1}`);
+  const state = { x:0, y:0, z:0, rx:0, ry:0, rz:0 };
+
+  const toDeg = r => THREE.MathUtils.radToDeg(r);
+  const toRad = d => THREE.MathUtils.degToRad(d);
+
+  const posX = f.add(state, 'x', -CUBE_RANGE, CUBE_RANGE, params.gridSpacing).name('Pos X [m]').onChange(v=>{ mesh.position.x=v; updateRaysFor(mesh, rays); });
+  const posY = f.add(state, 'y', -CUBE_RANGE, CUBE_RANGE, params.gridSpacing).name('Pos Y [m]').onChange(v=>{ mesh.position.y=v; updateRaysFor(mesh, rays); });
+  const posZ = f.add(state, 'z', -CUBE_RANGE, CUBE_RANGE, params.gridSpacing).name('Pos Z [m]').onChange(v=>{ mesh.position.z=v; updateRaysFor(mesh, rays); });
+
+  const rotX = f.add(state, 'rx', -180, 180, 0.1).name('Rot X [°]').onChange(v=>{ mesh.rotation.x = toRad(v); updateRaysFor(mesh, rays); });
+  const rotY = f.add(state, 'ry', -180, 180, 0.1).name('Rot Y [°]').onChange(v=>{ mesh.rotation.y = toRad(v); updateRaysFor(mesh, rays); });
+  const rotZ = f.add(state, 'rz', -180, 180, 0.1).name('Rot Z [°]').onChange(v=>{ mesh.rotation.z = toRad(v); updateRaysFor(mesh, rays); });
+
+  // Entfernen (robust: per ID)
+  f.add({Entfernen:()=>{
+    const idx = cubes.findIndex(cc => cc.id === id);
+    f.destroy();
+
+    // Remove visuals
+    if(rays){ rays.traverse(o=>{ if(o.geometry) o.geometry.dispose?.(); }); sceneObjects.remove(rays); }
+    if(mesh){
+      mesh.geometry.dispose?.(); mesh.material.dispose?.(); sceneObjects.remove(mesh);
+      const pi = pickables.indexOf(mesh); if (pi>=0) pickables.splice(pi,1);
+    }
+
+    if(idx>=0) cubes.splice(idx,1);
+
+    // Re-titeln
+    cubes.forEach((c, i)=> c.gui.title(`Würfel ${i+1}`));
+
+    // Aktive Auswahl korrigieren
+    if (params.activeId === id){
+      if (cubes.length){
+        activateCubeById(cubes[Math.min(idx, cubes.length-1)].id);
+      } else {
+        activateCubeById(-1);
+      }
+    } else {
+      // Falls activeId weiterhin existiert, State refreshen; sonst -1
+      const stillExists = cubes.some(c=> c.id === params.activeId);
+      if (!stillExists) activateCubeById(-1);
+      else activateCubeById(params.activeId);
+    }
+  }}, 'Entfernen').name('✖ Entfernen');
+
+  function syncFromMesh(){
+    state.x = +mesh.position.x.toFixed(3);
+    state.y = +mesh.position.y.toFixed(3);
+    state.z = +mesh.position.z.toFixed(3);
+    state.rx = +toDeg(mesh.rotation.x).toFixed(1);
+    state.ry = +toDeg(mesh.rotation.y).toFixed(1);
+    state.rz = +toDeg(mesh.rotation.z).toFixed(1);
+    [posX,posY,posZ,rotX,rotY,rotZ].forEach(c=> c.updateDisplay());
+  }
+
+  const setPosStep = (s)=>{
+    [posX,posY,posZ].forEach(ctrl=>{
+      const input = ctrl.domElement.querySelector('input');
+      if (input) input.step = s.toString();
+    });
+  };
+
+  const record = {
+    id, mesh, rays, gui:f, state,
+    inputControllers: [posX,posY,posZ,rotX,rotY,rotZ],
+    syncFromMesh, setPosStep
+  };
+  cubes.push(record);
+
+  // Initial
+  setPosStep(params.gridSpacing);
+  syncFromMesh();
+  updateRaysFor(mesh, rays);
+  activateCubeById(id);
+  renderer.domElement.focus();
+}
+
+function updateAllCubePositionSteps(){
+  cubes.forEach(c => c.setPosStep?.(params.gridSpacing));
+}
+
+// Spawn-Button
+document.getElementById('spawn').addEventListener('click', spawnCube);
+
+/* ---------- Picking (Klick in Szene; robust über IDs) ---------- */
+const raycaster = new THREE.Raycaster();
+const mouseNDC = new THREE.Vector2();
+function pickAtClient(x, y){
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mx = ((x - rect.left) / rect.width) * 2 - 1;
+  const my = -((y - rect.top) / rect.height) * 2 + 1;
+  mouseNDC.set(mx, my);
+
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hits = raycaster.intersectObjects(pickables, false);
+  if (hits.length){
+    const obj = hits[0].object;
+    const rec = cubes.find(c=> c.mesh === obj);
+    if (rec){
+      activateCubeById(rec.id);
+      updateRaysFor(rec.mesh, rec.rays);
+      return;
+    }
+  }
+  activateCubeById(-1);
+}
+renderer.domElement.addEventListener('pointerdown', (ev)=>{
+  if (ev.button !== 0) return;
+  const uiRect = document.querySelector('.lil-gui')?.getBoundingClientRect();
+  if (uiRect && ev.clientX >= uiRect.left && ev.clientX <= uiRect.right &&
+      ev.clientY >= uiRect.top  && ev.clientY <= uiRect.bottom){
+    return; // Klick ins Panel ignorieren
+  }
+  pickAtClient(ev.clientX, ev.clientY);
+});
+
+/* ---------- Tastatursteuerung (kamera-relativ, Schritt = Feldgröße) ---------- */
+window.addEventListener('keydown', (e)=>{
+  const rec = cubes.find(c=> c.id === params.activeId);
+  if(!rec) return;
+
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown'].includes(e.code) || e.key==='+' || e.key==='#') {
+    e.preventDefault();
+  }
+
+  const s = params.gridSpacing;                   // Schrittweite = Feldgröße
+  const snap = v => Math.round(v / s) * s;       // Snap aufs Zellraster
+
+  // Kamera-Basis (vorwärts/rechts) auf XZ projizieren
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd);
+  const upWorld = new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion);
+  const right = new THREE.Vector3().crossVectors(fwd, upWorld).normalize();
+  fwd.y = 0; right.y = 0;
+  if (fwd.lengthSq() > 0) fwd.normalize();
+  if (right.lengthSq() > 0) right.normalize();
+
+  let moved = false;
+  if(e.code === 'ArrowUp')    { rec.mesh.position.addScaledVector(fwd,  s); moved = true; }
+  if(e.code === 'ArrowDown')  { rec.mesh.position.addScaledVector(fwd, -s); moved = true; }
+  if(e.code === 'ArrowLeft')  { rec.mesh.position.addScaledVector(right, -s); moved = true; }
+  if(e.code === 'ArrowRight') { rec.mesh.position.addScaledVector(right,  s); moved = true; }
+  if(e.key === '+' || e.code === 'NumpadAdd' || e.code === 'PageUp'){ rec.mesh.position.y += s; moved = true; }
+  if(e.key === '#' || e.code === 'PageDown'){ rec.mesh.position.y -= s; moved = true; }
+
+  if(moved){
+    rec.mesh.position.x = snap(rec.mesh.position.x);
+    rec.mesh.position.y = snap(rec.mesh.position.y);
+    rec.mesh.position.z = snap(rec.mesh.position.z);
+    updateRaysFor(rec.mesh, rec.rays);
+    rec.syncFromMesh();
+  }
+});
+
+/* ---------- Minimap ---------- */
+const mini = document.getElementById('minimap');
+const mctx = mini.getContext('2d');
+function drawMinimap(){
+  const W = mini.width, H = mini.height;
+  const pxPerMeter = Math.min(W, H) * 0.45 / SPHERE_RADIUS;
+  const cx = W/2, cy = H/2;
+
+  mctx.clearRect(0,0,W,H);
+  mctx.fillStyle = '#0e0e10';
+  mctx.fillRect(0,0,W,H);
+
+  mctx.save();
+  mctx.translate(cx, cy); // kein Y-Flip
+
+  const h = gridMesh.position.y;
+  const rEff = Math.max(0, Math.sqrt(Math.max(SPHERE_RADIUS*SPHERE_RADIUS - h*h, 0)));
+  const rPx = rEff * pxPerMeter;
+
+  // Grid im Abstand gridSpacing
+  const stepPx = Math.max(1, params.gridSpacing * pxPerMeter);
+  const count = Math.floor(rPx / stepPx);
+
+  mctx.strokeStyle = '#1a1f24';
+  mctx.lineWidth = 1;
+  for(let i=-count; i<=count; i++){
+    const x = i * stepPx;
+    mctx.beginPath(); mctx.moveTo(x, -rPx); mctx.lineTo(x,  rPx); mctx.stroke(); // vertikal
+    const z = i * stepPx;
+    mctx.beginPath(); mctx.moveTo(-rPx, z); mctx.lineTo( rPx, z); mctx.stroke(); // horizontal
+  }
+
+  // Achsen (Mittelkreuz)
+  mctx.strokeStyle = '#ffe28a';
+  mctx.lineWidth = 2;
+  mctx.beginPath(); mctx.moveTo(-rPx,0); mctx.lineTo(rPx,0); mctx.stroke();  // X
+  mctx.beginPath(); mctx.moveTo(0,-rPx); mctx.lineTo(0,rPx); mctx.stroke();  // Z
+
+  // Sphere-Schnittkreis
+  mctx.strokeStyle = '#4ea1ff';
+  mctx.lineWidth = 2;
+  mctx.beginPath(); mctx.arc(0, 0, rPx, 0, Math.PI*2); mctx.stroke();
+
+  // Ursprung
+  mctx.fillStyle = '#ffffff';
+  mctx.beginPath(); mctx.arc(0, 0, 3, 0, Math.PI*2); mctx.fill();
+
+  // Würfel
+  cubes.forEach((c)=>{
+    const x = c.mesh.position.x * pxPerMeter;
+    const y = c.mesh.position.z * pxPerMeter; // Z nach unten
+    const s = CUBE_SIZE * pxPerMeter;
+    mctx.fillStyle = '#3366ff';
+    mctx.strokeStyle = (c.id === params.activeId) ? '#ffd400' : '#222';
+    mctx.lineWidth = (c.id === params.activeId) ? 3 : 1;
+    mctx.beginPath();
+    mctx.rect(x - s/2, y - s/2, s, s);
+    mctx.fill(); mctx.stroke();
+  });
+
+  mctx.restore();
+}
+
+/* ---------- Kamerabasis -> Shader + Kamera-Info ---------- */
+const _tmpEuler = new THREE.Euler(0,0,0,'YXZ');
+function updateCamBasis(){
+  // Kamera nah am Target halten
+  const dir = camera.position.clone().sub(controls.target);
+  if (dir.lengthSq() === 0) dir.set(0,0,1);
+  dir.normalize().multiplyScalar(CAMERA_RADIUS);
+  camera.position.copy(controls.target).add(dir);
+
+  camera.updateMatrixWorld();
+  const e = camera.matrixWorld.elements;
+  const right = new THREE.Vector3(e[0], e[1], e[2]).normalize();
+  const up    = new THREE.Vector3(e[4], e[5], e[6]).normalize();
+  const zAxis = new THREE.Vector3(e[8], e[9], e[10]).normalize();
+  const m = new THREE.Matrix3();
+  m.set(right.x, up.x, zAxis.x,
+        right.y, up.y, zAxis.y,
+        right.z, up.z, zAxis.z);
+  passAMat.uniforms.camBasis.value.copy(m);
+  passAMat.uniforms.aspect.value = camera.aspect;
+
+  // Kamera-Info aktualisieren (Yaw/Pitch/Roll in Grad)
+  _tmpEuler.setFromQuaternion(camera.quaternion, 'YXZ');
+  camInfo.yaw   = +(THREE.MathUtils.radToDeg(_tmpEuler.y)).toFixed(2);
+  camInfo.pitch = +(THREE.MathUtils.radToDeg(_tmpEuler.x)).toFixed(2);
+  camInfo.roll  = +(THREE.MathUtils.radToDeg(_tmpEuler.z)).toFixed(2);
+  camInfo.fov   = +camera.fov.toFixed(2);
+}
+
+/* ---------- Reset-View Button ---------- */
+document.getElementById('resetView').addEventListener('click', ()=>{
+  controls.reset();            // auf gespeicherten Startzustand
+  renderer.domElement.focus(); // Keys weiter an Canvas
+});
+
+/* ---------- Resize ---------- */
+function resizeAll(){
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(camera.fov);
+  passAMat.uniforms.aspect.value = camera.aspect;
+  renderer.getDrawingBufferSize(db);
+  passAMat.uniforms.resolution.value.copy(db);
+  passBMat.uniforms.resolution.value.copy(db);
+  rtObjects.setSize(db.x, db.y);
+  rtCombined.setSize(db.x, db.y);
+}
+window.addEventListener('resize', resizeAll);
+
+/* ---------- Renderloop ---------- */
+renderer.setClearColor(0x000000, 0);
+function render(){
+  controls.update();
+  updateCamBasis();
+
+  const cur = new THREE.Vector2(); renderer.getDrawingBufferSize(cur);
+  if(cur.x !== db.x || cur.y !== db.y){
+    db.copy(cur);
+    passAMat.uniforms.resolution.value.copy(db);
+    passBMat.uniforms.resolution.value.copy(db);
+    rtObjects.setSize(db.x, db.y);
+    rtCombined.setSize(db.x, db.y);
+  }
+
+  gridMat.uniforms.planeY.value = gridMesh.position.y;
+
+  // (1) Objekte -> RT
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(rtObjects);
+  renderer.clear(true,true,true);
+  renderer.render(sceneObjects, camera);
+  renderer.setRenderTarget(prev);
+
+  // (2) Pass A -> Combined
+  renderer.setRenderTarget(rtCombined);
+  renderer.clear(true,true,true);
+  renderer.render(screenSceneA, fsCam);
+  renderer.setRenderTarget(null);
+
+  // (3) Pass B
+  passBMat.uniforms.src.value = rtCombined.texture;
+  renderer.render(screenSceneB, fsCam);
+
+  // (4) Minimap
+  drawMinimap();
+
+  requestAnimationFrame(render);
+}
+render();
+
+/* ---------- Panorama Upload ---------- */
+document.getElementById('file').addEventListener('change', (e)=>{
+  const file = e.target.files?.[0]; if(!file) return;
+  const url = URL.createObjectURL(file);
+  new THREE.TextureLoader().load(url, (tex)=>{
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    panoTex = tex;
+    passAMat.uniforms.pano.value = panoTex;
+    URL.revokeObjectURL(url);
+  });
+});
+
+/* ---------- Buttons ---------- */
+document.getElementById('spawn').addEventListener('click', spawnCube);
+</script>
+</body>
+</html>
