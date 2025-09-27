@@ -38,10 +38,7 @@
     box-shadow: 0 0 0 2px #244cff inset;
     border-radius: 6px;
   }
-  .lil-gui.autoPlace {
-      top: 0;
-      right: 0;
-  }
+  .lil-gui.autoPlace { top: 0; right: 0; }
 </style>
 
 <script type="importmap">
@@ -88,7 +85,7 @@ controls.rotateSpeed = 0.9;
 controls.target.set(0,0,0);
 controls.saveState();
 
-/* ---------- Szene / Grid / Shader (unverändert) ---------- */
+/* ---------- Szene / Grid / Shader ---------- */
 const sceneObjects = new THREE.Scene();
 sceneObjects.add(new THREE.HemisphereLight(0xffffff, 0x222233, 1.0));
 const dl = new THREE.DirectionalLight(0xffffff, 0.7); dl.position.set(1,1,1); sceneObjects.add(dl);
@@ -184,7 +181,7 @@ const gridMat = new THREE.ShaderMaterial({
 const gridMesh = new THREE.Mesh(gridGeom, gridMat);
 sceneObjects.add(gridMesh);
 
-/* ---------- Pano + Post Pass (unverändert) ---------- */
+/* ---------- Pano + Post Pass ---------- */
 const db = new THREE.Vector2(); renderer.getDrawingBufferSize(db);
 let rtObjects  = new THREE.WebGLRenderTarget(db.x, db.y, { depthBuffer:true });
 let rtCombined = new THREE.WebGLRenderTarget(db.x, db.y, { depthBuffer:false });
@@ -345,7 +342,7 @@ const fovCtrl   = infoFolder.add(camInfo, 'fov').name('FOV [°]').listen();
   const input = c.domElement.querySelector('input'); if(input){ input.readOnly = true; input.style.opacity = .85; }
 });
 
-/* ---------- Würfel / Picking (robust mit IDs) ---------- */
+/* ---------- Würfel / Picking (IDs) ---------- */
 const cubesFolder = gui.addFolder('Würfel');
 const cubes = [];     // { id, mesh, rays, gui, state, inputControllers, setPosStep }
 const pickables = [];
@@ -395,19 +392,40 @@ function activateCubeById(id){
   params.activeId = id;
   cubes.forEach((c)=>{
     const isActive = c.id === id;
+
+    // GUI-Highlight & Rays
     c.gui.domElement.classList.toggle('active-cube', isActive);
     if (c.rays) c.rays.visible = isActive;
+
+    // Inputs sperren/öffnen
     c.inputControllers.forEach(ctrl=>{
       const el = ctrl.domElement.querySelector('input');
       if(el) el.disabled = !isActive;
     });
+
+    // >>> Neu: aktiven Würfel sichtbar heller machen (emissive glow)
+    const mat = c.mesh.material;
+    if (mat && 'emissive' in mat) {
+      mat.emissive.setHex(isActive ? 0x4466ff : 0x000000);
+      mat.emissiveIntensity = isActive ? 0.8 : 0.0;
+      mat.needsUpdate = true;
+    }
   });
   if (id !== -1) renderer.domElement.focus();
 }
 
 function spawnCube(){
   const id = nextCubeId++;
-  const mat = new THREE.MeshStandardMaterial({ color:0x3366ff, roughness:0.45, metalness:0.05 });
+
+  // Material mit emissive vorbereitet (Glow für aktiven Würfel)
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x3366ff,
+    roughness: 0.45,
+    metalness: 0.05,
+    emissive: 0x000000,
+    emissiveIntensity: 0.0
+  });
+
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE), mat);
   mesh.position.set(0,0,0);
   mesh.rotation.set(0,0,0);
@@ -513,7 +531,7 @@ renderer.domElement.addEventListener('pointerdown', (ev)=>{
   pickAtClient(ev.clientX, ev.clientY);
 });
 
-/* ---------- Tastatur Move (wie gehabt) ---------- */
+/* ---------- Tastatur Move ---------- */
 window.addEventListener('keydown', (e)=>{
   const rec = cubes.find(c=> c.id === params.activeId);
   if(!rec) return;
@@ -545,7 +563,7 @@ window.addEventListener('keydown', (e)=>{
   }
 });
 
-/* ---------- Minimap (wie gehabt) ---------- */
+/* ---------- Minimap ---------- */
 const mini = document.getElementById('minimap');
 const mctx = mini.getContext('2d');
 function drawMinimap(){
@@ -636,10 +654,9 @@ document.getElementById('resetView').addEventListener('click', ()=>{
   renderer.domElement.focus();
 });
 
-/* ---------- Wheel → FOV (nur auf Canvas, ohne Panel-Konflikt) ---------- */
+/* ---------- Wheel → FOV (Canvas-only) ---------- */
 function applyFovDelta(deltaY){
-  // Delta in „Zoomgeschwindigkeit“ (logarithmisch sanft)
-  const scale = Math.exp(deltaY * -0.001);               // negativ = reinzoomen
+  const scale = Math.exp(deltaY * -0.001);
   const newFov = THREE.MathUtils.clamp(camera.fov * scale, 40, 140);
   if (newFov !== camera.fov){
     camera.fov = newFov;
@@ -649,24 +666,19 @@ function applyFovDelta(deltaY){
     cameraFovCtrl.updateDisplay();
   }
 }
-// Standard-Wheel (Maus/Touchpad, inkl. Pinch->Wheel auf macOS)
 renderer.domElement.addEventListener('wheel', (e)=>{
-  // wenn über GUI oder UI-Bar → ignorieren
   const guiEl = document.querySelector('.lil-gui');
   const uiBar = document.getElementById('ui');
   const within = el => el && el.contains(e.target);
   if (within(guiEl) || within(uiBar)) return;
-
-  e.preventDefault(); // verhindert Scrollen/Page-Zoom-Konflikte
+  e.preventDefault();
   e.stopPropagation();
   applyFovDelta(e.deltaY);
 }, { passive:false });
 
-// Safari iOS „gesturechange“ (optional fallback)
 let baseFov = camera.fov;
-renderer.domElement.addEventListener('gesturestart', (e)=>{ baseFov = camera.fov; }, { passive:true });
+renderer.domElement.addEventListener('gesturestart', ()=>{ baseFov = camera.fov; }, { passive:true });
 renderer.domElement.addEventListener('gesturechange', (e)=>{
-  // e.scale >1 = rein; mappe linear -> logarithmisch
   const target = THREE.MathUtils.clamp(baseFov / e.scale, 40, 140);
   camera.fov = target;
   camera.updateProjectionMatrix();
