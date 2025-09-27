@@ -516,13 +516,7 @@ function createBackgroundPanel() {
       bgSphere.material.uniforms.uOffset.value = (deg % 360) / 360;
     }
   });
-  gui.add(bgParams, "panoramaAmp", 0, 100, 0.1).name("Amplitude").onChange((v) => {
-    if (bgSphere.material.uniforms.uAmplitude) {
-      bgSphere.material.uniforms.uAmplitude.value = v;
-    }
-  });
   gui.add(bgParams, "autoRotate").name("Auto-Rotate");
-  gui.add(bgParams, "speedDegPerSec", 0, 60, 0.1).name("Speed (°/s)");
 }
 
 // ---------- Grid-Panel inkl. Clipping-Toggle ----------
