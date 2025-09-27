@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<title>Pano + Grid-Scan · Stable Move · 0.25m Cubes (Grid-locked Y)</title>
+<title>Pano + Grid-Scan · 0.1m Moves · Per-Cube Size & Color</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   html,body { height:100%; margin:0; background:#0b0b0b; overflow:hidden; }
@@ -91,9 +91,8 @@ sceneObjects.add(new THREE.HemisphereLight(0xffffff, 0x222233, 1.0));
 const dl = new THREE.DirectionalLight(0xffffff, 0.7); dl.position.set(1,1,1); sceneObjects.add(dl);
 
 const SPHERE_RADIUS = 2.0;
-const CUBE_SIZE = 0.25;
-const CUBE_HALF = CUBE_SIZE * 0.5;
-const CUBE_RANGE = 5.0;
+const DEFAULT_SIZE = 0.25;     // m
+const CUBE_RANGE = 5.0;        // UI-Grenzen
 
 const gridGeom = new THREE.PlaneGeometry(200, 200, 1, 1);
 gridGeom.rotateX(-Math.PI/2);
@@ -101,7 +100,7 @@ const gridMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false,
   uniforms: {
     color: { value: new THREE.Color(0x00ffcc) },
-    spacing: { value: 0.1 },
+    spacing: { value: 0.1 },             // reine Visualisierung, nicht mehr Move-Step
     thickness:{ value: 0.015 },
     clipToSphere:{ value: true },
     sphereRadius:{ value: SPHERE_RADIUS },
@@ -184,7 +183,7 @@ const gridMat = new THREE.ShaderMaterial({
 const gridMesh = new THREE.Mesh(gridGeom, gridMat);
 sceneObjects.add(gridMesh);
 
-/* ---------- Pano + Post Pass ---------- */
+/* ---------- Pano + Post Pass (gleich wie zuvor) ---------- */
 const db = new THREE.Vector2(); renderer.getDrawingBufferSize(db);
 let rtObjects  = new THREE.WebGLRenderTarget(db.x, db.y, { depthBuffer:true });
 let rtCombined = new THREE.WebGLRenderTarget(db.x, db.y, { depthBuffer:false });
@@ -299,11 +298,10 @@ const params = {
   k1: -0.25, k2: 0.0,
   cameraFov: camera.fov,
   gridHeight: 0.0, gridClip: true, gridVisible: true,
-  gridSpacing: 0.10,          // 10 cm default
-  moveMode: 'Grid',
+  gridSpacing: 0.10,      // reine Visualisierung (Raster), kein Move-Step
   activeId: -1
 };
-let lastGridY = 0.0; // für ΔY-Berechnung
+let lastGridY = 0.0;
 
 const updateRot = ()=>{
   passAMat.uniforms.rotXYZ.value.set(
@@ -326,26 +324,19 @@ gui.add(params, 'gridHeight', -5, 5, 0.01).name('Grid Höhe (Y)').onChange(v=>{
   const dy = v - lastGridY;
   gridMesh.position.y = v;
   gridMat.uniforms.planeY.value = v;
+  // Alle Würfel behalten den Abstand zum Grid (addiere dy)
   cubes.forEach(c=>{
-    c.mesh.position.y += dy;          // Abstand zum Grid bleibt erhalten
-    updateRaysFor(c.mesh, c.rays);
+    c.mesh.position.y += dy;
+    updateRaysFor(c.mesh, c.rays, c.size);
     c.syncFromMesh();
   });
   lastGridY = v;
 });
-
 const gridFolder = gui.addFolder('Grid-Style');
-gridFolder.add(params, 'gridSpacing', 0.10, 1.00, 0.10).name('Feldgröße [m]').onChange(v=>{
-  gridMat.uniforms.spacing.value = v;
-  updateAllCubePositionSteps();
-  snapAllCubesToGrid();
-});
-gridFolder.add({mode:params.moveMode}, 'mode', ['Grid','Camera']).name('Move Mode')
-  .onChange(val => { params.moveMode = val; });
+gridFolder.add(gridMat.uniforms.spacing, 'value', 0.01, 1.00, 0.01).name('Feldgröße [m]');
 gridFolder.addColor({ axis:'#ffe28a' }, 'axis').name('Achsenfarbe')
   .onChange(v => gridMat.uniforms.axisColor.value.set(v));
 gridFolder.add(gridMat.uniforms.axisThickness, 'value', 0.5, 3.0, 0.1).name('Achsendicke [px]');
-gridMat.uniforms.spacing.value = params.gridSpacing;
 updateRot();
 
 /* ---------- Kamera · Info ---------- */
@@ -361,7 +352,7 @@ const fovCtrl   = infoFolder.add(camInfo, 'fov').name('FOV [°]').listen();
 
 /* ---------- Würfel / Picking (IDs) ---------- */
 const cubesFolder = gui.addFolder('Würfel');
-const cubes = [];     // { id, mesh, rays, gui, state, inputControllers, setPosStep }
+const cubes = [];     // { id, mesh, rays, gui, state, size, color, inputControllers, syncFromMesh }
 const pickables = [];
 let nextCubeId = 1;
 
@@ -374,7 +365,8 @@ function makeRayGroup(color=0x00ff00){
   }
   return g;
 }
-function updateRaysFor(mesh, rays){
+function updateRaysFor(mesh, rays, size){
+  const half = size * 0.5;
   const normals = [
     new THREE.Vector3( 1, 0, 0), new THREE.Vector3(-1, 0, 0),
     new THREE.Vector3( 0, 1, 0), new THREE.Vector3( 0,-1, 0),
@@ -384,7 +376,7 @@ function updateRaysFor(mesh, rays){
   const q   = mesh.quaternion.clone();
   for(let i=0;i<6;i++){
     const n = normals[i].clone().applyQuaternion(q).normalize();
-    const faceCenter = pos.clone().addScaledVector(n, CUBE_SIZE*0.5);
+    const faceCenter = pos.clone().addScaledVector(n, half);
     const b = 2.0 * faceCenter.dot(n);
     const c = faceCenter.lengthSq() - SPHERE_RADIUS*SPHERE_RADIUS;
     const disc = b*b - 4.0*c;
@@ -404,25 +396,23 @@ function updateRaysFor(mesh, rays){
   }
 }
 
-/* --- Sync-Guards & Snap --- */
-let isSyncingGUI = false;
-function snapToGrid(v, s){
-  const snapped = Math.round(v / s) * s;
+/* --- Helpers --- */
+function isGuiInputFocused(){
+  const active = document.activeElement;
+  if(!active) return false;
+  if(active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA') {
+    return !!active.closest('.lil-gui');
+  }
+  return false;
+}
+const MOVE_STEP = 0.1; // 10 cm – feste Schrittweite
+
+function snapToStep(v){
+  const snapped = Math.round(v / MOVE_STEP) * MOVE_STEP;
   return Math.abs(snapped) < 1e-9 ? 0 : +snapped.toFixed(6);
 }
-function snapAllCubesToGrid(){
-  const s = params.gridSpacing;
-  cubes.forEach(c=>{
-    c.mesh.position.set(
-      snapToGrid(c.mesh.position.x, s),
-      snapToGrid(c.mesh.position.y, s),
-      snapToGrid(c.mesh.position.z, s)
-    );
-    updateRaysFor(c.mesh, c.rays);
-    c.syncFromMesh(true);
-  });
-}
 
+/* --- Aktivieren / Hervorheben --- */
 function activateCubeById(id){
   params.activeId = id;
   cubes.forEach((c)=>{
@@ -436,13 +426,14 @@ function activateCubeById(id){
     const mat = c.mesh.material;
     if (mat && 'emissive' in mat) {
       mat.emissive.setHex(0x6690ff);
-      mat.emissiveIntensity = isActive ? 0.35 : 0.15;
+      mat.emissiveIntensity = isActive ? 0.30 : 0.18; // etwas kleinerer Unterschied
       mat.needsUpdate = true;
     }
   });
   if (id !== -1) renderer.domElement.focus();
 }
 
+/* --- Spawn --- */
 function spawnCube(){
   const id = nextCubeId++;
 
@@ -451,13 +442,15 @@ function spawnCube(){
     roughness: 0.4,
     metalness: 0.08,
     emissive: 0x6690ff,
-    emissiveIntensity: 0.15
+    emissiveIntensity: 0.18
   });
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE), mat);
+  const geom = new THREE.BoxGeometry(DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE);
+  const mesh = new THREE.Mesh(geom, mat);
 
-  // Auf das Grid stellen: y = gridY + halbe Höhe
+  // Auf das Grid stellen: y = gridY + size/2
+  const size = DEFAULT_SIZE;
   const gy = gridMesh.position.y;
-  mesh.position.set(0, gy + CUBE_HALF, 0);
+  mesh.position.set(0, gy + size*0.5, 0);
   mesh.rotation.set(0,0,0);
 
   sceneObjects.add(mesh);
@@ -467,22 +460,44 @@ function spawnCube(){
   sceneObjects.add(rays);
 
   const f = cubesFolder.addFolder(`Würfel ${cubes.length+1}`);
-  const state = { x:mesh.position.x, y:mesh.position.y, z:mesh.position.z, rx:0, ry:0, rz:0 };
+  const state = {
+    x: mesh.position.x, y: mesh.position.y, z: mesh.position.z,
+    rx: 0, ry: 0, rz: 0,
+    size: size,
+    color: '#5a7dff'
+  };
   const toDeg = r => THREE.MathUtils.radToDeg(r);
   const toRad = d => THREE.MathUtils.degToRad(d);
 
-  // Panels: Schrittweite = gridSpacing, Snap bei onFinishChange
-  const posX = f.add(state, 'x', -CUBE_RANGE, CUBE_RANGE, params.gridSpacing).name('Pos X [m]')
-    .onFinishChange(v=>{ const s=params.gridSpacing; mesh.position.x = snapToGrid(+v, s); updateRaysFor(mesh, rays); syncFromMesh(); });
-  const posY = f.add(state, 'y', -CUBE_RANGE, CUBE_RANGE, params.gridSpacing).name('Pos Y [m]')
-    .onFinishChange(v=>{ const s=params.gridSpacing; mesh.position.y = snapToGrid(+v, s); updateRaysFor(mesh, rays); syncFromMesh(); });
-  const posZ = f.add(state, 'z', -CUBE_RANGE, CUBE_RANGE, params.gridSpacing).name('Pos Z [m]')
-    .onFinishChange(v=>{ const s=params.gridSpacing; mesh.position.z = snapToGrid(+v, s); updateRaysFor(mesh, rays); syncFromMesh(); });
+  // Positions-Controls: Schrittweite 0.1 (auch im Input)
+  const posX = f.add(state, 'x', -CUBE_RANGE, CUBE_RANGE, 0.1).name('Pos X [m]')
+    .onChange(v=>{ mesh.position.x = snapToStep(+v); updateRaysFor(mesh, rays, state.size); });
+  const posY = f.add(state, 'y', -CUBE_RANGE, CUBE_RANGE, 0.1).name('Pos Y [m]')
+    .onChange(v=>{ mesh.position.y = snapToStep(+v); updateRaysFor(mesh, rays, state.size); });
+  const posZ = f.add(state, 'z', -CUBE_RANGE, CUBE_RANGE, 0.1).name('Pos Z [m]')
+    .onChange(v=>{ mesh.position.z = snapToStep(+v); updateRaysFor(mesh, rays, state.size); });
 
-  const rotX = f.add(state, 'rx', -180, 180, 0.1).name('Rot X [°]').onChange(v=>{ mesh.rotation.x = toRad(v); updateRaysFor(mesh, rays); });
-  const rotY = f.add(state, 'ry', -180, 180, 0.1).name('Rot Y [°]').onChange(v=>{ mesh.rotation.y = toRad(v); updateRaysFor(mesh, rays); });
-  const rotZ = f.add(state, 'rz', -180, 180, 0.1).name('Rot Z [°]').onChange(v=>{ mesh.rotation.z = toRad(v); updateRaysFor(mesh, rays); });
+  // Rotation
+  const rotX = f.add(state, 'rx', -180, 180, 0.1).name('Rot X [°]').onChange(v=>{ mesh.rotation.x = toRad(v); updateRaysFor(mesh, rays, state.size); });
+  const rotY = f.add(state, 'ry', -180, 180, 0.1).name('Rot Y [°]').onChange(v=>{ mesh.rotation.y = toRad(v); updateRaysFor(mesh, rays, state.size); });
+  const rotZ = f.add(state, 'rz', -180, 180, 0.1).name('Rot Z [°]').onChange(v=>{ mesh.rotation.z = toRad(v); updateRaysFor(mesh, rays, state.size); });
 
+  // Größe (ändert Geometrie via Scale) + Strahlen + Minimap
+  const sizeCtrl = f.add(state, 'size', 0.05, 1.0, 0.01).name('Größe [m]')
+    .onChange(v=>{
+      const s = Math.max(0.01, +v);
+      const scale = s / DEFAULT_SIZE;
+      mesh.scale.setScalar(scale);
+      updateRaysFor(mesh, rays, s);
+    });
+
+  // Farbe
+  const colorCtrl = f.addColor(state, 'color').name('Farbe')
+    .onChange(v=>{
+      mesh.material.color.set(v);
+    });
+
+  // Entfernen
   f.add({Entfernen:()=>{
     const idx = cubes.findIndex(cc => cc.id === id);
     f.destroy();
@@ -502,43 +517,31 @@ function spawnCube(){
     }
   }}, 'Entfernen').name('✖ Entfernen');
 
-  function syncFromMesh(skipControllers=false){
-    if (isSyncingGUI) return;
-    isSyncingGUI = true;
-    const s = params.gridSpacing;
-    state.x = snapToGrid(mesh.position.x, s);
-    state.y = snapToGrid(mesh.position.y, s);
-    state.z = snapToGrid(mesh.position.z, s);
+  function syncFromMesh(){
+    state.x = snapToStep(mesh.position.x);
+    state.y = snapToStep(mesh.position.y);
+    state.z = snapToStep(mesh.position.z);
     state.rx = +toDeg(mesh.rotation.x).toFixed(1);
     state.ry = +toDeg(mesh.rotation.y).toFixed(1);
     state.rz = +toDeg(mesh.rotation.z).toFixed(1);
-    if (!skipControllers){
-      [posX,posY,posZ,rotX,rotY,rotZ].forEach(c=> c.updateDisplay());
-    }
-    isSyncingGUI = false;
+    [posX,posY,posZ,rotX,rotY,rotZ,sizeCtrl,colorCtrl].forEach(c=> c.updateDisplay());
   }
-  const setPosStep = (step)=>{
-    [posX,posY,posZ].forEach(ctrl=>{
-      const input = ctrl.domElement.querySelector('input');
-      if (input) input.step = step.toString();
-    });
-  };
 
-  const record = { id, mesh, rays, gui:f, state,
-    inputControllers: [posX,posY,posZ,rotX,rotY,rotZ],
-    syncFromMesh, setPosStep
+  const record = {
+    id, mesh, rays, gui:f, state,
+    size: state.size,
+    inputControllers: [posX,posY,posZ,rotX,rotY,rotZ,sizeCtrl,colorCtrl],
+    syncFromMesh
   };
+  // wenn Größe über Controller geändert wird, halte record.size aktuell
+  sizeCtrl.onChange(v => { record.size = +v; });
+
   cubes.push(record);
 
-  setPosStep(params.gridSpacing);
   syncFromMesh();
-  updateRaysFor(mesh, rays);
+  updateRaysFor(mesh, rays, record.size);
   activateCubeById(id);
   renderer.domElement.focus();
-}
-
-function updateAllCubePositionSteps(){
-  cubes.forEach(c => c.setPosStep?.(params.gridSpacing));
 }
 
 /* ---------- Picking ---------- */
@@ -556,7 +559,7 @@ function pickAtClient(x, y){
     const rec = cubes.find(c=> c.mesh === obj);
     if (rec){
       activateCubeById(rec.id);
-      updateRaysFor(rec.mesh, rec.rays);
+      updateRaysFor(rec.mesh, rec.rays, rec.size);
       return;
     }
   }
@@ -572,16 +575,7 @@ renderer.domElement.addEventListener('pointerdown', (ev)=>{
   pickAtClient(ev.clientX, ev.clientY);
 });
 
-/* ---------- Tastatur Move ---------- */
-function isGuiInputFocused(){
-  const active = document.activeElement;
-  if(!active) return false;
-  if(active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA') {
-    return !!active.closest('.lil-gui');
-  }
-  return false;
-}
-
+/* ---------- Tastatur Move: 0.1 m Schritte ---------- */
 window.addEventListener('keydown', (e)=>{
   if (isGuiInputFocused()) return;
   const rec = cubes.find(c=> c.id === params.activeId);
@@ -591,34 +585,19 @@ window.addEventListener('keydown', (e)=>{
     e.preventDefault();
   }
 
-  const s = params.gridSpacing;   // 10 cm standard
   let moved = false;
 
-  if (params.moveMode === 'Grid'){
-    // Korrektur: ↑ = nach vorne (Z -= s), ↓ = zurück (Z += s)
-    if(e.code === 'ArrowUp')    { rec.mesh.position.z = snapToGrid(rec.mesh.position.z - s, s); moved = true; }
-    if(e.code === 'ArrowDown')  { rec.mesh.position.z = snapToGrid(rec.mesh.position.z + s, s); moved = true; }
-    if(e.code === 'ArrowLeft')  { rec.mesh.position.x = snapToGrid(rec.mesh.position.x - s, s); moved = true; }
-    if(e.code === 'ArrowRight') { rec.mesh.position.x = snapToGrid(rec.mesh.position.x + s, s); moved = true; }
-  } else {
-    // Kamera-basiert (XZ)
-    const fwd  = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-    const right= new THREE.Vector3(1,0, 0).applyQuaternion(camera.quaternion);
-    fwd.y = 0; right.y = 0; if (fwd.lengthSq()<1e-8) fwd.set(0,0,-1); if (right.lengthSq()<1e-8) right.set(1,0,0);
-    fwd.normalize(); right.normalize();
-    if(e.code === 'ArrowUp')    { rec.mesh.position.addScaledVector(fwd,  s); moved = true; }   // vorwärts
-    if(e.code === 'ArrowDown')  { rec.mesh.position.addScaledVector(fwd, -s); moved = true; }   // rückwärts
-    if(e.code === 'ArrowLeft')  { rec.mesh.position.addScaledVector(right, -s); moved = true; }
-    if(e.code === 'ArrowRight') { rec.mesh.position.addScaledVector(right,  s); moved = true; }
-    rec.mesh.position.x = snapToGrid(rec.mesh.position.x, s);
-    rec.mesh.position.z = snapToGrid(rec.mesh.position.z, s);
-  }
+  // ↑ vor (Z -= 0.1), ↓ zurück (Z += 0.1), ← links (X -= 0.1), → rechts (X += 0.1)
+  if(e.code === 'ArrowUp')    { rec.mesh.position.z = snapToStep(rec.mesh.position.z - MOVE_STEP); moved = true; }
+  if(e.code === 'ArrowDown')  { rec.mesh.position.z = snapToStep(rec.mesh.position.z + MOVE_STEP); moved = true; }
+  if(e.code === 'ArrowLeft')  { rec.mesh.position.x = snapToStep(rec.mesh.position.x - MOVE_STEP); moved = true; }
+  if(e.code === 'ArrowRight') { rec.mesh.position.x = snapToStep(rec.mesh.position.x + MOVE_STEP); moved = true; }
 
-  if(e.key === '+' || e.code === 'NumpadAdd' || e.code === 'PageUp'){ rec.mesh.position.y = snapToGrid(rec.mesh.position.y + s, s); moved = true; }
-  if(e.key === '#' || e.code === 'PageDown'){ rec.mesh.position.y = snapToGrid(rec.mesh.position.y - s, s); moved = true; }
+  if(e.key === '+' || e.code === 'NumpadAdd' || e.code === 'PageUp'){ rec.mesh.position.y = snapToStep(rec.mesh.position.y + MOVE_STEP); moved = true; }
+  if(e.key === '#' || e.code === 'PageDown'){ rec.mesh.position.y = snapToStep(rec.mesh.position.y - MOVE_STEP); moved = true; }
 
   if(moved){
-    updateRaysFor(rec.mesh, rec.rays);
+    updateRaysFor(rec.mesh, rec.rays, rec.size);
     rec.syncFromMesh();
   }
 });
@@ -642,7 +621,7 @@ function drawMinimap(){
   const rEff = Math.max(0, Math.sqrt(Math.max(SPHERE_RADIUS*SPHERE_RADIUS - h*h, 0)));
   const rPx = rEff * pxPerMeter;
 
-  const stepPx = Math.max(1, params.gridSpacing * pxPerMeter);
+  const stepPx = Math.max(1, gridMat.uniforms.spacing.value * pxPerMeter);
   const count = Math.floor(rPx / stepPx);
 
   mctx.strokeStyle = '#1a1f24';
@@ -669,8 +648,8 @@ function drawMinimap(){
   cubes.forEach((c)=>{
     const x = c.mesh.position.x * pxPerMeter;
     const y = c.mesh.position.z * pxPerMeter;
-    const s = CUBE_SIZE * pxPerMeter;
-    mctx.fillStyle = '#5a7dff';
+    const s = c.size * pxPerMeter;
+    mctx.fillStyle = c.state.color || '#5a7dff';
     mctx.strokeStyle = (c.id === params.activeId) ? '#ffd400' : '#222';
     mctx.lineWidth = (c.id === params.activeId) ? 3 : 1;
     mctx.beginPath();
