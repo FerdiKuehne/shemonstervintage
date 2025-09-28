@@ -22,9 +22,10 @@
     position: fixed; left: 10px; bottom: 10px; z-index: 10000;
     width: 220px; height: 220px;
     border: 1px solid #2a2a2a; border-radius: 8px; background: #0e0e10;
-    pointer-events: none;
     box-shadow: 0 6px 18px rgba(0,0,0,.35);
+    cursor: crosshair;
   }
+  #minimap.dragging { cursor: grabbing; }
   .lil-gui .folder.active-cube > .title {
     background: linear-gradient(90deg, #244cff, #0f1a3a) !important;
     color: #fff !important;
@@ -46,7 +47,7 @@
 <body>
   <div id="ui">
     <input id="file" type="file" accept="image/*" />
-    <button id="spawn" class="btn">＋ Neuer Würfel (0.05 m)</button>
+    <button id="spawn" class="btn">＋ Neuer Würfel)</button>
     <button id="resetView" class="btn">↺ Reset Position</button>
   </div>
   <canvas id="minimap" width="440" height="440"></canvas>
@@ -89,7 +90,7 @@ sceneObjects.add(new THREE.HemisphereLight(0xffffff, 0x222233, 1.0));
 const dl = new THREE.DirectionalLight(0xffffff, 0.7); dl.position.set(1,1,1); sceneObjects.add(dl);
 
 const SPHERE_RADIUS = 2.0;
-const DEFAULT_SIZE = 0.05; // Startgröße 5 cm
+const DEFAULT_SIZE = 0.25; 
 const CUBE_RANGE = 5.0;
 
 const gridGeom = new THREE.PlaneGeometry(200, 200, 1, 1);
@@ -223,17 +224,6 @@ const cameraFovCtrl = gui.add(params,'cameraFov',40,140,0.1).name('Kamera FOV')
   .onChange(v=>{ camera.fov=v; camera.updateProjectionMatrix(); passAMat.uniforms.fovY.value=THREE.MathUtils.degToRad(v); });
 
 gui.add(params,'gridVisible').name('Grid sichtbar').onChange(v=> gridMesh.visible = v);
-gui.add(params,'gridHeight',-5,5,0.01).name('Grid Höhe (Y)').onChange(v=>{
-  const dy = v - lastGridY;
-  gridMesh.position.y = v;
-  gridMat.uniforms.planeY.value = v;
-  cubes.forEach(c=>{
-    c.mesh.position.y += dy; // Abstand zum Grid erhalten
-    updateRaysFor(c.mesh, c.rays, c.sizes);
-    c.syncFromMesh();
-  });
-  lastGridY = v;
-});
 
 const gridFolder = gui.addFolder('Grid-Style');
 gridFolder.add(gridMat.uniforms.spacing,'value',0.01,1.00,0.01).name('Feldgröße [m]');
@@ -241,6 +231,24 @@ gridFolder.addColor({axis:'#ffe28a'},'axis').name('Achsenfarbe')
   .onChange(v => gridMat.uniforms.axisColor.value.set(v));
 gridFolder.add(gridMat.uniforms.axisThickness,'value',0.5,3.0,0.1).name('Achsendicke [px]');
 updateRot();
+
+/* --- Helper: Grid-Höhe zentral setzen (GUI + Minimap) --- */
+function setGridY(v){
+  v = THREE.MathUtils.clamp(v, -5, 5); // gleiches Limit wie im GUI
+  const dy = v - lastGridY;
+  gridMesh.position.y = v;
+  gridMat.uniforms.planeY.value = v;
+  cubes.forEach(c=>{
+    c.mesh.position.y += dy;           // Abstand zum Grid beibehalten
+    updateRaysFor(c.mesh, c.rays, c.sizes);
+    c.syncFromMesh();
+  });
+  lastGridY = v;
+  params.gridHeight = v;
+  gridHeightCtrl.updateDisplay();      // GUI updaten
+}
+const gridHeightCtrl = gui.add(params,'gridHeight',-5,5,0.01).name('Grid Höhe (Y)')
+  .onChange(setGridY);
 
 /* ---------- Kamera · Info (editierbar) ---------- */
 const camInfo = { yaw:0, pitch:0, roll:0, fov:camera.fov };
@@ -454,7 +462,7 @@ function spawnCube(){
       const val = Math.max(0, Math.min(1, +v));
       mesh.material.opacity = val;
       mesh.material.transparent = val < 1.0;
-      mesh.material.depthWrite = true;   // <<< trotz Transparenz Z schreiben
+      mesh.material.depthWrite = true;   // trotz Transparenz Z schreiben
       mesh.material.needsUpdate = true;
     });
 
@@ -630,6 +638,94 @@ function drawMinimap(){
 
   mctx.restore();
 }
+
+/* ---------- Minimap Interaktion: Klick + Drag (XZ) ---------- */
+function getMiniTransform(){
+  const W = mini.width, H = mini.height;
+  const pxPerMeter = Math.min(W, H) * 0.45 / SPHERE_RADIUS;
+  const cx = W/2, cy = H/2;
+  return { W,H,pxPerMeter,cx,cy };
+}
+function miniToWorldXZ(clientX, clientY){
+  const { pxPerMeter, cx, cy } = getMiniTransform();
+  const r = mini.getBoundingClientRect();
+  const mx = ((clientX - r.left) * mini.width  / r.width);
+  const my = ((clientY - r.top)  * mini.height / r.height);
+  const x = (mx - cx) / pxPerMeter;
+  const z = (my - cy) / pxPerMeter;
+  return { x, z };
+}
+function worldXZToMini(x, z){
+  const { pxPerMeter, cx, cy } = getMiniTransform();
+  return { x: x*pxPerMeter + cx, y: z*pxPerMeter + cy };
+}
+function pointInPoly(px, py, poly){
+  let inside = false;
+  for(let i=0, j=poly.length-1; i<poly.length; j=i++){
+    const xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y;
+    const intersect = ((yi>py)!==(yj>py)) && (px < (xj-xi)*(py-yi)/(yj-yi+1e-9) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+function quadForCube2D(c){
+  const hx=c.sizes.x*0.5, hy=c.sizes.y*0.5, hz=c.sizes.z*0.5;
+  const cornersLocal=[
+    new THREE.Vector3(-hx,-hy,-hz),
+    new THREE.Vector3( hx,-hy,-hz),
+    new THREE.Vector3( hx,-hy, hz),
+    new THREE.Vector3(-hx,-hy, hz),
+  ];
+  const worldPts = cornersLocal.map(v=> v.applyQuaternion(c.mesh.quaternion).add(c.mesh.position));
+  return worldPts.map(w => worldXZToMini(w.x, w.z));
+}
+function moveCubeXZ(c, wx, wz){
+  c.mesh.position.x = snap001(wx);
+  c.mesh.position.z = snap001(wz);
+  updateRaysFor(c.mesh, c.rays, c.sizes);
+  c.syncFromMesh();
+}
+function pickCubeOnMini(clientX, clientY){
+  const r = mini.getBoundingClientRect();
+  const mx = ((clientX - r.left) * mini.width  / r.width);
+  const my = ((clientY - r.top)  * mini.height / r.height);
+  for(let i=cubes.length-1; i>=0; i--){
+    const c = cubes[i];
+    const poly = quadForCube2D(c);
+    if (pointInPoly(mx, my, poly)) return c;
+  }
+  return null;
+}
+let dragState = null; // { cube, offX, offZ }
+mini.addEventListener('pointerdown', (e)=>{
+  const cube = pickCubeOnMini(e.clientX, e.clientY);
+  if (!cube) return;
+  activateCubeById(cube.id);
+  const world = miniToWorldXZ(e.clientX, e.clientY);
+  dragState = { cube, offX: cube.mesh.position.x - world.x, offZ: cube.mesh.position.z - world.z };
+  mini.classList.add('dragging');
+});
+window.addEventListener('pointermove', (e)=>{
+  if (!dragState) return;
+  const world = miniToWorldXZ(e.clientX, e.clientY);
+  moveCubeXZ(dragState.cube, world.x + dragState.offX, world.z + dragState.offZ);
+});
+window.addEventListener('pointerup', ()=>{
+  if (dragState){
+    mini.classList.remove('dragging');
+    dragState = null;
+  }
+});
+
+/* ---------- Scroll auf Minimap: Grid hoch/runter ---------- */
+mini.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  e.stopPropagation();
+  const sensitivity = 0.001;            // Grundempfinden
+  const fine = e.shiftKey ? 0.25 : 1.0; // Shift = feiner
+  const deltaMeters = -e.deltaY * sensitivity * fine;
+  setGridY(params.gridHeight + deltaMeters);
+}, { passive:false });
 
 /* ---------- Kamera-Basis & Info ---------- */
 const _tmpEuler = new THREE.Euler(0,0,0,'YXZ');
