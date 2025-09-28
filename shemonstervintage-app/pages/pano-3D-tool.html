@@ -2,12 +2,11 @@
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<title>Pano + Grid-Scan · 0.01m Position Steps (fix) + Edges</title>
+<title>Pano + Grid-Scan · 0.01m Steps + Crisp Edge Outline</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   html,body { height:100%; margin:0; background:#0b0b0b; overflow:hidden; }
   #ui { position:fixed; top:10px; left:10px; z-index:1000; display:flex; gap:.5rem; align-items:center; }
-
   .btn {
     --bg1:#1a2740; --bg2:#0f172a; --border:#2b3b6b; --hover:#243b74; --active:#162452;
     color:#e6ebff; font:600 13px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -18,9 +17,7 @@
   }
   .btn:hover { background: linear-gradient(180deg, var(--hover), var(--bg2)); transform: translateY(-1px); }
   .btn:active { background: linear-gradient(180deg, var(--active), var(--bg2)); transform: translateY(0); }
-
   canvas { display:block; }
-
   #minimap {
     position: fixed; left: 10px; bottom: 10px; z-index: 10000;
     width: 220px; height: 220px;
@@ -28,16 +25,12 @@
     pointer-events: none;
     box-shadow: 0 6px 18px rgba(0,0,0,.35);
   }
-
   .lil-gui .folder.active-cube > .title {
     background: linear-gradient(90deg, #244cff, #0f1a3a) !important;
     color: #fff !important;
     text-shadow: 0 1px 0 rgba(0,0,0,.25);
   }
-  .lil-gui .folder.active-cube {
-    box-shadow: 0 0 0 2px #244cff inset;
-    border-radius: 6px;
-  }
+  .lil-gui .folder.active-cube { box-shadow: 0 0 0 2px #244cff inset; border-radius: 6px; }
   .lil-gui.autoPlace { top: 0; right: 0; }
 </style>
 
@@ -52,7 +45,7 @@
 </head>
 <body>
   <div id="ui">
-    <input id="file" type="file" accept="image/*"  />
+    <input id="file" type="file" accept="image/*" />
     <button id="spawn" class="btn">＋ Neuer Würfel (0.05 m)</button>
     <button id="resetView" class="btn">↺ Reset Position</button>
   </div>
@@ -62,6 +55,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GUI } from 'https://unpkg.com/lil-gui@0.19/dist/lil-gui.esm.js';
+
+/* Screen-space dicke Linien für glatte Konturen */
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 
 /* ---------- Renderer & Kamera ---------- */
 const renderer = new THREE.WebGLRenderer({ antialias:true });
@@ -78,20 +76,20 @@ camera.position.set(0,0,CAMERA_RADIUS);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enablePan = false;
-controls.enableZoom = false;          // FOV via Wheel
+controls.enableZoom = false; // FOV via Wheel
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
 controls.rotateSpeed = 0.9;
 controls.target.set(0,0,0);
 controls.saveState();
 
-/* ---------- Szene / Grid / Shader ---------- */
+/* ---------- Szene / Grid ---------- */
 const sceneObjects = new THREE.Scene();
 sceneObjects.add(new THREE.HemisphereLight(0xffffff, 0x222233, 1.0));
 const dl = new THREE.DirectionalLight(0xffffff, 0.7); dl.position.set(1,1,1); sceneObjects.add(dl);
 
 const SPHERE_RADIUS = 2.0;
-const DEFAULT_SIZE = 0.05;     // Startgröße 5 cm
+const DEFAULT_SIZE = 0.05; // Startgröße 5 cm
 const CUBE_RANGE = 5.0;
 
 const gridGeom = new THREE.PlaneGeometry(200, 200, 1, 1);
@@ -111,74 +109,27 @@ const gridMat = new THREE.ShaderMaterial({
     axisAlpha:   { value: 1.0 },
     axisThickness:{ value: 1.5 }
   },
-  vertexShader: /* glsl */`
-    varying vec3 vWorldPos;
+  vertexShader: `varying vec3 vWorldPos; void main(){ vec4 wp=modelMatrix*vec4(position,1.0); vWorldPos=wp.xyz; gl_Position=projectionMatrix*viewMatrix*wp; }`,
+  fragmentShader: `
+    precision highp float; varying vec3 vWorldPos;
+    uniform vec3 color, ringColor, axisColor; uniform float spacing, thickness, sphereRadius, planeY, ringOpacity, axisAlpha, axisThickness; uniform bool clipToSphere;
+    float gridMask(vec2 p, float s, float t){ vec2 c=p/s; vec2 fw=max(fwidth(c), vec2(1e-6)); vec2 g=abs(fract(c)-0.5)/fw; float line=1.0-min(min(g.x,g.y)*(t*50.0),1.0); return line; }
     void main(){
-      vec4 wp = modelMatrix * vec4(position, 1.0);
-      vWorldPos = wp.xyz;
-      gl_Position = projectionMatrix * viewMatrix * wp;
-    }
-  `,
-  fragmentShader: /* glsl */`
-    precision highp float;
-    varying vec3 vWorldPos;
-    uniform vec3  color;
-    uniform float spacing, thickness, sphereRadius, planeY;
-    uniform bool  clipToSphere;
-    uniform vec3  ringColor;
-    uniform float ringOpacity;
-    uniform vec3  axisColor;
-    uniform float axisAlpha;
-    uniform float axisThickness;
-
-    float gridMask(vec2 p, float s, float t){
-      vec2 c = p / s;
-      vec2 fw = max(fwidth(c), vec2(1e-6));
-      vec2 g = abs(fract(c) - 0.5) / fw;
-      float line = 1.0 - min(min(g.x, g.y) * (t*50.0), 1.0);
-      return line;
-    }
-
-    void main(){
-      float h = planeY;
-      float rEff2 = max(sphereRadius*sphereRadius - h*h, 0.0);
-      float rEff  = sqrt(rEff2);
-
-      float r = length(vWorldPos.xz);
-      if (clipToSphere && r > rEff + 1e-4) discard;
-
-      float m = gridMask(vWorldPos.xz, spacing, thickness);
-
-      float fade = 1.0;
-      if (clipToSphere){
-        float d = clamp((rEff - r) / 0.2, 0.0, 1.0);
-        fade = d;
-      }
-
-      float w = fwidth(r) * 1.5;
-      float ring = 1.0 - smoothstep(w, w*2.0, abs(r - rEff));
-
-      float fx = fwidth(vWorldPos.x);
-      float fz = fwidth(vWorldPos.z);
-      float halfW_x = max(axisThickness * fx, 1e-6);
-      float halfW_z = max(axisThickness * fz, 1e-6);
-      float lineX = 1.0 - smoothstep(0.0, halfW_x, abs(vWorldPos.x));
-      float lineZ = 1.0 - smoothstep(0.0, halfW_z, abs(vWorldPos.z));
-      float axisMask = max(lineX, lineZ);
-
-      vec3 finalCol = color;
-      float finalAlpha = m * 0.85 * fade;
-
-      finalCol = mix(finalCol, ringColor, clamp(ring * ringOpacity, 0.0, 1.0));
-      finalAlpha = max(finalAlpha, ring * ringOpacity);
-
-      finalCol = mix(finalCol, axisColor, clamp(axisMask * axisAlpha, 0.0, 1.0));
-      finalAlpha = max(finalAlpha, axisMask * axisAlpha);
-
-      if (finalAlpha <= 0.0) discard;
-      gl_FragColor = vec4(finalCol, finalAlpha);
-    }
-  `
+      float h=planeY; float rEff2=max(sphereRadius*sphereRadius-h*h,0.0); float rEff=sqrt(rEff2);
+      float r=length(vWorldPos.xz); if(clipToSphere && r>rEff+1e-4) discard;
+      float m=gridMask(vWorldPos.xz, spacing, thickness);
+      float fade=1.0; if(clipToSphere){ float d=clamp((rEff-r)/0.2,0.0,1.0); fade=d; }
+      float w=fwidth(r)*1.5; float ring=1.0-smoothstep(w,w*2.0,abs(r-rEff));
+      float fx=fwidth(vWorldPos.x), fz=fwidth(vWorldPos.z);
+      float halfW_x=max(axisThickness*fx,1e-6), halfW_z=max(axisThickness*fz,1e-6);
+      float lineX=1.0-smoothstep(0.0,halfW_x,abs(vWorldPos.x));
+      float lineZ=1.0-smoothstep(0.0,halfW_z,abs(vWorldPos.z));
+      float axisMask=max(lineX,lineZ);
+      vec3 finalCol=color; float finalAlpha=m*0.85*fade;
+      finalCol=mix(finalCol, ringColor, clamp(ring*ringOpacity,0.0,1.0)); finalAlpha=max(finalAlpha, ring*ringOpacity);
+      finalCol=mix(finalCol, axisColor, clamp(axisMask*axisAlpha,0.0,1.0)); finalAlpha=max(finalAlpha, axisMask*axisAlpha);
+      if(finalAlpha<=0.0) discard; gl_FragColor=vec4(finalCol, finalAlpha);
+    }`
 });
 const gridMesh = new THREE.Mesh(gridGeom, gridMat);
 sceneObjects.add(gridMesh);
@@ -190,8 +141,7 @@ let rtCombined = new THREE.WebGLRenderTarget(db.x, db.y, { depthBuffer:false });
 
 let panoTex = new THREE.Texture();
 panoTex.colorSpace = THREE.SRGBColorSpace;
-panoTex.wrapS = THREE.RepeatWrapping;
-panoTex.wrapT = THREE.ClampToEdgeWrapping;
+panoTex.wrapS = THREE.RepeatWrapping; panoTex.wrapT = THREE.ClampToEdgeWrapping;
 
 const fsCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
 const screenSceneA = new THREE.Scene();
@@ -199,94 +149,42 @@ const screenSceneB = new THREE.Scene();
 
 const passAMat = new THREE.ShaderMaterial({
   uniforms:{
-    objTex: { value: rtObjects.texture },
-    pano:   { value: panoTex },
-    resolution: { value: db.clone() },
-    fovY:   { value: THREE.MathUtils.degToRad(camera.fov) },
-    aspect: { value: camera.aspect },
-    camBasis: { value: new THREE.Matrix3() },
-    rotXYZ: { value: new THREE.Vector3(0,0,0) }
+    objTex:{ value: rtObjects.texture },
+    pano:{ value: panoTex },
+    resolution:{ value: db.clone() },
+    fovY:{ value: THREE.MathUtils.degToRad(camera.fov) },
+    aspect:{ value: camera.aspect },
+    camBasis:{ value: new THREE.Matrix3() },
+    rotXYZ:{ value: new THREE.Vector3(0,0,0) }
   },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main(){ vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy,0.0,1.0); }
-  `,
-  fragmentShader: /* glsl */`
-    precision highp float;
-    uniform sampler2D objTex, pano;
-    uniform vec2  resolution;
-    uniform float fovY, aspect;
-    uniform mat3  camBasis;
-    uniform vec3  rotXYZ;
-    const float PI = 3.141592653589793;
-    vec3 rayFromNDC(vec2 ndc){
-      float t = tan(0.5*fovY);
-      vec3 dCam = normalize(vec3(ndc.x * aspect * t, ndc.y * t, -1.0));
-      return normalize(camBasis * dCam);
-    }
-    vec3 applyEulerXYZ(vec3 v, vec3 r){
-      float cx=cos(r.x), sx=sin(r.x), cy=cos(r.y), sy=sin(r.y), cz=cos(r.z), sz=sin(r.z);
-      v = vec3( v.x, cx*v.y - sx*v.z, sx*v.y + cx*v.z );
-      v = vec3(  cy*v.x + sy*v.z, v.y, -sy*v.x + cy*v.z );
-      v = vec3(  cz*v.x - sz*v.y, sz*v.x + cz*v.y, v.z );
-      return v;
-    }
-    vec3 samplePano(vec3 dir, vec3 rot){
-      dir = normalize(applyEulerXYZ(dir, rot));
-      float u = fract(atan(dir.z, dir.x)/(2.0*PI) + 0.5);
-      float v = clamp(asin(clamp(dir.y,-1.0,1.0))/PI + 0.5, 0.0, 1.0);
-      return texture2D(pano, vec2(u,v)).rgb;
-    }
+  vertexShader: `varying vec2 vUv; void main(){ vUv=position.xy*0.5+0.5; gl_Position=vec4(position.xy,0.0,1.0); }`,
+  fragmentShader: `
+    precision highp float; uniform sampler2D objTex, pano; uniform vec2 resolution; uniform float fovY, aspect; uniform mat3 camBasis; uniform vec3 rotXYZ;
+    const float PI=3.141592653589793;
+    vec3 rayFromNDC(vec2 ndc){ float t=tan(0.5*fovY); vec3 dCam=normalize(vec3(ndc.x*aspect*t, ndc.y*t, -1.0)); return normalize(camBasis*dCam); }
+    vec3 applyEulerXYZ(vec3 v, vec3 r){ float cx=cos(r.x), sx=sin(r.x), cy=cos(r.y), sy=sin(r.y), cz=cos(r.z), sz=sin(r.z);
+      v=vec3(v.x, cx*v.y - sx*v.z, sx*v.y + cx*v.z); v=vec3(cy*v.x + sy*v.z, v.y, -sy*v.x + cy*v.z); v=vec3(cz*v.x - sz*v.y, sz*v.x + cz*v.y, v.z); return v; }
+    vec3 samplePano(vec3 dir, vec3 rot){ dir=normalize(applyEulerXYZ(dir,rot));
+      float u=fract(atan(dir.z,dir.x)/(2.0*PI)+0.5); float v=clamp(asin(clamp(dir.y,-1.0,1.0))/PI+0.5,0.0,1.0);
+      return texture2D(pano, vec2(u,v)).rgb; }
     void main(){
-      vec2 ndc = (gl_FragCoord.xy / resolution) * 2.0 - 1.0;
-      vec3 dir = rayFromNDC(ndc);
-      vec3 panoCol = samplePano(dir, rotXYZ);
-      vec2 uvRect = ndc*0.5 + 0.5;
-      vec4 objCol = vec4(0.0);
-      if(all(greaterThanEqual(uvRect, vec2(0.0))) && all(lessThanEqual(uvRect, vec2(1.0)))){
-        objCol = texture2D(objTex, uvRect);
-      }
-      gl_FragColor = vec4(mix(panoCol, objCol.rgb, objCol.a), 1.0);
-    }
-  `,
+      vec2 ndc=(gl_FragCoord.xy/resolution)*2.0-1.0; vec3 dir=rayFromNDC(ndc);
+      vec3 panoCol=samplePano(dir,rotXYZ); vec2 uvRect=ndc*0.5+0.5; vec4 objCol=vec4(0.0);
+      if(all(greaterThanEqual(uvRect,vec2(0.0)))&&all(lessThanEqual(uvRect,vec2(1.0)))) objCol=texture2D(objTex,uvRect);
+      gl_FragColor=vec4(mix(panoCol,objCol.rgb,objCol.a),1.0);
+    }`,
   depthTest:false, depthWrite:false
 });
 screenSceneA.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), passAMat));
 
 const passBMat = new THREE.ShaderMaterial({
-  uniforms:{
-    src: { value: rtCombined.texture },
-    resolution: { value: db.clone() },
-    k1: { value: -0.25 },
-    k2: { value: 0.0 }
-  },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main(){ vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy,0.0,1.0); }
-  `,
-  fragmentShader: /* glsl */`
-    precision highp float;
-    varying vec2 vUv;
-    uniform sampler2D src;
-    uniform vec2  resolution;
-    uniform float k1, k2;
-    void main(){
-      vec2 center = vec2(0.5);
-      vec2 xy = vUv - center;
-      float aspect = resolution.x / max(resolution.y, 1.0);
-      xy.x *= aspect;
-      float r2 = dot(xy,xy);
-      float f  = 1.0 + k1*r2 + k2*r2*r2;
-      vec2 warped = xy * f;
-      warped.x /= aspect;
-      vec2 uvSrc = center + warped;
-      if(any(lessThan(uvSrc, vec2(0.0))) || any(greaterThan(uvSrc, vec2(1.0)))){
-        gl_FragColor = vec4(0.0);
-      } else {
-        gl_FragColor = texture2D(src, uvSrc);
-      }
-    }
-  `,
+  uniforms:{ src:{value: rtCombined.texture}, resolution:{value: db.clone()}, k1:{value: -0.25}, k2:{value: 0.0} },
+  vertexShader:`varying vec2 vUv; void main(){ vUv=position.xy*0.5+0.5; gl_Position=vec4(position.xy,0.0,1.0); }`,
+  fragmentShader:`precision highp float; varying vec2 vUv; uniform sampler2D src; uniform vec2 resolution; uniform float k1,k2;
+    void main(){ vec2 c=vec2(0.5); vec2 xy=vUv-c; float a=resolution.x/max(resolution.y,1.0);
+      xy.x*=a; float r2=dot(xy,xy); float f=1.0+k1*r2+k2*r2*r2; vec2 w=xy*f; w.x/=a;
+      vec2 uv=c+w; if(any(lessThan(uv,vec2(0.0)))||any(greaterThan(uv,vec2(1.0)))) gl_FragColor=vec4(0.0);
+      else gl_FragColor=texture2D(src,uv); }`,
   depthTest:false, depthWrite:false
 });
 screenSceneB.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), passBMat));
@@ -299,8 +197,7 @@ const params = {
   cameraFov: camera.fov,
   gridHeight: 0.0, gridClip: true, gridVisible: true,
   gridSpacing: 0.10,
-  activeId: -1,
-  boxSizeMax: 5.0
+  activeId: -1
 };
 let lastGridY = 0.0;
 
@@ -311,23 +208,22 @@ const updateRot = ()=>{
     THREE.MathUtils.degToRad(params.rotZ_deg)
   );
 };
-gui.add(params, 'rotX_deg', -180, 180, 0.1).name('Textur Rot X°').onChange(updateRot);
-gui.add(params, 'rotY_deg', -180, 180, 0.1).name('Textur Rot Y°').onChange(updateRot);
-gui.add(params, 'rotZ_deg', -180, 180, 0.1).name('Textur Rot Z°').onChange(updateRot);
-gui.add(params, 'k1', -0.6, 0.6, 0.005).name('De-Fisheye k1').onChange(v=> passBMat.uniforms.k1.value = v);
-gui.add(params, 'k2', -0.6, 0.6, 0.005).name('Fein k2').onChange(v=> passBMat.uniforms.k2.value = v);
+gui.add(params,'rotX_deg',-180,180,0.1).name('Textur Rot X°').onChange(updateRot);
+gui.add(params,'rotY_deg',-180,180,0.1).name('Textur Rot Y°').onChange(updateRot);
+gui.add(params,'rotZ_deg',-180,180,0.1).name('Textur Rot Z°').onChange(updateRot);
+gui.add(params,'k1',-0.6,0.6,0.005).name('De-Fisheye k1').onChange(v=> passBMat.uniforms.k1.value = v);
+gui.add(params,'k2',-0.6,0.6,0.005).name('Fein k2').onChange(v=> passBMat.uniforms.k2.value = v);
 
-const cameraFovCtrl = gui.add(params, 'cameraFov', 40, 140, 0.1).name('Kamera FOV')
-  .onChange(v=>{ camera.fov = v; camera.updateProjectionMatrix(); passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(v); });
+const cameraFovCtrl = gui.add(params,'cameraFov',40,140,0.1).name('Kamera FOV')
+  .onChange(v=>{ camera.fov=v; camera.updateProjectionMatrix(); passAMat.uniforms.fovY.value=THREE.MathUtils.degToRad(v); });
 
-gui.add(params, 'gridVisible').name('Grid sichtbar').onChange(v=> gridMesh.visible = v);
-gui.add(params, 'gridHeight', -5, 5, 0.01).name('Grid Höhe (Y)').onChange(v=>{
+gui.add(params,'gridVisible').name('Grid sichtbar').onChange(v=> gridMesh.visible = v);
+gui.add(params,'gridHeight',-5,5,0.01).name('Grid Höhe (Y)').onChange(v=>{
   const dy = v - lastGridY;
   gridMesh.position.y = v;
   gridMat.uniforms.planeY.value = v;
-  // Abstand zum Grid erhalten
   cubes.forEach(c=>{
-    c.mesh.position.y += dy;
+    c.mesh.position.y += dy; // Abstand zum Grid erhalten
     updateRaysFor(c.mesh, c.rays, c.sizes);
     c.syncFromMesh();
   });
@@ -335,26 +231,45 @@ gui.add(params, 'gridHeight', -5, 5, 0.01).name('Grid Höhe (Y)').onChange(v=>{
 });
 
 const gridFolder = gui.addFolder('Grid-Style');
-gridFolder.add(gridMat.uniforms.spacing, 'value', 0.01, 1.00, 0.01).name('Feldgröße [m]');
-gridFolder.addColor({ axis:'#ffe28a' }, 'axis').name('Achsenfarbe')
+gridFolder.add(gridMat.uniforms.spacing,'value',0.01,1.00,0.01).name('Feldgröße [m]');
+gridFolder.addColor({axis:'#ffe28a'},'axis').name('Achsenfarbe')
   .onChange(v => gridMat.uniforms.axisColor.value.set(v));
-gridFolder.add(gridMat.uniforms.axisThickness, 'value', 0.5, 3.0, 0.1).name('Achsendicke [px]');
+gridFolder.add(gridMat.uniforms.axisThickness,'value',0.5,3.0,0.1).name('Achsendicke [px]');
 updateRot();
 
-/* ---------- Kamera · Info ---------- */
-const camInfo = { yaw: 0, pitch: 0, roll: 0, fov: camera.fov };
+/* ---------- Kamera · Info (editierbar) ---------- */
+const camInfo = { yaw:0, pitch:0, roll:0, fov:camera.fov };
 const infoFolder = gui.addFolder('Kamera · Info');
-const yawCtrl   = infoFolder.add(camInfo, 'yaw').name('Yaw [°]').listen();
-const pitchCtrl = infoFolder.add(camInfo, 'pitch').name('Pitch [°]').listen();
-const rollCtrl  = infoFolder.add(camInfo, 'roll').name('Roll [°]').listen();
-const fovCtrl   = infoFolder.add(camInfo, 'fov').name('FOV [°]').listen();
-[yawCtrl, pitchCtrl, rollCtrl, fovCtrl].forEach(c=>{
-  const input = c.domElement.querySelector('input'); if(input){ input.readOnly = true; input.style.opacity = .85; }
+const yawCtrl   = infoFolder.add(camInfo,'yaw',  -180,180,0.1).name('Yaw [°]').onChange(applyCamAngles);
+const pitchCtrl = infoFolder.add(camInfo,'pitch', -89, 89,0.1).name('Pitch [°]').onChange(applyCamAngles);
+const rollCtrl  = infoFolder.add(camInfo,'roll', -180,180,0.1).name('Roll [°]').onChange(applyCamAngles);
+const fovCtrl   = infoFolder.add(camInfo,'fov',   40,140,0.1).name('FOV [°]').onChange(v=>{
+  camera.fov = v; camera.updateProjectionMatrix();
+  passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(v);
+  params.cameraFov = v;
 });
+function applyCamAngles(){
+  const e = new THREE.Euler(
+    THREE.MathUtils.degToRad(camInfo.pitch),
+    THREE.MathUtils.degToRad(camInfo.yaw),
+    THREE.MathUtils.degToRad(camInfo.roll),
+    'YXZ'
+  );
+  camera.quaternion.setFromEuler(e);
+  camera.updateMatrixWorld();
+}
+function syncCamInfoFromCamera(){
+  const e = new THREE.Euler().setFromQuaternion(camera.quaternion,'YXZ');
+  camInfo.yaw   = +(THREE.MathUtils.radToDeg(e.y)).toFixed(2);
+  camInfo.pitch = +(THREE.MathUtils.radToDeg(e.x)).toFixed(2);
+  camInfo.roll  = +(THREE.MathUtils.radToDeg(e.z)).toFixed(2);
+  camInfo.fov   = +camera.fov.toFixed(2);
+  [yawCtrl,pitchCtrl,rollCtrl,fovCtrl].forEach(c=> c.updateDisplay());
+}
 
-/* ---------- Würfel / Picking (IDs) ---------- */
+/* ---------- Würfel / Picking ---------- */
 const cubesFolder = gui.addFolder('Würfel');
-const cubes = [];     // { id, mesh, edges, rays, gui, state, sizes, inputControllers, ... }
+const cubes = []; // { id, mesh, edges, rays, gui, state, sizes, ... }
 const pickables = [];
 let nextCubeId = 1;
 
@@ -362,99 +277,90 @@ function makeRayGroup(color=0x00ff00){
   const g = new THREE.Group();
   const mat = new THREE.LineBasicMaterial({ color, transparent:true, opacity:0.95 });
   for(let i=0;i<6;i++){
-    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-    g.add(new THREE.Line(geo, mat));
+    const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    g.add(new THREE.Line(geo,mat));
   }
   return g;
 }
 function updateRaysFor(mesh, rays, sizes){
-  const localNormals = [
-    new THREE.Vector3( 1, 0, 0), new THREE.Vector3(-1, 0, 0),
-    new THREE.Vector3( 0, 1, 0), new THREE.Vector3( 0,-1, 0),
-    new THREE.Vector3( 0, 0, 1), new THREE.Vector3( 0, 0,-1)
-  ];
-  const half = { x: sizes.x*0.5, y: sizes.y*0.5, z: sizes.z*0.5 };
-  const pos = mesh.position.clone();
-  const q   = mesh.quaternion.clone();
+  const localNormals=[ new THREE.Vector3(1,0,0),new THREE.Vector3(-1,0,0),
+                       new THREE.Vector3(0,1,0),new THREE.Vector3(0,-1,0),
+                       new THREE.Vector3(0,0,1),new THREE.Vector3(0,0,-1) ];
+  const half={ x:sizes.x*0.5, y:sizes.y*0.5, z:sizes.z*0.5 };
+  const pos=mesh.position.clone(); const q=mesh.quaternion.clone();
   for(let i=0;i<6;i++){
-    const ln = localNormals[i];
-    const worldNormal = ln.clone().applyQuaternion(q).normalize();
-    const offsetLocal = new THREE.Vector3(
-      ln.x !== 0 ? Math.sign(ln.x) * half.x : 0,
-      ln.y !== 0 ? Math.sign(ln.y) * half.y : 0,
-      ln.z !== 0 ? Math.sign(ln.z) * half.z : 0
+    const ln=localNormals[i]; const worldNormal=ln.clone().applyQuaternion(q).normalize();
+    const offsetLocal=new THREE.Vector3(
+      ln.x!==0?Math.sign(ln.x)*half.x:0,
+      ln.y!==0?Math.sign(ln.y)*half.y:0,
+      ln.z!==0?Math.sign(ln.z)*half.z:0
     );
-    const offsetWorld = offsetLocal.clone().applyQuaternion(q);
-    const faceCenter = pos.clone().add(offsetWorld);
-
-    const b = 2.0 * faceCenter.dot(worldNormal);
-    const c = faceCenter.lengthSq() - SPHERE_RADIUS*SPHERE_RADIUS;
-    const disc = b*b - 4.0*c;
-    let t = 0.0;
-    if (disc >= 0.0){
-      const sqrtD = Math.sqrt(disc);
-      const t1 = (-b + sqrtD) * 0.5;
-      const t2 = (-b - sqrtD) * 0.5;
-      t = Math.max(t1, t2);
-      if (t < 0.0) t = 0.0;
-    }
-    const end = faceCenter.clone().addScaledVector(worldNormal, t);
-    const line = rays.children[i];
-    const arr = new Float32Array([faceCenter.x, faceCenter.y, faceCenter.z, end.x, end.y, end.z]);
-    line.geometry.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    const offsetWorld=offsetLocal.clone().applyQuaternion(q);
+    const faceCenter=pos.clone().add(offsetWorld);
+    const b=2.0*faceCenter.dot(worldNormal); const c=faceCenter.lengthSq()-SPHERE_RADIUS*SPHERE_RADIUS;
+    const disc=b*b-4.0*c; let t=0.0;
+    if(disc>=0.0){ const sqrtD=Math.sqrt(disc); const t1=(-b+sqrtD)*0.5; const t2=(-b-sqrtD)*0.5; t=Math.max(t1,t2); if(t<0.0) t=0.0; }
+    const end=faceCenter.clone().addScaledVector(worldNormal,t);
+    const line=rays.children[i];
+    const arr=new Float32Array([faceCenter.x,faceCenter.y,faceCenter.z,end.x,end.y,end.z]);
+    line.geometry.setAttribute('position', new THREE.BufferAttribute(arr,3));
     line.geometry.computeBoundingSphere();
   }
 }
 
-/* ---- Utility ---- */
 function isGuiInputFocused(){
-  const active = document.activeElement;
-  if(!active) return false;
-  if(active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA') {
-    return !!active.closest('.lil-gui');
-  }
-  return false;
+  const a=document.activeElement;
+  return !!(a && (a.tagName==='INPUT'||a.tagName==='SELECT'||a.tagName==='TEXTAREA') && a.closest('.lil-gui'));
 }
-const snap001 = v => {
-  const s = Math.round(v / 0.01) * 0.01;
-  return Math.abs(s) < 1e-9 ? 0 : +s.toFixed(6);
-};
+const snap001 = v => { const s=Math.round(v/0.01)*0.01; return Math.abs(s)<1e-9?0:+s.toFixed(6); };
 
-/* ---- Aktivieren / Hervorheben ---- */
 function activateCubeById(id){
-  params.activeId = id;
-  cubes.forEach((c)=>{
-    const isActive = c.id === id;
+  params.activeId=id;
+  cubes.forEach(c=>{
+    const isActive=c.id===id;
     c.gui.domElement.classList.toggle('active-cube', isActive);
-    if (c.rays) c.rays.visible = isActive;
-    c.inputControllers.forEach(ctrl=>{
-      const el = ctrl.domElement.querySelector('input');
-      if(el) el.disabled = !isActive;
-    });
-    const mat = c.mesh.material;
+    if(c.rays) c.rays.visible=isActive;
+    // Inputs NICHT mehr deaktivieren – alles editierbar
+    const mat=c.mesh.material;
     if (mat && 'emissive' in mat) {
       mat.emissive.setHex(0x6690ff);
-      mat.emissiveIntensity = isActive ? 0.30 : 0.18;
-      mat.needsUpdate = true;
+      mat.emissiveIntensity=isActive?0.30:0.18;
+      mat.needsUpdate=true;
     }
   });
-  if (id !== -1) renderer.domElement.focus();
+  if(id!==-1) renderer.domElement.focus();
 }
 
-/* ---- Globaler Size-Limit-Updater ---- */
-function updateAllSizeLimits(){
-  cubes.forEach(c=>{
-    c.sizeXCtrl?.max(params.boxSizeMax);
-    c.sizeYCtrl?.max(params.boxSizeMax);
-    c.sizeZCtrl?.max(params.boxSizeMax);
-    c.sizeXCtrl?.updateDisplay();
-    c.sizeYCtrl?.updateDisplay();
-    c.sizeZCtrl?.updateDisplay();
+/* ---------- Kontur aufbauen (1.5 px, DPR-sicher) ---------- */
+function buildCrispEdges(mesh, colorHex){
+  const edgesGeo = new THREE.EdgesGeometry(mesh.geometry, 1);
+  const segGeo = new LineSegmentsGeometry().fromEdgesGeometry(edgesGeo);
+  edgesGeo.dispose();
+
+  const mat = new LineMaterial({
+    color: colorHex,
+    worldUnits: false,   // screen-space width (px)
+    dashed: false,
+    depthTest: true,     // verdeckte Kanten bleiben verdeckt
+    depthWrite: false,
+    transparent: false,  // NIE transparent
+    opacity: 1.0
   });
-}
-gui.add(params, 'boxSizeMax', 0.5, 10.0, 0.1).name('Max Box-Größe [m]').onChange(updateAllSizeLimits);
 
-/* ---- Spawn (mit Edges) ---- */
+  // Resolution = Drawing-Buffer (mit DPR), linewidth = 1.5 px
+  const dbSize = new THREE.Vector2();
+  renderer.getDrawingBufferSize(dbSize);
+  mat.resolution.set(dbSize.x, dbSize.y);
+  mat.linewidth = 1.5;
+  mat.needsUpdate = true;
+
+  const lines = new LineSegments2(segGeo, mat);
+  lines.renderOrder = 10; // nach dem Mesh
+  mesh.add(lines);
+  return lines;
+}
+
+/* ---------- Spawn ---------- */
 function spawnCube(){
   const id = nextCubeId++;
 
@@ -465,23 +371,22 @@ function spawnCube(){
     emissive: 0x6690ff,
     emissiveIntensity: 0.18,
     transparent: false,
-    opacity: 1.0
+    opacity: 1.0,
+    polygonOffset: true,
+    polygonOffsetFactor: 2,
+    polygonOffsetUnits: 2
   });
   const geom = new THREE.BoxGeometry(DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE);
   const mesh = new THREE.Mesh(geom, mat);
-
-  // KONTUR: gleiche Farbe, volle Deckkraft
-  const edgesGeom = new THREE.EdgesGeometry(geom, 1); // thresholdAngle 1°
-  const edgesMat  = new THREE.LineBasicMaterial({ color: mat.color.getHex(), transparent:false });
-  const edges = new THREE.LineSegments(edgesGeom, edgesMat);
-  edges.renderOrder = 2;      // leicht vor dem Mesh, um Z-Flimmern zu vermeiden
-  mesh.add(edges);
 
   const sizes = { x: DEFAULT_SIZE, y: DEFAULT_SIZE, z: DEFAULT_SIZE };
   const gy = gridMesh.position.y;
   mesh.position.set(0, gy + sizes.y*0.5, 0);
   mesh.rotation.set(0,0,0);
   mesh.scale.set(1,1,1);
+
+  // Glatte Kontur (immer deckend)
+  const edges = buildCrispEdges(mesh, mat.color.getHex());
 
   sceneObjects.add(mesh);
   pickables.push(mesh);
@@ -500,49 +405,49 @@ function spawnCube(){
   const toDeg = r => THREE.MathUtils.radToDeg(r);
   const toRad = d => THREE.MathUtils.degToRad(d);
 
-  const posX = f.add(state, 'x', -CUBE_RANGE, CUBE_RANGE, 0.01).name('Pos X [m]')
+  const posX = f.add(state,'x', -CUBE_RANGE, CUBE_RANGE, 0.01).name('Pos X [m]')
     .onChange(v=>{ mesh.position.x = snap001(+v); updateRaysFor(mesh, rays, sizes); });
-  const posY = f.add(state, 'y', -CUBE_RANGE, CUBE_RANGE, 0.01).name('Pos Y [m]')
+  const posY = f.add(state,'y', -CUBE_RANGE, CUBE_RANGE, 0.01).name('Pos Y [m]')
     .onChange(v=>{ mesh.position.y = snap001(+v); updateRaysFor(mesh, rays, sizes); });
-  const posZ = f.add(state, 'z', -CUBE_RANGE, CUBE_RANGE, 0.01).name('Pos Z [m]')
+  const posZ = f.add(state,'z', -CUBE_RANGE, CUBE_RANGE, 0.01).name('Pos Z [m]')
     .onChange(v=>{ mesh.position.z = snap001(+v); updateRaysFor(mesh, rays, sizes); });
 
-  const rotX = f.add(state, 'rx', -180, 180, 0.1).name('Rot X [°]').onChange(v=>{ mesh.rotation.x = toRad(v); updateRaysFor(mesh, rays, sizes); });
-  const rotY = f.add(state, 'ry', -180, 180, 0.1).name('Rot Y [°]').onChange(v=>{ mesh.rotation.y = toRad(v); updateRaysFor(mesh, rays, sizes); });
-  const rotZ = f.add(state, 'rz', -180, 180, 0.1).name('Rot Z [°]').onChange(v=>{ mesh.rotation.z = toRad(v); updateRaysFor(mesh, rays, sizes); });
+  const rotX = f.add(state,'rx', -180, 180, 0.1).name('Rot X [°]').onChange(v=>{ mesh.rotation.x = toRad(v); updateRaysFor(mesh, rays, sizes); });
+  const rotY = f.add(state,'ry', -180, 180, 0.1).name('Rot Y [°]').onChange(v=>{ mesh.rotation.y = toRad(v); updateRaysFor(mesh, rays, sizes); });
+  const rotZ = f.add(state,'rz', -180, 180, 0.1).name('Rot Z [°]').onChange(v=>{ mesh.rotation.z = toRad(v); updateRaysFor(mesh, rays, sizes); });
 
-  const sizeXCtrl = f.add(state, 'sizeX', 0.05, params.boxSizeMax, 0.01).name('Größe X [m]').onChange(v=>{
+  const sizeXCtrl = f.add(state,'sizeX', 0.05, 5.0, 0.01).name('Größe X [m]').onChange(v=>{
     sizes.x = Math.max(0.01, +v);
     mesh.scale.x = sizes.x / DEFAULT_SIZE;
     updateRaysFor(mesh, rays, sizes);
   });
-  const sizeYCtrl = f.add(state, 'sizeY', 0.05, params.boxSizeMax, 0.01).name('Größe Y [m]').onChange(v=>{
+  const sizeYCtrl = f.add(state,'sizeY', 0.05, 5.0, 0.01).name('Größe Y [m]').onChange(v=>{
     const centerAboveGrid = mesh.position.y - gridMesh.position.y - sizes.y*0.5;
     sizes.y = Math.max(0.01, +v);
     mesh.scale.y = sizes.y / DEFAULT_SIZE;
-    mesh.position.y = gridMesh.position.y + sizes.y*0.5 + centerAboveGrid;
+    mesh.position.y = gridMesh.position.y + sizes.y*0.5 + centerAboveGrid; // Unterkante beibehalten
     updateRaysFor(mesh, rays, sizes);
     syncFromMesh();
   });
-  const sizeZCtrl = f.add(state, 'sizeZ', 0.05, params.boxSizeMax, 0.01).name('Größe Z [m]').onChange(v=>{
+  const sizeZCtrl = f.add(state,'sizeZ', 0.05, 5.0, 0.01).name('Größe Z [m]').onChange(v=>{
     sizes.z = Math.max(0.01, +v);
     mesh.scale.z = sizes.z / DEFAULT_SIZE;
     updateRaysFor(mesh, rays, sizes);
   });
 
-  const colorCtrl = f.addColor(state, 'color').name('Farbe')
+  const colorCtrl = f.addColor(state,'color').name('Farbe')
     .onChange(v=>{
       mesh.material.color.set(v);
-      edges.material.color.set(v);     // Kontur-Farbe mitziehen
+      if (edges?.material) edges.material.color.set(v); // Kontur-Farbe mitziehen
     });
 
-  const opacityCtrl = f.add(state, 'opacity', 0.0, 1.0, 0.01).name('Transparenz')
+  const opacityCtrl = f.add(state,'opacity', 0.0, 1.0, 0.01).name('Transparenz')
     .onChange(v=>{
       const val = Math.max(0, Math.min(1, +v));
       mesh.material.opacity = val;
       mesh.material.transparent = val < 1.0;
       mesh.material.needsUpdate = true;
-      // Edges bleiben voll deckend, keine Änderung nötig
+      // Edges bleiben voll deckend, unabhängig von Box-Opacity
     });
 
   f.add({Entfernen:()=>{
@@ -550,7 +455,6 @@ function spawnCube(){
     f.destroy();
     if(rays){ rays.traverse(o=>{ if(o.geometry) o.geometry.dispose?.(); }); sceneObjects.remove(rays); }
     if(mesh){
-      // Edges sauber disposen
       if (edges){ edges.geometry.dispose?.(); edges.material.dispose?.(); }
       mesh.geometry.dispose?.(); mesh.material.dispose?.();
       sceneObjects.remove(mesh);
@@ -574,9 +478,7 @@ function spawnCube(){
     state.rx = +toDeg(mesh.rotation.x).toFixed(1);
     state.ry = +toDeg(mesh.rotation.y).toFixed(1);
     state.rz = +toDeg(mesh.rotation.z).toFixed(1);
-    state.sizeX = sizes.x;
-    state.sizeY = sizes.y;
-    state.sizeZ = sizes.z;
+    state.sizeX = sizes.x; state.sizeY = sizes.y; state.sizeZ = sizes.z;
     state.opacity = +mesh.material.opacity.toFixed(2);
     [posX,posY,posZ,rotX,rotY,rotZ,sizeXCtrl,sizeYCtrl,sizeZCtrl,colorCtrl,opacityCtrl].forEach(c=> c.updateDisplay());
   }
@@ -590,7 +492,6 @@ function spawnCube(){
   };
   cubes.push(record);
 
-  updateAllSizeLimits();
   syncFromMesh();
   updateRaysFor(mesh, rays, sizes);
   activateCubeById(id);
@@ -661,18 +562,15 @@ window.addEventListener('keydown', (e)=>{
 /* ---------- Minimap ---------- */
 const mini = document.getElementById('minimap');
 const mctx = mini.getContext('2d');
-
 function drawMinimap(){
   const W = mini.width, H = mini.height;
   const pxPerMeter = Math.min(W, H) * 0.45 / SPHERE_RADIUS;
   const cx = W/2, cy = H/2;
 
   mctx.clearRect(0,0,W,H);
-  mctx.fillStyle = '#0e0e10';
-  mctx.fillRect(0,0,W,H);
+  mctx.fillStyle = '#0e0e10'; mctx.fillRect(0,0,W,H);
 
-  mctx.save();
-  mctx.translate(cx, cy);
+  mctx.save(); mctx.translate(cx, cy);
 
   const h = gridMesh.position.y;
   const rEff = Math.max(0, Math.sqrt(Math.max(SPHERE_RADIUS*SPHERE_RADIUS - h*h, 0)));
@@ -681,8 +579,7 @@ function drawMinimap(){
   const stepPx = Math.max(1, gridMat.uniforms.spacing.value * pxPerMeter);
   const count = Math.floor(rPx / stepPx);
 
-  mctx.strokeStyle = '#1a1f24';
-  mctx.lineWidth = 1;
+  mctx.strokeStyle = '#1a1f24'; mctx.lineWidth = 1;
   for(let i=-count; i<=count; i++){
     const x = i * stepPx;
     mctx.beginPath(); mctx.moveTo(x, -rPx); mctx.lineTo(x,  rPx); mctx.stroke();
@@ -690,35 +587,32 @@ function drawMinimap(){
     mctx.beginPath(); mctx.moveTo(-rPx, z); mctx.lineTo( rPx, z); mctx.stroke();
   }
 
-  mctx.strokeStyle = '#ffe28a';
-  mctx.lineWidth = 2;
+  mctx.strokeStyle = '#ffe28a'; mctx.lineWidth = 2;
   mctx.beginPath(); mctx.moveTo(-rPx,0); mctx.lineTo(rPx,0); mctx.stroke();
   mctx.beginPath(); mctx.moveTo(0,-rPx); mctx.lineTo(0,rPx); mctx.stroke();
 
-  mctx.strokeStyle = '#4ea1ff';
-  mctx.lineWidth = 2;
+  mctx.strokeStyle = '#4ea1ff'; mctx.lineWidth = 2;
   mctx.beginPath(); mctx.arc(0, 0, rPx, 0, Math.PI*2); mctx.stroke();
 
   mctx.fillStyle = '#ffffff';
   mctx.beginPath(); mctx.arc(0, 0, 3, 0, Math.PI*2); mctx.fill();
 
-  // Oriented footprint
   cubes.forEach((c)=>{
-    const hx = c.sizes.x * 0.5, hy = c.sizes.y * 0.5, hz = c.sizes.z * 0.5;
-    const cornersLocal = [
-      new THREE.Vector3(-hx, -hy, -hz),
-      new THREE.Vector3( hx, -hy, -hz),
-      new THREE.Vector3( hx, -hy,  hz),
-      new THREE.Vector3(-hx, -hy,  hz),
+    const hx=c.sizes.x*0.5, hy=c.sizes.y*0.5, hz=c.sizes.z*0.5;
+    const cornersLocal=[
+      new THREE.Vector3(-hx,-hy,-hz),
+      new THREE.Vector3( hx,-hy,-hz),
+      new THREE.Vector3( hx,-hy, hz),
+      new THREE.Vector3(-hx,-hy, hz),
     ];
     const pts = cornersLocal.map(v=>{
-      const w = v.clone().applyQuaternion(c.mesh.quaternion).add(c.mesh.position);
-      return { x: w.x * pxPerMeter, y: w.z * pxPerMeter };
+      const w=v.clone().applyQuaternion(c.mesh.quaternion).add(c.mesh.position);
+      return { x:w.x*pxPerMeter, y:w.z*pxPerMeter };
     });
 
     mctx.fillStyle = c.state.color || '#5a7dff';
-    mctx.strokeStyle = (c.id === params.activeId) ? '#ffd400' : '#222';
-    mctx.lineWidth = (c.id === params.activeId) ? 3 : 1;
+    mctx.strokeStyle = (c.id===params.activeId) ? '#ffd400' : '#222';
+    mctx.lineWidth = (c.id===params.activeId) ? 3 : 1;
     mctx.beginPath();
     mctx.moveTo(pts[0].x, pts[0].y);
     for(let i=1;i<pts.length;i++) mctx.lineTo(pts[i].x, pts[i].y);
@@ -739,30 +633,28 @@ function updateCamBasis(){
 
   camera.updateMatrixWorld();
   const e = camera.matrixWorld.elements;
-  const right = new THREE.Vector3(e[0], e[1], e[2]).normalize();
-  const up    = new THREE.Vector3(e[4], e[5], e[6]).normalize();
-  const zAxis = new THREE.Vector3(e[8], e[9], e[10]).normalize();
+  const right = new THREE.Vector3(e[0],e[1],e[2]).normalize();
+  const up    = new THREE.Vector3(e[4],e[5],e[6]).normalize();
+  const zAxis = new THREE.Vector3(e[8],e[9],e[10]).normalize();
   const m = new THREE.Matrix3();
-  m.set(right.x, up.x, zAxis.x,
-        right.y, up.y, zAxis.y,
-        right.z, up.z, zAxis.z);
+  m.set(right.x,up.x,zAxis.x, right.y,up.y,zAxis.y, right.z,up.z,zAxis.z);
   passAMat.uniforms.camBasis.value.copy(m);
   passAMat.uniforms.aspect.value = camera.aspect;
 
-  _tmpEuler.setFromQuaternion(camera.quaternion, 'YXZ');
+  _tmpEuler.setFromQuaternion(camera.quaternion,'YXZ');
   camInfo.yaw   = +(THREE.MathUtils.radToDeg(_tmpEuler.y)).toFixed(2);
   camInfo.pitch = +(THREE.MathUtils.radToDeg(_tmpEuler.x)).toFixed(2);
   camInfo.roll  = +(THREE.MathUtils.radToDeg(_tmpEuler.z)).toFixed(2);
   camInfo.fov   = +camera.fov.toFixed(2);
+  [yawCtrl,pitchCtrl,rollCtrl,fovCtrl].forEach(c=> c.updateDisplay());
 }
 
-/* ---------- Reset ---------- */
+/* ---------- Reset / Wheel / Resize / Render ---------- */
 document.getElementById('resetView').addEventListener('click', ()=>{
   controls.reset();
   renderer.domElement.focus();
 });
 
-/* ---------- Wheel → FOV (Canvas-only) ---------- */
 function applyFovDelta(deltaY){
   const scale = Math.exp(deltaY * -0.001);
   const newFov = THREE.MathUtils.clamp(camera.fov * scale, 40, 140);
@@ -795,18 +687,29 @@ renderer.domElement.addEventListener('gesturechange', (e)=>{
   cameraFovCtrl.updateDisplay();
 }, { passive:true });
 
-/* ---------- Resize ---------- */
 function resizeAll(){
   renderer.setSize(window.innerWidth, window.innerHeight);
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
+
   passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(camera.fov);
   passAMat.uniforms.aspect.value = camera.aspect;
+
   renderer.getDrawingBufferSize(db);
   passAMat.uniforms.resolution.value.copy(db);
   passBMat.uniforms.resolution.value.copy(db);
   rtObjects.setSize(db.x, db.y);
   rtCombined.setSize(db.x, db.y);
+
+  // Kontur-Material: Drawing-Buffer-Größe setzen, linewidth bleibt 1.5 px
+  cubes.forEach(c=>{
+    const mat = c.edges?.material;
+    if (mat && mat.resolution){
+      mat.resolution.set(db.x, db.y);
+      mat.linewidth = 1.5;
+      mat.needsUpdate = true;
+    }
+  });
 }
 window.addEventListener('resize', resizeAll);
 
@@ -814,8 +717,9 @@ window.addEventListener('resize', resizeAll);
 renderer.setClearColor(0x000000, 0);
 function render(){
   controls.update();
-  updateCamBasis();
+  updateCamBasis();      // aktualisiert camBasis & GUI-Anzeige
 
+  // falls DPR/Buffergröße sich ändert
   const cur = new THREE.Vector2(); renderer.getDrawingBufferSize(cur);
   if(cur.x !== db.x || cur.y !== db.y){
     db.copy(cur);
@@ -823,6 +727,15 @@ function render(){
     passBMat.uniforms.resolution.value.copy(db);
     rtObjects.setSize(db.x, db.y);
     rtCombined.setSize(db.x, db.y);
+    // Edges an neue DB-Größe anpassen
+    cubes.forEach(c=>{
+      const mat = c.edges?.material;
+      if (mat && mat.resolution){
+        mat.resolution.set(db.x, db.y);
+        mat.linewidth = 1.5;
+        mat.needsUpdate = true;
+      }
+    });
   }
 
   gridMat.uniforms.planeY.value = gridMesh.position.y;
