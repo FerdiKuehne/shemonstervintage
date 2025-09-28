@@ -134,6 +134,11 @@ const gridMat = new THREE.ShaderMaterial({
 const gridMesh = new THREE.Mesh(gridGeom, gridMat);
 sceneObjects.add(gridMesh);
 
+/* Grid einmal global konfigurieren */
+gridMat.depthTest = true;
+gridMat.depthWrite = false;
+gridMesh.renderOrder = 9999;
+
 /* ---------- Pano + Post Pass ---------- */
 const db = new THREE.Vector2(); renderer.getDrawingBufferSize(db);
 let rtObjects  = new THREE.WebGLRenderTarget(db.x, db.y, { depthBuffer:true });
@@ -276,10 +281,14 @@ let nextCubeId = 1;
 function makeRayGroup(color=0x00ff00){
   const g = new THREE.Group();
   const mat = new THREE.LineBasicMaterial({ color, transparent:true, opacity:0.95 });
+
   for(let i=0;i<6;i++){
-    const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-    g.add(new THREE.Line(geo,mat));
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    const line = new THREE.Line(geo, mat.clone());
+    line.material.depthWrite = false; // nicht in Z schreiben
+    g.add(line);
   }
+  g.renderOrder = 10000; // sehr spät
   return g;
 }
 function updateRaysFor(mesh, rays, sizes){
@@ -320,7 +329,6 @@ function activateCubeById(id){
     const isActive=c.id===id;
     c.gui.domElement.classList.toggle('active-cube', isActive);
     if(c.rays) c.rays.visible=isActive;
-    // Inputs NICHT mehr deaktivieren – alles editierbar
     const mat=c.mesh.material;
     if (mat && 'emissive' in mat) {
       mat.emissive.setHex(0x6690ff);
@@ -339,15 +347,14 @@ function buildCrispEdges(mesh, colorHex){
 
   const mat = new LineMaterial({
     color: colorHex,
-    worldUnits: false,   // screen-space width (px)
+    worldUnits: false,
     dashed: false,
-    depthTest: true,     // verdeckte Kanten bleiben verdeckt
+    depthTest: true,
     depthWrite: false,
-    transparent: false,  // NIE transparent
+    transparent: false,
     opacity: 1.0
   });
 
-  // Resolution = Drawing-Buffer (mit DPR), linewidth = 1.5 px
   const dbSize = new THREE.Vector2();
   renderer.getDrawingBufferSize(dbSize);
   mat.resolution.set(dbSize.x, dbSize.y);
@@ -355,7 +362,7 @@ function buildCrispEdges(mesh, colorHex){
   mat.needsUpdate = true;
 
   const lines = new LineSegments2(segGeo, mat);
-  lines.renderOrder = 10; // nach dem Mesh
+  lines.renderOrder = 10;
   mesh.add(lines);
   return lines;
 }
@@ -372,10 +379,12 @@ function spawnCube(){
     emissiveIntensity: 0.18,
     transparent: false,
     opacity: 1.0,
+    depthWrite: true,                  // <<< Z-Buffer immer schreiben
     polygonOffset: true,
     polygonOffsetFactor: 2,
     polygonOffsetUnits: 2
   });
+
   const geom = new THREE.BoxGeometry(DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE);
   const mesh = new THREE.Mesh(geom, mat);
 
@@ -385,7 +394,6 @@ function spawnCube(){
   mesh.rotation.set(0,0,0);
   mesh.scale.set(1,1,1);
 
-  // Glatte Kontur (immer deckend)
   const edges = buildCrispEdges(mesh, mat.color.getHex());
 
   sceneObjects.add(mesh);
@@ -425,7 +433,7 @@ function spawnCube(){
     const centerAboveGrid = mesh.position.y - gridMesh.position.y - sizes.y*0.5;
     sizes.y = Math.max(0.01, +v);
     mesh.scale.y = sizes.y / DEFAULT_SIZE;
-    mesh.position.y = gridMesh.position.y + sizes.y*0.5 + centerAboveGrid; // Unterkante beibehalten
+    mesh.position.y = gridMesh.position.y + sizes.y*0.5 + centerAboveGrid;
     updateRaysFor(mesh, rays, sizes);
     syncFromMesh();
   });
@@ -438,7 +446,7 @@ function spawnCube(){
   const colorCtrl = f.addColor(state,'color').name('Farbe')
     .onChange(v=>{
       mesh.material.color.set(v);
-      if (edges?.material) edges.material.color.set(v); // Kontur-Farbe mitziehen
+      if (edges?.material) edges.material.color.set(v);
     });
 
   const opacityCtrl = f.add(state,'opacity', 0.0, 1.0, 0.01).name('Transparenz')
@@ -446,8 +454,8 @@ function spawnCube(){
       const val = Math.max(0, Math.min(1, +v));
       mesh.material.opacity = val;
       mesh.material.transparent = val < 1.0;
+      mesh.material.depthWrite = true;   // <<< trotz Transparenz Z schreiben
       mesh.material.needsUpdate = true;
-      // Edges bleiben voll deckend, unabhängig von Box-Opacity
     });
 
   f.add({Entfernen:()=>{
