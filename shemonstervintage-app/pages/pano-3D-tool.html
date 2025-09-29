@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<title>Pano + Grid-Scan · 0.01m Steps + Crisp Edge Outline</title>
+<title>Pano + Grid-Scan · 0.25m Cube · Minimap Drag · Kamera GUI (Yaw/Pitch/FOV)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   html,body { height:100%; margin:0; background:#0b0b0b; overflow:hidden; }
@@ -47,7 +47,7 @@
 <body>
   <div id="ui">
     <input id="file" type="file" accept="image/*" />
-    <button id="spawn" class="btn">＋ Neuer Würfel)</button>
+    <button id="spawn" class="btn">＋ Neuer Würfel (0.25 m)</button>
     <button id="resetView" class="btn">↺ Reset Position</button>
   </div>
   <canvas id="minimap" width="440" height="440"></canvas>
@@ -57,7 +57,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GUI } from 'https://unpkg.com/lil-gui@0.19/dist/lil-gui.esm.js';
 
-/* Screen-space dicke Linien für glatte Konturen */
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
@@ -90,7 +89,7 @@ sceneObjects.add(new THREE.HemisphereLight(0xffffff, 0x222233, 1.0));
 const dl = new THREE.DirectionalLight(0xffffff, 0.7); dl.position.set(1,1,1); sceneObjects.add(dl);
 
 const SPHERE_RADIUS = 2.0;
-const DEFAULT_SIZE = 0.25; 
+const DEFAULT_SIZE = 0.25; // 25 cm
 const CUBE_RANGE = 5.0;
 
 const gridGeom = new THREE.PlaneGeometry(200, 200, 1, 1);
@@ -135,7 +134,7 @@ const gridMat = new THREE.ShaderMaterial({
 const gridMesh = new THREE.Mesh(gridGeom, gridMat);
 sceneObjects.add(gridMesh);
 
-/* Grid einmal global konfigurieren */
+/* Grid global konfigurieren */
 gridMat.depthTest = true;
 gridMat.depthWrite = false;
 gridMesh.renderOrder = 9999;
@@ -232,9 +231,9 @@ gridFolder.addColor({axis:'#ffe28a'},'axis').name('Achsenfarbe')
 gridFolder.add(gridMat.uniforms.axisThickness,'value',0.5,3.0,0.1).name('Achsendicke [px]');
 updateRot();
 
-/* --- Helper: Grid-Höhe zentral setzen (GUI + Minimap) --- */
+/* --- Helper: Grid-Höhe zentral setzen --- */
 function setGridY(v){
-  v = THREE.MathUtils.clamp(v, -5, 5); // gleiches Limit wie im GUI
+  v = THREE.MathUtils.clamp(v, -5, 5);
   const dy = v - lastGridY;
   gridMesh.position.y = v;
   gridMat.uniforms.planeY.value = v;
@@ -245,39 +244,54 @@ function setGridY(v){
   });
   lastGridY = v;
   params.gridHeight = v;
-  gridHeightCtrl.updateDisplay();      // GUI updaten
+  gridHeightCtrl.updateDisplay();
 }
 const gridHeightCtrl = gui.add(params,'gridHeight',-5,5,0.01).name('Grid Höhe (Y)')
   .onChange(setGridY);
 
-/* ---------- Kamera · Info (editierbar) ---------- */
-const camInfo = { yaw:0, pitch:0, roll:0, fov:camera.fov };
-const infoFolder = gui.addFolder('Kamera · Info');
-const yawCtrl   = infoFolder.add(camInfo,'yaw',  -180,180,0.1).name('Yaw [°]').onChange(applyCamAngles);
-const pitchCtrl = infoFolder.add(camInfo,'pitch', -89, 89,0.1).name('Pitch [°]').onChange(applyCamAngles);
-const rollCtrl  = infoFolder.add(camInfo,'roll', -180,180,0.1).name('Roll [°]').onChange(applyCamAngles);
-const fovCtrl   = infoFolder.add(camInfo,'fov',   40,140,0.1).name('FOV [°]').onChange(v=>{
-  camera.fov = v; camera.updateProjectionMatrix();
-  passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(v);
-  params.cameraFov = v;
-});
-function applyCamAngles(){
-  const e = new THREE.Euler(
-    THREE.MathUtils.degToRad(camInfo.pitch),
-    THREE.MathUtils.degToRad(camInfo.yaw),
-    THREE.MathUtils.degToRad(camInfo.roll),
-    'YXZ'
-  );
-  camera.quaternion.setFromEuler(e);
-  camera.updateMatrixWorld();
+/* ---------- Kamera · Position (Yaw/Pitch/FOV) ---------- */
+const camInfo = { yaw:0, pitch:0, fov:camera.fov };
+const infoFolder = gui.addFolder('Kamera · Position');
+
+const yawCtrl   = infoFolder.add(camInfo,'yaw',  -180,180,0.1).name('Yaw [°]').listen()
+  .onChange(()=> applyCameraFromGUI());
+const pitchCtrl = infoFolder.add(camInfo,'pitch', -89, 89,0.1).name('Pitch [°]').listen()
+  .onChange(()=> applyCameraFromGUI());
+const fovCtrl   = infoFolder.add(camInfo,'fov',   40,140,0.1).name('FOV [°]').listen()
+  .onChange(v=>{
+    camera.fov = v; camera.updateProjectionMatrix();
+    passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(v);
+    params.cameraFov = v;
+  });
+
+function applyCameraFromGUI(){
+  // Mapping: yaw = Drehung um Y, pitch = Neigung (+hoch), roll entfällt
+  const yaw = THREE.MathUtils.degToRad(camInfo.yaw);
+  const pitch = THREE.MathUtils.degToRad(camInfo.pitch);
+
+  // Erzeuge Orientierung aus Euler (YXZ)
+  const q = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+  camera.quaternion.setFromEuler(q);
+  camera.updateMatrixWorld(true);
+
+  // Kamera-Position in Radiusentfernung vor Target setzen
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd); // zeigt nach -Z der Kamera (Richtung "vorne")
+  // Wir wollen die Kamera hinter dem Target in Gegenrichtung der Blickrichtung platzieren:
+  camera.position.copy(controls.target).sub(fwd.multiplyScalar(CAMERA_RADIUS));
+
+  camera.updateMatrixWorld(true);
+  controls.update(); // Constraints/Damping anwenden
+  // FOV aus camInfo wird separat via fovCtrl gesetzt
 }
+
 function syncCamInfoFromCamera(){
+  // Euler aus Kamera lesen -> GUI spiegeln
   const e = new THREE.Euler().setFromQuaternion(camera.quaternion,'YXZ');
   camInfo.yaw   = +(THREE.MathUtils.radToDeg(e.y)).toFixed(2);
   camInfo.pitch = +(THREE.MathUtils.radToDeg(e.x)).toFixed(2);
-  camInfo.roll  = +(THREE.MathUtils.radToDeg(e.z)).toFixed(2);
   camInfo.fov   = +camera.fov.toFixed(2);
-  [yawCtrl,pitchCtrl,rollCtrl,fovCtrl].forEach(c=> c.updateDisplay());
+  [yawCtrl,pitchCtrl,fovCtrl].forEach(c=> c.updateDisplay());
 }
 
 /* ---------- Würfel / Picking ---------- */
@@ -293,10 +307,10 @@ function makeRayGroup(color=0x00ff00){
   for(let i=0;i<6;i++){
     const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
     const line = new THREE.Line(geo, mat.clone());
-    line.material.depthWrite = false; // nicht in Z schreiben
+    line.material.depthWrite = false;
     g.add(line);
   }
-  g.renderOrder = 10000; // sehr spät
+  g.renderOrder = 10000;
   return g;
 }
 function updateRaysFor(mesh, rays, sizes){
@@ -347,7 +361,7 @@ function activateCubeById(id){
   if(id!==-1) renderer.domElement.focus();
 }
 
-/* ---------- Kontur aufbauen (1.5 px, DPR-sicher) ---------- */
+/* ---------- Outline (1.5 px, DPR-sicher) ---------- */
 function buildCrispEdges(mesh, colorHex){
   const edgesGeo = new THREE.EdgesGeometry(mesh.geometry, 1);
   const segGeo = new LineSegmentsGeometry().fromEdgesGeometry(edgesGeo);
@@ -387,7 +401,7 @@ function spawnCube(){
     emissiveIntensity: 0.18,
     transparent: false,
     opacity: 1.0,
-    depthWrite: true,                  // <<< Z-Buffer immer schreiben
+    depthWrite: true,
     polygonOffset: true,
     polygonOffsetFactor: 2,
     polygonOffsetUnits: 2
@@ -462,7 +476,7 @@ function spawnCube(){
       const val = Math.max(0, Math.min(1, +v));
       mesh.material.opacity = val;
       mesh.material.transparent = val < 1.0;
-      mesh.material.depthWrite = true;   // trotz Transparenz Z schreiben
+      mesh.material.depthWrite = true;
       mesh.material.needsUpdate = true;
     });
 
@@ -575,22 +589,44 @@ window.addEventListener('keydown', (e)=>{
   }
 });
 
-/* ---------- Minimap ---------- */
+/* ---------- Minimap (korrekte Skalierung) ---------- */
 const mini = document.getElementById('minimap');
 const mctx = mini.getContext('2d');
-function drawMinimap(){
+
+function getMiniTransform(){
   const W = mini.width, H = mini.height;
-  const pxPerMeter = Math.min(W, H) * 0.45 / SPHERE_RADIUS;
-  const cx = W/2, cy = H/2;
+  const marginPx = 10;
+  const pxPerMeter = (Math.min(W, H) * 0.5 - marginPx) / SPHERE_RADIUS;
+  const cx = W * 0.5, cy = H * 0.5;
+  return { W, H, cx, cy, pxPerMeter, marginPx };
+}
+
+function worldXZToMini(x, z){
+  const { pxPerMeter, cx, cy } = getMiniTransform();
+  return { x: x*pxPerMeter + cx, y: z*pxPerMeter + cy };
+}
+
+function miniToWorldXZ(clientX, clientY){
+  const { pxPerMeter, cx, cy } = getMiniTransform();
+  const r = mini.getBoundingClientRect();
+  const mx = (clientX - r.left) * (mini.width  / r.width);
+  const my = (clientY - r.top ) * (mini.height / r.height);
+  return { x: (mx - cx) / pxPerMeter, z: (my - cy) / pxPerMeter };
+}
+
+function drawMinimap(){
+  const { W, H, cx, cy, pxPerMeter } = getMiniTransform();
 
   mctx.clearRect(0,0,W,H);
-  mctx.fillStyle = '#0e0e10'; mctx.fillRect(0,0,W,H);
+  mctx.fillStyle = '#0e0e10';
+  mctx.fillRect(0,0,W,H);
 
-  mctx.save(); mctx.translate(cx, cy);
+  mctx.save();
+  mctx.translate(cx, cy);
 
   const h = gridMesh.position.y;
   const rEff = Math.max(0, Math.sqrt(Math.max(SPHERE_RADIUS*SPHERE_RADIUS - h*h, 0)));
-  const rPx = rEff * pxPerMeter;
+  const rPx  = rEff * pxPerMeter;
 
   const stepPx = Math.max(1, gridMat.uniforms.spacing.value * pxPerMeter);
   const count = Math.floor(rPx / stepPx);
@@ -623,15 +659,16 @@ function drawMinimap(){
     ];
     const pts = cornersLocal.map(v=>{
       const w=v.clone().applyQuaternion(c.mesh.quaternion).add(c.mesh.position);
-      return { x:w.x*pxPerMeter, y:w.z*pxPerMeter };
+      return worldXZToMini(w.x, w.z);
     });
 
     mctx.fillStyle = c.state.color || '#5a7dff';
     mctx.strokeStyle = (c.id===params.activeId) ? '#ffd400' : '#222';
     mctx.lineWidth = (c.id===params.activeId) ? 3 : 1;
+
     mctx.beginPath();
-    mctx.moveTo(pts[0].x, pts[0].y);
-    for(let i=1;i<pts.length;i++) mctx.lineTo(pts[i].x, pts[i].y);
+    mctx.moveTo(pts[0].x - cx, pts[0].y - cy);
+    for(let i=1;i<pts.length;i++) mctx.lineTo(pts[i].x - cx, pts[i].y - cy);
     mctx.closePath();
     mctx.fill(); mctx.stroke();
   });
@@ -640,25 +677,6 @@ function drawMinimap(){
 }
 
 /* ---------- Minimap Interaktion: Klick + Drag (XZ) ---------- */
-function getMiniTransform(){
-  const W = mini.width, H = mini.height;
-  const pxPerMeter = Math.min(W, H) * 0.45 / SPHERE_RADIUS;
-  const cx = W/2, cy = H/2;
-  return { W,H,pxPerMeter,cx,cy };
-}
-function miniToWorldXZ(clientX, clientY){
-  const { pxPerMeter, cx, cy } = getMiniTransform();
-  const r = mini.getBoundingClientRect();
-  const mx = ((clientX - r.left) * mini.width  / r.width);
-  const my = ((clientY - r.top)  * mini.height / r.height);
-  const x = (mx - cx) / pxPerMeter;
-  const z = (my - cy) / pxPerMeter;
-  return { x, z };
-}
-function worldXZToMini(x, z){
-  const { pxPerMeter, cx, cy } = getMiniTransform();
-  return { x: x*pxPerMeter + cx, y: z*pxPerMeter + cy };
-}
 function pointInPoly(px, py, poly){
   let inside = false;
   for(let i=0, j=poly.length-1; i<poly.length; j=i++){
@@ -687,8 +705,8 @@ function moveCubeXZ(c, wx, wz){
 }
 function pickCubeOnMini(clientX, clientY){
   const r = mini.getBoundingClientRect();
-  const mx = ((clientX - r.left) * mini.width  / r.width);
-  const my = ((clientY - r.top)  * mini.height / r.height);
+  const mx = (clientX - r.left) * (mini.width  / r.width);
+  const my = (clientY - r.top ) * (mini.height / r.height);
   for(let i=cubes.length-1; i>=0; i--){
     const c = cubes[i];
     const poly = quadForCube2D(c);
@@ -721,15 +739,15 @@ window.addEventListener('pointerup', ()=>{
 mini.addEventListener('wheel', (e)=>{
   e.preventDefault();
   e.stopPropagation();
-  const sensitivity = 0.001;            // Grundempfinden
-  const fine = e.shiftKey ? 0.25 : 1.0; // Shift = feiner
+  const sensitivity = 0.001;
+  const fine = e.shiftKey ? 0.25 : 1.0;
   const deltaMeters = -e.deltaY * sensitivity * fine;
   setGridY(params.gridHeight + deltaMeters);
 }, { passive:false });
 
 /* ---------- Kamera-Basis & Info ---------- */
-const _tmpEuler = new THREE.Euler(0,0,0,'YXZ');
 function updateCamBasis(){
+  // halte Kamera in kleinem Radius um das Target
   const dir = camera.position.clone().sub(controls.target);
   if (dir.lengthSq() === 0) dir.set(0,0,1);
   dir.normalize().multiplyScalar(CAMERA_RADIUS);
@@ -745,18 +763,15 @@ function updateCamBasis(){
   passAMat.uniforms.camBasis.value.copy(m);
   passAMat.uniforms.aspect.value = camera.aspect;
 
-  _tmpEuler.setFromQuaternion(camera.quaternion,'YXZ');
-  camInfo.yaw   = +(THREE.MathUtils.radToDeg(_tmpEuler.y)).toFixed(2);
-  camInfo.pitch = +(THREE.MathUtils.radToDeg(_tmpEuler.x)).toFixed(2);
-  camInfo.roll  = +(THREE.MathUtils.radToDeg(_tmpEuler.z)).toFixed(2);
-  camInfo.fov   = +camera.fov.toFixed(2);
-  [yawCtrl,pitchCtrl,rollCtrl,fovCtrl].forEach(c=> c.updateDisplay());
+  // GUI spiegeln
+  syncCamInfoFromCamera();
 }
 
 /* ---------- Reset / Wheel / Resize / Render ---------- */
 document.getElementById('resetView').addEventListener('click', ()=>{
   controls.reset();
   renderer.domElement.focus();
+  syncCamInfoFromCamera();
 });
 
 function applyFovDelta(deltaY){
@@ -768,6 +783,7 @@ function applyFovDelta(deltaY){
     passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(newFov);
     params.cameraFov = newFov;
     cameraFovCtrl.updateDisplay();
+    fovCtrl.updateDisplay();
   }
 }
 renderer.domElement.addEventListener('wheel', (e)=>{
@@ -789,6 +805,7 @@ renderer.domElement.addEventListener('gesturechange', (e)=>{
   passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(target);
   params.cameraFov = target;
   cameraFovCtrl.updateDisplay();
+  fovCtrl.updateDisplay();
 }, { passive:true });
 
 function resizeAll(){
@@ -805,7 +822,6 @@ function resizeAll(){
   rtObjects.setSize(db.x, db.y);
   rtCombined.setSize(db.x, db.y);
 
-  // Kontur-Material: Drawing-Buffer-Größe setzen, linewidth bleibt 1.5 px
   cubes.forEach(c=>{
     const mat = c.edges?.material;
     if (mat && mat.resolution){
@@ -821,7 +837,7 @@ window.addEventListener('resize', resizeAll);
 renderer.setClearColor(0x000000, 0);
 function render(){
   controls.update();
-  updateCamBasis();      // aktualisiert camBasis & GUI-Anzeige
+  updateCamBasis();
 
   // falls DPR/Buffergröße sich ändert
   const cur = new THREE.Vector2(); renderer.getDrawingBufferSize(cur);
@@ -831,7 +847,6 @@ function render(){
     passBMat.uniforms.resolution.value.copy(db);
     rtObjects.setSize(db.x, db.y);
     rtCombined.setSize(db.x, db.y);
-    // Edges an neue DB-Größe anpassen
     cubes.forEach(c=>{
       const mat = c.edges?.material;
       if (mat && mat.resolution){
@@ -877,6 +892,9 @@ document.getElementById('file').addEventListener('change', (e)=>{
   });
 });
 document.getElementById('spawn').addEventListener('click', spawnCube);
+
+/* ---------- Initial GUI Sync ---------- */
+syncCamInfoFromCamera();
 </script>
 </body>
 </html>
