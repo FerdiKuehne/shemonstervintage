@@ -195,7 +195,7 @@ const passBMat = new THREE.ShaderMaterial({
 screenSceneB.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), passBMat));
 
 /* ---------- GUI ---------- */
-const gui = new GUI({ title: 'Controls' });
+const gui = new GUI({ title: 'Pano Settings' });
 const params = {
   rotX_deg: 0, rotY_deg: 0, rotZ_deg: 0,
   k1: -0.25, k2: 0.0,
@@ -222,14 +222,13 @@ gui.add(params,'k2',-0.6,0.6,0.005).name('Fein k2').onChange(v=> passBMat.unifor
 const cameraFovCtrl = gui.add(params,'cameraFov',40,140,0.1).name('Kamera FOV')
   .onChange(v=>{ camera.fov=v; camera.updateProjectionMatrix(); passAMat.uniforms.fovY.value=THREE.MathUtils.degToRad(v); });
 
-gui.add(params,'gridVisible').name('Grid sichtbar').onChange(v=> gridMesh.visible = v);
-
-const gridFolder = gui.addFolder('Grid-Style');
-gridFolder.add(gridMat.uniforms.spacing,'value',0.01,1.00,0.01).name('Feldgröße [m]');
-gridFolder.addColor({axis:'#ffe28a'},'axis').name('Achsenfarbe')
+/* ---------- Grid Settings (zusammengeführt) ---------- */
+const gridSettings = gui.addFolder('Grid Settings');
+gridSettings.add(params,'gridVisible').name('Grid sichtbar').onChange(v=> gridMesh.visible = v);
+gridSettings.add(gridMat.uniforms.spacing,'value',0.01,1.00,0.01).name('Feldgröße [m]');
+gridSettings.addColor({axis:'#ffe28a'},'axis').name('Achsenfarbe')
   .onChange(v => gridMat.uniforms.axisColor.value.set(v));
-gridFolder.add(gridMat.uniforms.axisThickness,'value',0.5,3.0,0.1).name('Achsendicke [px]');
-updateRot();
+gridSettings.add(gridMat.uniforms.axisThickness,'value',0.5,3.0,0.1).name('Achsendicke [px]');
 
 /* --- Helper: Grid-Höhe zentral setzen --- */
 function setGridY(v){
@@ -246,8 +245,10 @@ function setGridY(v){
   params.gridHeight = v;
   gridHeightCtrl.updateDisplay();
 }
-const gridHeightCtrl = gui.add(params,'gridHeight',-5,5,0.01).name('Grid Höhe (Y)')
+const gridHeightCtrl = gridSettings.add(params,'gridHeight',-5,5,0.01).name('Grid Höhe (Y)')
   .onChange(setGridY);
+
+updateRot();
 
 /* ---------- Kamera · Position (Yaw/Pitch/FOV) ---------- */
 const camInfo = { yaw:0, pitch:0, fov:camera.fov };
@@ -265,28 +266,20 @@ const fovCtrl   = infoFolder.add(camInfo,'fov',   40,140,0.1).name('FOV [°]').l
   });
 
 function applyCameraFromGUI(){
-  // Mapping: yaw = Drehung um Y, pitch = Neigung (+hoch), roll entfällt
   const yaw = THREE.MathUtils.degToRad(camInfo.yaw);
   const pitch = THREE.MathUtils.degToRad(camInfo.pitch);
-
-  // Erzeuge Orientierung aus Euler (YXZ)
   const q = new THREE.Euler(pitch, yaw, 0, 'YXZ');
   camera.quaternion.setFromEuler(q);
   camera.updateMatrixWorld(true);
 
-  // Kamera-Position in Radiusentfernung vor Target setzen
   const fwd = new THREE.Vector3();
-  camera.getWorldDirection(fwd); // zeigt nach -Z der Kamera (Richtung "vorne")
-  // Wir wollen die Kamera hinter dem Target in Gegenrichtung der Blickrichtung platzieren:
+  camera.getWorldDirection(fwd);
   camera.position.copy(controls.target).sub(fwd.multiplyScalar(CAMERA_RADIUS));
 
   camera.updateMatrixWorld(true);
-  controls.update(); // Constraints/Damping anwenden
-  // FOV aus camInfo wird separat via fovCtrl gesetzt
+  controls.update();
 }
-
 function syncCamInfoFromCamera(){
-  // Euler aus Kamera lesen -> GUI spiegeln
   const e = new THREE.Euler().setFromQuaternion(camera.quaternion,'YXZ');
   camInfo.yaw   = +(THREE.MathUtils.radToDeg(e.y)).toFixed(2);
   camInfo.pitch = +(THREE.MathUtils.radToDeg(e.x)).toFixed(2);
@@ -747,7 +740,6 @@ mini.addEventListener('wheel', (e)=>{
 
 /* ---------- Kamera-Basis & Info ---------- */
 function updateCamBasis(){
-  // halte Kamera in kleinem Radius um das Target
   const dir = camera.position.clone().sub(controls.target);
   if (dir.lengthSq() === 0) dir.set(0,0,1);
   dir.normalize().multiplyScalar(CAMERA_RADIUS);
@@ -763,7 +755,6 @@ function updateCamBasis(){
   passAMat.uniforms.camBasis.value.copy(m);
   passAMat.uniforms.aspect.value = camera.aspect;
 
-  // GUI spiegeln
   syncCamInfoFromCamera();
 }
 
@@ -839,7 +830,6 @@ function render(){
   controls.update();
   updateCamBasis();
 
-  // falls DPR/Buffergröße sich ändert
   const cur = new THREE.Vector2(); renderer.getDrawingBufferSize(cur);
   if(cur.x !== db.x || cur.y !== db.y){
     db.copy(cur);
