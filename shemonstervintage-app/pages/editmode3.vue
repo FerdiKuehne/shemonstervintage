@@ -499,8 +499,6 @@ onMounted(async () => {
     );
   };
 
-  /* ---------- Minimap (korrekte Skalierung) ---------- */
-
   const { mini, mctx } = createMinimap();
 
   const  getMiniTransform = ()=> {
