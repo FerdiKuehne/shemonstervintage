@@ -49,16 +49,5 @@
           { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }
         ]
       }
-    },
-    vite: {
-      resolve: {
-        alias: {
-          three: fileURLToPath(new URL("node_modules/three", import.meta.url)),
-          "super-three": fileURLToPath(new URL("node_modules/three", import.meta.url)),
-          "three/examples/jsm": fileURLToPath(
-            new URL("node_modules/three/examples/jsm", import.meta.url)
-          )
-        }
-      }
     }
   })

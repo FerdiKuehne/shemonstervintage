@@ -11,11 +11,20 @@ export function initListener(
   renderer,
   camera,
   pickAtClient,
-    mini,
-    worldXZToMini,
-    activateCubeById,
-    setGridY,
-    getMiniTransform
+  mini,
+  worldXZToMini,
+  activateCubeById,
+  setGridY,
+  getMiniTransform,
+  passAMat,
+  controls,
+  passBMat,
+  cameraFovCtrl,
+  syncCamInfoFromCamera,
+  fovCtrl,
+  rtObjects,
+  rtCombined,
+  db
 ) {
   window.addEventListener("keydown", (e) => {
     if (isGuiInputFocusedShort()) return;
@@ -86,7 +95,6 @@ export function initListener(
     pickAtClient(ev.clientX, ev.clientY, renderer, camera);
   });
 
- 
   function pointInPoly(px, py, poly) {
     let inside = false;
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -101,16 +109,14 @@ export function initListener(
     }
     return inside;
   }
- 
 
-  function miniToWorldXZ(clientX, clientY){
+  function miniToWorldXZ(clientX, clientY) {
     const { pxPerMeter, cx, cy } = getMiniTransform();
     const r = mini.getBoundingClientRect();
-    const mx = (clientX - r.left) * (mini.width  / r.width);
-    const my = (clientY - r.top ) * (mini.height / r.height);
+    const mx = (clientX - r.left) * (mini.width / r.width);
+    const my = (clientY - r.top) * (mini.height / r.height);
     return { x: (mx - cx) / pxPerMeter, z: (my - cy) / pxPerMeter };
   }
-
 
   function quadForCube2D(c) {
     const hx = c.sizes.x * 0.5,
@@ -188,7 +194,6 @@ export function initListener(
     { passive: false }
   );
 
-
   let baseFov = camera.fov;
   renderer.domElement.addEventListener(
     "gesturestart",
@@ -211,7 +216,6 @@ export function initListener(
     { passive: true }
   );
 
-
   /* ---------- Reset / Wheel / Resize / Render ---------- */
   document.getElementById("resetView").addEventListener("click", () => {
     controls.reset();
@@ -219,14 +223,13 @@ export function initListener(
     syncCamInfoFromCamera();
   });
 
-
   function applyFovDelta(deltaY) {
     const scale = Math.exp(deltaY * -0.001);
-    const newFov = THREE.MathUtils.clamp(camera.fov * scale, 40, 140);
+    const newFov = MathUtils.clamp(camera.fov * scale, 40, 140);
     if (newFov !== camera.fov) {
       camera.fov = newFov;
       camera.updateProjectionMatrix();
-      passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(newFov);
+      passAMat.uniforms.fovY.value = MathUtils.degToRad(newFov);
       params.cameraFov = newFov;
       cameraFovCtrl.updateDisplay();
       fovCtrl.updateDisplay();
@@ -247,14 +250,12 @@ export function initListener(
     { passive: false }
   );
 
-
-
   function resizeAll() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
 
-    passAMat.uniforms.fovY.value = THREE.MathUtils.degToRad(camera.fov);
+    passAMat.uniforms.fovY.value = MathUtils.degToRad(camera.fov);
     passAMat.uniforms.aspect.value = camera.aspect;
 
     renderer.getDrawingBufferSize(db);
@@ -272,7 +273,7 @@ export function initListener(
       }
     });
   }
+  
 
   window.addEventListener("resize", resizeAll);
-
 }
