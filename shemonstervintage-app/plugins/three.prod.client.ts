@@ -1,7 +1,8 @@
 // plugins/three.ts
 import { defineNuxtPlugin } from '#app'
+import type { Object3D } from 'three';
 import { Scene, PerspectiveCamera, WebGLRenderer, Color } from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { createBackgroundSphereFromAPI } from '@/composables/backgroundsphere.js'
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { XRButton } from 'three/examples/jsm/webxr/XRButton.js';
@@ -23,6 +24,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     animatedCallbacks: new Map<string, (delta: number) => void>(),
     backgroundSphere: null as any,
     scroller: null as HTMLElement | null,
+    itemClick: null as ((obj: Object3D) => void) | null
   }
 
   // --- Ready promise handling ---

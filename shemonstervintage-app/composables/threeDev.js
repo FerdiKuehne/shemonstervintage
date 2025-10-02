@@ -1,55 +1,80 @@
-import { Scene, PerspectiveCamera, WebGLRenderer, Color, Group, BoxGeometry, MeshBasicMaterial, Mesh,AmbientLight,DirectionalLight } from "three";
+import {
+  HemisphereLight,
+  Scene,
+  PerspectiveCamera,
+  WebGLRenderer,
+  Color,
+  Group,
+  BoxGeometry,
+  MeshBasicMaterial,
+  Mesh,
+  AmbientLight,
+  DirectionalLight,
+  Raycaster,
+  Vector2,
+  SRGBColorSpace,
+} from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createBackgroundSphereFromAPI } from "@/composables/backgroundsphere.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
-import { XRButton } from 'three/examples/jsm/webxr/XRButton.js';
-import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
-
+import { XRButton } from "three/examples/jsm/webxr/XRButton.js";
+import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
+import { Observer } from "gsap/Observer";
 import {
   ArToolkitContext,
   ArToolkitSource,
   ArMarkerControls,
 } from "@ar-js-org/ar.js/three.js/build/ar-threex.js";
+import { gsap } from "gsap";
+gsap.registerPlugin(Observer);
 
 async function init(
   backgroundSphereNeeded = true,
   orbiterControlsNeeded = true,
   trackerNeeded = false,
   arNeeded = false,
-  xrNeeded = false, 
+  xrNeeded = false,
+  itemClick = (v) => console.log(v)
 ) {
   let controls, backgroundSphere, arToolkitSource, arToolkitContext;
   const animateObjects = [];
   const container = document.getElementById("three-root");
+  const CAMERA_RADIUS = 1e-4;
 
   // Scene
   const scene = new Scene();
- 
-  scene.add(new AmbientLight(0xffffff, 0.5));
-  const dirLight = new DirectionalLight(0xffffff, 0.8);
-  dirLight.position.set(1, 1, 1);
-  scene.add(dirLight);
+
+  const dl = new DirectionalLight(0xffffff, 0.7);
+  dl.position.set(1, 1, 1);
+
+  scene.add(new HemisphereLight(0xffffff, 0x222233, 1.0));
+  scene.add(dl);
 
   // Camera
   const camera = new PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,
-    0.1,
+    0.001,
     1000
   );
-  camera.position.set(0, 0, 2.5);
+  
+  camera.position.set(0, 0, CAMERA_RADIUS);
 
   // Renderer
-  const renderer = new WebGLRenderer({ antialias: true });
+  const renderer = new WebGLRenderer({ antialias:true });
+  renderer.outputColorSpace = SRGBColorSpace;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  document.getElementById("three-root").appendChild(renderer.domElement);
+  renderer.domElement.setAttribute('tabindex','0');
+  renderer.domElement.addEventListener('click', ()=> renderer.domElement.focus());
 
-  if(xrNeeded){
+  if (xrNeeded) {
     renderer.xr.enabled = true;
     container.appendChild(XRButton.createButton(renderer));
   }
 
-  if(arNeeded) {
+  if (arNeeded) {
     renderer.xr.enabled = true;
     container.appendChild(ARButton.createButton(renderer));
   }
@@ -93,11 +118,10 @@ async function init(
     });
 
     const geometry = new BoxGeometry();
-    const material = new MeshBasicMaterial({color: 0xff00ff})
+    const material = new MeshBasicMaterial({ color: 0xff00ff });
 
-    marker.add(new Mesh(geometry,material))
+    marker.add(new Mesh(geometry, material));
   }
-
 
   if (backgroundSphereNeeded) {
     backgroundSphere = await createBackgroundSphereFromAPI();
@@ -106,12 +130,36 @@ async function init(
 
   if (orbiterControlsNeeded) {
     controls = new OrbitControls(camera, renderer.domElement);
+
+    controls.enablePan = false;
+    controls.enableZoom = false; // FOV via Wheel
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.enableZoom = true;
+    controls.dampingFactor = 0.07;
+    controls.rotateSpeed = 0.9;
     controls.target.set(0, 0, 0);
-    controls.update();
+    controls.saveState();
   }
+  
+  const raycaster = new Raycaster();
+  const mouse = new Vector2();
+
+  Observer.create({
+    target: renderer.domElement,
+    type: "pointer",
+    onClick(ev) {
+      const e = ev.event || ev;
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      console.log("click");
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects([scene], true);
+      if (!hits.length) return;
+     
+      itemClick(hits[0].object);
+      
+    }})
+
 
   function animate() {
     if (animateObjects.length > 0) {

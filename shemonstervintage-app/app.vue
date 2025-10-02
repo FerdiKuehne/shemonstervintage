@@ -31,7 +31,6 @@
   <!--
       <button class="enter-btn" @click="moveCamera">{{ buttonText }}</button>
     <NuxtLayout />
-  
   -->  
     <NuxtLayout />
   </div>

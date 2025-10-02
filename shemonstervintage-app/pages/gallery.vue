@@ -10,6 +10,7 @@ import { initGrid, updateContainerHeight } from "@/composables/grid.js";
 import { galleryCameraShift } from "~/composables/screenplay.js";
 import { scrollerRef } from "@/composables/scroller.js";
 
+
 definePageMeta({
   layout: "three",
 });
@@ -35,7 +36,6 @@ onMounted(async () => {
     $three = useNuxtApp().$three;
     await $three.ready;
   }
-
 
     const grid = await initGrid(
       $three.renderer,

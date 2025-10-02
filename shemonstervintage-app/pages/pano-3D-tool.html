@@ -245,6 +245,7 @@ function setGridY(v){
   params.gridHeight = v;
   gridHeightCtrl.updateDisplay();
 }
+
 const gridHeightCtrl = gridSettings.add(params,'gridHeight',-5,5,0.01).name('Grid Höhe (Y)')
   .onChange(setGridY);
 
@@ -252,6 +253,7 @@ updateRot();
 
 /* ---------- Kamera · Position (Yaw/Pitch/FOV) ---------- */
 const camInfo = { yaw:0, pitch:0, fov:camera.fov };
+
 const infoFolder = gui.addFolder('Kamera · Position');
 
 const yawCtrl   = infoFolder.add(camInfo,'yaw',  -180,180,0.1).name('Yaw [°]').listen()
@@ -306,6 +308,8 @@ function makeRayGroup(color=0x00ff00){
   g.renderOrder = 10000;
   return g;
 }
+
+
 function updateRaysFor(mesh, rays, sizes){
   const localNormals=[ new THREE.Vector3(1,0,0),new THREE.Vector3(-1,0,0),
                        new THREE.Vector3(0,1,0),new THREE.Vector3(0,-1,0),
@@ -336,6 +340,7 @@ function isGuiInputFocused(){
   const a=document.activeElement;
   return !!(a && (a.tagName==='INPUT'||a.tagName==='SELECT'||a.tagName==='TEXTAREA') && a.closest('.lil-gui'));
 }
+
 const snap001 = v => { const s=Math.round(v/0.01)*0.01; return Math.abs(s)<1e-9?0:+s.toFixed(6); };
 
 function activateCubeById(id){
@@ -524,7 +529,7 @@ function spawnCube(){
 /* ---------- Picking ---------- */
 const raycaster = new THREE.Raycaster();
 const mouseNDC = new THREE.Vector2();
-function pickAtClient(x, y){
+function pickAtClient(x, y, renderer, camera){
   const rect = renderer.domElement.getBoundingClientRect();
   const mx = ((x - rect.left) / rect.width) * 2 - 1;
   const my = -((y - rect.top) / rect.height) * 2 + 1;
@@ -542,6 +547,8 @@ function pickAtClient(x, y){
   }
   activateCubeById(-1);
 }
+
+
 renderer.domElement.addEventListener('pointerdown', (ev)=>{
   if (ev.button !== 0) return;
   const guiRect = document.querySelector('.lil-gui')?.getBoundingClientRect();
@@ -557,6 +564,7 @@ function isGuiInputFocusedShort(){
   const a = document.activeElement;
   return a && (a.tagName === 'INPUT' || a.tagName === 'SELECT' || a.tagName === 'TEXTAREA') && a.closest('.lil-gui');
 }
+
 window.addEventListener('keydown', (e)=>{
   if (isGuiInputFocusedShort()) return;
   const rec = cubes.find(c=> c.id === params.activeId);
@@ -679,6 +687,7 @@ function pointInPoly(px, py, poly){
   }
   return inside;
 }
+
 function quadForCube2D(c){
   const hx=c.sizes.x*0.5, hy=c.sizes.y*0.5, hz=c.sizes.z*0.5;
   const cornersLocal=[
@@ -690,12 +699,14 @@ function quadForCube2D(c){
   const worldPts = cornersLocal.map(v=> v.applyQuaternion(c.mesh.quaternion).add(c.mesh.position));
   return worldPts.map(w => worldXZToMini(w.x, w.z));
 }
+
 function moveCubeXZ(c, wx, wz){
   c.mesh.position.x = snap001(wx);
   c.mesh.position.z = snap001(wz);
   updateRaysFor(c.mesh, c.rays, c.sizes);
   c.syncFromMesh();
 }
+
 function pickCubeOnMini(clientX, clientY){
   const r = mini.getBoundingClientRect();
   const mx = (clientX - r.left) * (mini.width  / r.width);
@@ -707,6 +718,7 @@ function pickCubeOnMini(clientX, clientY){
   }
   return null;
 }
+
 let dragState = null; // { cube, offX, offZ }
 mini.addEventListener('pointerdown', (e)=>{
   const cube = pickCubeOnMini(e.clientX, e.clientY);
@@ -822,6 +834,7 @@ function resizeAll(){
     }
   });
 }
+
 window.addEventListener('resize', resizeAll);
 
 /* ---------- Renderloop ---------- */
@@ -830,7 +843,8 @@ function render(){
   controls.update();
   updateCamBasis();
 
-  const cur = new THREE.Vector2(); renderer.getDrawingBufferSize(cur);
+  const cur = new THREE.Vector2(); 
+  renderer.getDrawingBufferSize(cur);
   if(cur.x !== db.x || cur.y !== db.y){
     db.copy(cur);
     passAMat.uniforms.resolution.value.copy(db);
@@ -880,6 +894,7 @@ document.getElementById('file').addEventListener('change', (e)=>{
     passAMat.uniforms.pano.value = panoTex;
     URL.revokeObjectURL(url);
   });
+  console.log("panoTex", panoTex);
 });
 document.getElementById('spawn').addEventListener('click', spawnCube);
 

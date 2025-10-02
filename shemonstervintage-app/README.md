@@ -2,6 +2,13 @@
 
 Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
 
+Länge 4,51 zur gaderobe // 1.05, => 5,56
+Weite 4 Meter 4
+fensterbret 0,36 / 0,6
+3 meter 17 => seite park
+fensterbrett 0,35 / 0,6
+2 meter 48 => seite straßenbahn
+
 ## Setup
 
 Make sure to install dependencies:

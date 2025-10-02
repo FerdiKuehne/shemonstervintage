@@ -10,12 +10,7 @@ let $three;
 
 onMounted(async () => {
 
-  if (!import.meta.dev) {
-    $three = useNuxtApp().$three;
-    await $three.ready;
-    await nextTick();
-    homeCameraShift($three.camera);
-  } 
+
   
 });
 </script>
