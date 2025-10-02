@@ -21,16 +21,8 @@ vec3 samplePano(vec3 dir, vec3 rot) {
     dir = normalize(applyEulerXYZ(dir, rot));
     float u = fract(atan(dir.z, dir.x) / (2.0 * PI) + 0.5);
     float v = clamp(asin(clamp(dir.y, -1.0, 1.0)) / PI + 0.5, 0.0, 1.0);
-
-    vec3 srgbCol = texture2D(pano, vec2(u, v)).rgb;
-
-    // Convert sRGB → linear
-    vec3 linearCol = pow(srgbCol, vec3(2.2));
-
-    return linearCol;
+    return texture2D(pano, vec2(u, v)).rgb;
 }
-
-
 void main() {
     vec2 ndc = (gl_FragCoord.xy / resolution) * 2.0 - 1.0;
     vec3 dir = rayFromNDC(ndc);
