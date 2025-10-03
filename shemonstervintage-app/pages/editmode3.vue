@@ -31,6 +31,7 @@ import {
   createMinimap,
   drawMinimap,
 } from "@/components/pano3dTool/minimap/minimap.js";
+import { openRoomEditor } from "@/components/pano3dTool/minimap/roomEditor.js";
 import { CAMERA_RADIUS,SPHERE_RADIUS, DEFAULT_SIZE} from "~/components/pano3dTool/constants";
 /* End Minimap */
 
@@ -502,6 +503,10 @@ onMounted(async () => {
   /* ---------- Minimap (korrekte Skalierung) ---------- */
 
   const { mini, mctx } = createMinimap();
+
+  mini.addEventListener("dblclick", () => {
+    openRoomEditor({ mini, gridMesh, gridMat, cubes, params });
+  });
 
   const  getMiniTransform = ()=> {
     const W = mini.width,
