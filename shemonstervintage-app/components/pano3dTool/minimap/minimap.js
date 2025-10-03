@@ -1,40 +1,54 @@
-// minimap.js
+// minimap.js (ersetzt deine Datei komplett)
 import { SPHERE_RADIUS } from "../constants.js";
 import { Vector3 } from "three";
 
-/* ---------- Look & Feel ---------- */
+/* ---------- Farben/Style ---------- */
 const COLORS = {
   bg: "#0e0e10",
-  grid: "rgba(170, 190, 210, 0.32)",       // etwas heller/dezenter
-  axes: "rgba(255, 226, 138, 0.55)",       // dezente Achsen
-  circleDynamic: "rgba(100, 180, 255, 0.45)", // skaliert mit h
-  circleFixed: "rgba(255, 255, 255, 0.18)",   // fixer Referenz-Kreis
-  centerDot: "rgba(255,255,255,0.85)",
+  grid: "rgba(170,190,210,0.28)",
+  axes: "rgba(255,226,138,0.65)",
+  circleDynamic: "rgba(100,180,255,0.55)",
+  circleFixed: "rgba(255,255,255,0.20)",
+  centerDot: "rgba(255,255,255,0.90)",
   cubeOutline: "#222",
   cubeOutlineActive: "#ffd400",
 };
+const LINE = { grid: 1, axes: 2, cDyn: 2, cFix: 1.5 };
 
-const LINE_WIDTHS = {
-  grid: 1,
-  axes: 2,
-  circleDynamic: 2,
-  circleFixed: 1.5,
-};
+/* ---------- DPI / Transform ---------- */
+export function resizeMiniToDPR(mini) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = mini.getBoundingClientRect();
+  mini.style.width = rect.width + "px";
+  mini.style.height = rect.height + "px";
+  mini.width  = Math.max(1, Math.round(rect.width  * dpr));
+  mini.height = Math.max(1, Math.round(rect.height * dpr));
+  // Wichtig: Context in CSS-Pixeln betreiben
+  const ctx = mini.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return ctx;
+}
 
-/* ---------- Helpers ---------- */
-function getMiniTransform(mini) {
-  const W = mini.width;
-  const H = mini.height;
+/* ---------- Koordinaten-Helper (inkl. Pan) ---------- */
+export function getMiniTransform(mini, miniPan) {
+  const dpr = window.devicePixelRatio || 1;
+  const W = mini.width / dpr;
+  const H = mini.height / dpr;
   const marginPx = 10;
   const pxPerMeter = (Math.min(W, H) * 0.5 - marginPx) / SPHERE_RADIUS;
-  const cx = W * 0.5;
-  const cy = H * 0.5;
+  const cx = W * 0.5 + (miniPan?.x ?? 0);
+  const cy = H * 0.5 + (miniPan?.y ?? 0);
   return { W, H, cx, cy, pxPerMeter, marginPx };
 }
 
-function worldXZToMini(x, z, mini) {
-  const { pxPerMeter, cx, cy } = getMiniTransform(mini);
+export function worldXZToMiniCSS(x, z, mini, miniPan) {
+  const { pxPerMeter, cx, cy } = getMiniTransform(mini, miniPan);
   return { x: x * pxPerMeter + cx, y: z * pxPerMeter + cy };
+}
+
+export function miniCSSToWorldXZ(mini, px, py, miniPan) {
+  const { pxPerMeter, cx, cy } = getMiniTransform(mini, miniPan);
+  return { x: (px - cx) / pxPerMeter, z: (py - cy) / pxPerMeter };
 }
 
 /* ---------- API ---------- */
@@ -44,102 +58,93 @@ export function createMinimap() {
   return { mini, mctx };
 }
 
-export function drawMinimap(mini, mctx, gridMesh, gridMat, cubes, params) {
-  const { W, H, cx, cy, pxPerMeter } = getMiniTransform(mini);
+/**
+ * Unendlich pannbares Grid:
+ * - Linien werden viewport-gefüllt gezeichnet.
+ * - Startposition nutzt modulo mit Pan-Offset ⇒ kein Drift/Gap.
+ */
+export function drawMinimapPannable(mini, mctx, gridMesh, gridMat, cubes, params, miniPan) {
+  const { W, H, cx, cy, pxPerMeter } = getMiniTransform(mini, miniPan);
+  const halfW = W * 0.5, halfH = H * 0.5;
 
-  // Hintergrund
-  mctx.clearRect(0, 0, W, H);
+  // Hintergrund reset in CSS-Pixeln
+  mctx.setTransform(1, 0, 0, 1, 0, 0);
+  mctx.clearRect(0, 0, mini.width, mini.height);
   mctx.fillStyle = COLORS.bg;
-  mctx.fillRect(0, 0, W, H);
+  mctx.fillRect(0, 0, mini.width, mini.height);
 
+  // In CSS-Pixeln weiterzeichnen, Ursprung = (cx, cy)
   mctx.save();
   mctx.translate(cx, cy);
 
-  // Maximaler Pixel-Radius bei h = 0 (breiteste Stelle der Sphere)
-  const rPxMax = SPHERE_RADIUS * pxPerMeter;
+  // Schrittweite in Pixeln (weltmetergenau)
+  const spacingMeters = gridMat.uniforms.spacing.value;
+  const stepPx = Math.max(1, spacingMeters * pxPerMeter);
 
-  // Dynamischer Schnittkreis (skaliert mit h)
-  const h = gridMesh.position.y;
-  const rEff = Math.max(0, Math.sqrt(Math.max(SPHERE_RADIUS * SPHERE_RADIUS - h * h, 0)));
-  const rPxDynamic = rEff * pxPerMeter;
+  // modulo-Start, damit Linien immer „einrasten“, auch bei Pan
+  const startX = -halfW - ((-halfW) % stepPx);
+  const endX   =  halfW;
+  const startY = -halfH - ((-halfH) % stepPx);
+  const endY   =  halfH;
 
-  // Fester Referenz-Kreis (NICHT skaliert)
-  const rPxFixed = rPxMax;
-
-  // ---- Grid (FIX: orientiert sich am festen Radius, NICHT an rPxDynamic) ----
-  // Schrittweite bleibt in Weltmetern konstant -> in Pixeln via pxPerMeter
-  const stepPx = Math.max(1, gridMat.uniforms.spacing.value * pxPerMeter);
-  const count = Math.floor(rPxFixed / stepPx);
-
+  // Grid
   mctx.strokeStyle = COLORS.grid;
-  mctx.lineWidth = LINE_WIDTHS.grid;
-  for (let i = -count; i <= count; i++) {
-    const x = i * stepPx;
-    mctx.beginPath();
-    mctx.moveTo(x, -rPxFixed);
-    mctx.lineTo(x, rPxFixed);
-    mctx.stroke();
-
-    const z = i * stepPx;
-    mctx.beginPath();
-    mctx.moveTo(-rPxFixed, z);
-    mctx.lineTo(rPxFixed, z);
-    mctx.stroke();
+  mctx.lineWidth = LINE.grid;
+  for (let x = startX; x <= endX + 0.5; x += stepPx) {
+    mctx.beginPath(); mctx.moveTo(x, -halfH); mctx.lineTo(x, halfH); mctx.stroke();
+  }
+  for (let y = startY; y <= endY + 0.5; y += stepPx) {
+    mctx.beginPath(); mctx.moveTo(-halfW, y); mctx.lineTo(halfW, y); mctx.stroke();
   }
 
-  // ---- Achsen (ebenfalls fix bis zum festen Radius) ----
+  // Achsen (laufen mit Pan mit)
   mctx.strokeStyle = COLORS.axes;
-  mctx.lineWidth = LINE_WIDTHS.axes;
-  mctx.beginPath(); mctx.moveTo(-rPxFixed, 0); mctx.lineTo(rPxFixed, 0); mctx.stroke();
-  mctx.beginPath(); mctx.moveTo(0, -rPxFixed); mctx.lineTo(0, rPxFixed); mctx.stroke();
+  mctx.lineWidth = LINE.axes;
+  mctx.beginPath(); mctx.moveTo(-halfW, 0); mctx.lineTo(halfW, 0); mctx.stroke();
+  mctx.beginPath(); mctx.moveTo(0, -halfH); mctx.lineTo(0, halfH); mctx.stroke();
 
-  // ---- Fixer Kreis (bleibt gleich groß; bei Start == dynamischer Kreis) ----
+  // Kreise
+  const rPxFixed   = SPHERE_RADIUS * pxPerMeter;
+  const h          = gridMesh.position.y;
+  const rEff       = Math.max(0, Math.sqrt(Math.max(SPHERE_RADIUS * SPHERE_RADIUS - h * h, 0)));
+  const rPxDynamic = rEff * pxPerMeter;
+
   mctx.strokeStyle = COLORS.circleFixed;
-  mctx.lineWidth = LINE_WIDTHS.circleFixed;
-  mctx.beginPath();
-  mctx.arc(0, 0, rPxFixed, 0, Math.PI * 2);
-  mctx.stroke();
+  mctx.lineWidth = LINE.cFix;
+  mctx.beginPath(); mctx.arc(0, 0, rPxFixed, 0, Math.PI * 2); mctx.stroke();
 
-  // ---- Dynamischer Kreis (Schnitt mit Kugel, skaliert mit h) ----
   mctx.strokeStyle = COLORS.circleDynamic;
-  mctx.lineWidth = LINE_WIDTHS.circleDynamic;
-  mctx.beginPath();
-  mctx.arc(0, 0, rPxDynamic, 0, Math.PI * 2);
-  mctx.stroke();
+  mctx.lineWidth = LINE.cDyn;
+  mctx.beginPath(); mctx.arc(0, 0, rPxDynamic, 0, Math.PI * 2); mctx.stroke();
 
   // Mittelpunkt
   mctx.fillStyle = COLORS.centerDot;
-  mctx.beginPath();
-  mctx.arc(0, 0, 3, 0, Math.PI * 2);
-  mctx.fill();
+  mctx.beginPath(); mctx.arc(0, 0, 3, 0, Math.PI * 2); mctx.fill();
 
-  // ---- Würfel (ohne zusätzliche Skalierung) ----
+  // Würfel (inkl. Pan)
   cubes.forEach((c) => {
-    const hx = c.sizes.x * 0.5;
-    const hy = c.sizes.y * 0.5;
-    const hz = c.sizes.z * 0.5;
-
+    const hx = c.sizes.x * 0.5, hy = c.sizes.y * 0.5, hz = c.sizes.z * 0.5;
     const cornersLocal = [
       new Vector3(-hx, -hy, -hz),
       new Vector3( hx, -hy, -hz),
       new Vector3( hx, -hy,  hz),
       new Vector3(-hx, -hy,  hz),
     ];
-
-    const pts = cornersLocal.map((v) => {
+    const ptsAbs = cornersLocal.map((v) => {
       const w = v.clone().applyQuaternion(c.mesh.quaternion).add(c.mesh.position);
-      return worldXZToMini(w.x, w.z, mini);
+      return worldXZToMiniCSS(w.x, w.z, mini, miniPan);
     });
+
+    // Da wir am Anfang (cx,cy) ins lokale (0,0) verschoben haben:
+    const pts = ptsAbs.map(p => ({ x: p.x - cx, y: p.y - cy }));
 
     mctx.fillStyle = c.state?.color || "#5a7dff";
     mctx.strokeStyle = c.id === params.activeId ? COLORS.cubeOutlineActive : COLORS.cubeOutline;
     mctx.lineWidth = c.id === params.activeId ? 3 : 1;
 
     mctx.beginPath();
-    mctx.moveTo(pts[0].x - cx, pts[0].y - cy);
-    for (let i = 1; i < pts.length; i++) {
-      mctx.lineTo(pts[i].x - cx, pts[i].y - cy);
-    }
+    mctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) mctx.lineTo(pts[i].x, pts[i].y);
     mctx.closePath();
     mctx.fill();
     mctx.stroke();
@@ -147,4 +152,3 @@ export function drawMinimap(mini, mctx, gridMesh, gridMat, cubes, params) {
 
   mctx.restore();
 }
-
