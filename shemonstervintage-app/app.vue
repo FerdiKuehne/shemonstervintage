@@ -35,6 +35,9 @@
     <NuxtLayout />
   </div>
 
+
+   <canvas id="minimap" width="440" height="440"></canvas>
+
   <footer>
     <ul class="footer-nav">
       <li><NuxtLink to="/Datenschutz">Privacy Policy</NuxtLink></li>
@@ -236,6 +239,27 @@ ul.main-nav li:hover:after {
   height: 100%;
   z-index: 0;
   background: transparent;
+}
+
+
+canvas {
+  display: block;
+}
+#minimap {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 10000;
+  width: 220px;
+  height: 220px;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  background: #0e0e10;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  cursor: crosshair;
+}
+#minimap.dragging {
+  cursor: grabbing;
 }
 
 footer {

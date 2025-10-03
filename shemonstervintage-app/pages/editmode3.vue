@@ -5,7 +5,7 @@
       <button id="spawn" class="btn">＋ New Cube</button>
       <button id="resetView" class="btn">↺ Reset Position</button>
     </div>
-    <canvas id="minimap" width="440" height="440"></canvas>
+
   </div>
 </template>
 
@@ -684,25 +684,7 @@ body {
   background: linear-gradient(180deg, var(--active), var(--bg2));
   transform: translateY(0);
 }
-canvas {
-  display: block;
-}
-#minimap {
-  position: fixed;
-  left: 10px;
-  bottom: 10px;
-  z-index: 10000;
-  width: 220px;
-  height: 220px;
-  border: 1px solid #2a2a2a;
-  border-radius: 8px;
-  background: #0e0e10;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  cursor: crosshair;
-}
-#minimap.dragging {
-  cursor: grabbing;
-}
+
 .lil-gui .folder.active-cube > .title {
   background: linear-gradient(90deg, #244cff, #0f1a3a) !important;
   color: #fff !important;
