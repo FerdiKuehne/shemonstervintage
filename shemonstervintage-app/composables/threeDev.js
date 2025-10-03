@@ -44,7 +44,7 @@ async function init(
   // Scene
   const scene = new Scene();
 
-  const dl = new DirectionalLight(0x00ffff, 1000.7);
+  const dl = new DirectionalLight(0xffffff, 0.7);
   dl.position.set(1, 1, 1);
 
   scene.add(new HemisphereLight(0xffffff, 0x222233, 1.0));
