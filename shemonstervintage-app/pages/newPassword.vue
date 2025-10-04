@@ -1,5 +1,6 @@
 <template>
-    <div>
+  <div class="password-wrapper">
+    <div class="password">
       <h3>{{  $t("newPassword.title") }}</h3>
       
       <div class="cofirmation-input-group">
@@ -25,6 +26,7 @@
       <button @click="resetPassword">{{ $t("newPassword.submit") }}</button>
       <div>{{ $t("newPassword.passwordResetSuccess") }}</div>
     </div>
+   </div>div> 
   </template>
 
 
@@ -76,40 +78,19 @@ const resetPassword = async () => {
 
 <style scoped>
 
-.cofirmation-input-group {
-  position: relative;
-  margin-bottom: 1.5rem;
+.password-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100vh;
 }
 
-.cofirmation-input {
-  font-size: 16px;
-  padding: 10px 10px 10px 5px;
-  display: block;
-  width: 200px;
-  outline: none;
-  border: none;
-  border-bottom: 1px solid #515151;
-  background: transparent;
+.password {
+  width: 400px;
+  border: 1px solid #000;
+  padding: 1rem;
 }
 
-.cofirmation-label {
-  position: absolute;
-  pointer-events: none;
-  top: 10px;
-  left: 5px;
-  transition: top 1s ease, font-size 0.6s ease, color 0.4s ease;
-}
 
-.cofirmation-input:focus ~ .cofirmation-label,
-.cofirmation-input:not(:placeholder-shown) ~ .cofirmation-label  {
-  top: -10px;
-  font-size: 14px;
-  color: #515151;
-}
-
-.cofirmation-input:focus {
-  border-width: 2px;
-  border-color: #515151;
-  box-shadow: inset 0 -3px 5px -3px #fffefe; /* only bottom */
-}
 </style>
