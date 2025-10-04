@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS customer_preferences (
     color VARCHAR(50) DEFAULT NULL,          -- e.g., Black, White
     style VARCHAR(100) DEFAULT NULL,         -- e.g., Casual, Formal
     brand VARCHAR(100) DEFAULT NULL,         -- e.g., Nike, Gucci
-    year YEAR DEFAULT NULL,                   -- e.g., 2018
+    year YEAR DEFAULT NULL,                  -- e.g., 2018
+    owner_note TEXT DEFAULT NULL,            -- only visible/editable by admins
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT fk_customer_pref FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE

@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS customers (
     street VARCHAR(100) DEFAULT NULL,
     street_number VARCHAR(10) DEFAULT NULL,
     city VARCHAR(100) DEFAULT NULL,
-    country CHAR(2) DEFAULT NULL,
+    country CHAR(2) DEFAULT NULL,  -- ISO code (e.g., "DE", "US")
     phone VARCHAR(20) DEFAULT NULL,
     instagram VARCHAR(50) DEFAULT NULL,
     is_active BOOLEAN DEFAULT TRUE,
@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS customers (
     last_login TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,  -- for soft-deletes
     
     INDEX idx_customer_username (username),
     INDEX idx_customer_email (email)
