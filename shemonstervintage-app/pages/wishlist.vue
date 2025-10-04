@@ -1,6 +1,8 @@
 <template>
   <div class="wishlist">
-    <h2>Wishlist Page - Coming Soon!</h2>
+
+    <div class="wishlist-item-wrapper">
+    <h2>Your Wishlist</h2>
     <div v-for="(item, i) in testData" :key="item.id" class="wishlist-item">
       <div
         @click="removeItem(item.id)"
@@ -31,15 +33,17 @@
         />
         <img
           :src="`https://picsum.photos/800/900?random=${i + 1}`"
-          :alt="item.name"
-          style="width: 200px; height: auto"
+          :alt="item.name" class="wishlist-item-image"
         />
       </picture>
-      <div class="whishlist-beschreibung">{{ item.description }}</div>
-      <div class="whishlist-materialien">
-        Price: ${{ item.price.toFixed(2) }}
-      </div>
+      <div class="item-details">
+        <div class="whishlist-beschreibung">{{ item.description }}</div>
+        <div class="whishlist-materialien">
+          Price: ${{ item.price.toFixed(2) }}
+        </div>
+      </div> 
     </div>
+  </div> 
     <div class="whishlist-empty" v-if="testData.length === 0">
       <p>Your wishlist is empty.</p>
     </div>
@@ -202,18 +206,59 @@ const testData = ref([
 ]);
 </script>
 <style scoped>
+
+
 .wishlist {
   position: absolute; /* float above 3D background */
-  top: 5rem; /* adjust spacing from top */
-  left: 50%;
-  transform: translateX(-50%);
-  width: 80%;
-  height: 70vh; /* fixed height panel */
-  overflow-y: auto; /* internal scroll */
-  background-color: rgba(0, 255, 255, 0.9);
-  padding: 2rem;
-  border-radius: 1rem;
+  top: 0; /* adjust spacing from top */
+  right: 0;
+  width: 420px;
+  height: 100vh; /* fixed height panel */
+
+  background-color: rgb(255 255 255 / 0%);
+  backdrop-filter: blur(10px);
   z-index: 1000; /* above Three.js canvas */
+}
+
+.wishlist-item-wrapper {
+  overflow-y: auto; /* internal scroll */
+  padding: 1rem 1rem 8.5rem 1rem;
+  height: 100vh;
+  width: 100%;
+}
+
+.wishlist h2 {
+  color: #fff;
+}
+
+.wishlist-item {
+  display: flex;
+  position: relative;
+  margin-bottom: 1rem;
+  background-color: #fff;
+}
+
+.item-details {
+  padding: 1rem;
+}
+
+.wishlist-item-image {
+  width: 150px;
+  height: auto;
+}
+
+.remove-item {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+}
+
+.wishlist-actions {
+  position: fixed;
+  bottom: 0;
+  background-color: #fff;
+  padding: 1rem 1rem 3rem 1rem;
+  width: 100%;
 }
 
 .whishlist-beschreibung::selection {
