@@ -203,14 +203,13 @@ onMounted(() => {
 
 
 .hammer {
-  animation: hit 0.3s ease-out;
+  animation: typewriterTap 0.2s cubic-bezier(0.33, 1, 0.68, 1); /* springy feel */
 }
 
-@keyframes hit {
-  0%   { transform: scale(1); }
-  25%  { transform: scale(0.95); }
-  50%  { transform: scale(0.98); }
-  75%  { transform: scale(1.05); }
-  100% { transform: scale(1); }
+@keyframes typewriterTap {
+  0%   { transform: scaleY(1) translateY(0); }
+  30%  { transform: scaleY(0.85) translateY(2px); } /* key press down */
+  60%  { transform: scaleY(1.05) translateY(-1px); } /* slight bounce back */
+  100% { transform: scaleY(1) translateY(0); } /* rest */
 }
 </style>
