@@ -7,7 +7,7 @@
           <div class="cofirmation-input-group">
             <input
               v-model="person.username"
-              class="cofirmation-input"
+              class="cofirmation-input hammer-input"
               type="text"
               placeholder=" "
             />
@@ -20,7 +20,9 @@
               type="text"
               placeholder=" "
             />
-            <label class="cofirmation-label">{{ $t("person.firstname") }}</label>
+            <label class="cofirmation-label">{{
+              $t("person.firstName")
+            }}</label>
           </div>
           <div class="cofirmation-input-group">
             <input
@@ -56,7 +58,9 @@
               type="text"
               placeholder=" "
             />
-            <label class="cofirmation-label">{{ $t("person.instagram") }}</label>
+            <label class="cofirmation-label">{{
+              $t("person.instagram")
+            }}</label>
           </div>
           <div class="cofirmation-input-group">
             <input
@@ -120,8 +124,8 @@
           </div>
         </div>
       </div>
-     </div>
     </div>
+  </div>
 </template>
 
 <script setup>
@@ -167,10 +171,22 @@ const register = async () => {
     console.error("Fehler bei der Registrierung:", error);
   }
 };
+
+onMounted(() => {
+  const inputs = document.querySelectorAll(".hammer-input");
+
+  inputs.forEach((input) => {
+    input.addEventListener("input", () => {
+      // restart hammer animation on every keystroke
+      input.classList.remove("hammer");
+      void input.offsetWidth; // force reflow
+      input.classList.add("hammer");
+    });
+  });
+});
 </script>
 
 <style scoped>
-
 .register-wrapper {
   display: flex;
   align-items: center;
@@ -185,4 +201,16 @@ const register = async () => {
   padding: 1rem;
 }
 
+
+.hammer {
+  animation: hit 0.3s ease-out;
+}
+
+@keyframes hit {
+  0%   { transform: scale(1); }
+  25%  { transform: scale(0.95); }
+  50%  { transform: scale(0.98); }
+  75%  { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
 </style>
