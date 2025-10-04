@@ -288,12 +288,13 @@ const testData = ref([
 }
 
 .item-details {
-  padding: 1rem;
+  padding: 1rem 1rem 1rem 0;
 }
 
 .wishlist-item-image {
   width: 150px;
   height: auto;
+  margin: 1rem;
 }
 
 .remove-item {
