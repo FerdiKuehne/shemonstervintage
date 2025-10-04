@@ -312,6 +312,12 @@ const testData = ref([
   border-top: 1px solid #000;
 }
 
+.whishlist-empty {
+  position: absolute;
+  top: calc(80px + 1rem);
+  left: 1rem;
+}
+
 .whishlist-beschreibung::selection {
   color: white;
   background: black;
