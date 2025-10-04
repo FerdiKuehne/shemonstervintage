@@ -5,6 +5,41 @@
     "wunschliste": "Wishlist",
     "visitUndKontakt": "Contact & Visit"
   },
+"newPassword": {
+    "title": "Reset Password",
+     "newPassword": "New Password",
+    "confirmNewPassword": "Confirm New Password",
+    "submit": "Submit",
+    "passwordResetSuccess": "Your password has been successfully reset. You can now log in with your new password."
+
+},
+
+  "passwordReset": {
+      "title": "Reset Password",
+      "subtitle": "Enter your email address to receive a link to reset your password.",
+      "email": "Email Address",
+      "sendLink": "Send Link",
+      "backToLogin": "Back to Login",
+      "checkInbox": "Check Your Inbox",
+      "linkSent": "A link to reset your password has been sent to your email address.",
+      "resetPassword": "Reset Password",
+      "newPassword": "New Password",
+      "confirmNewPassword": "Confirm New Password",
+      "submit": "Submit",
+      "passwordResetSuccess": "Your password has been successfully reset. You can now log in with your new password."
+  },
+  "login":{
+      "title":"Login",
+      "subtitle":"Welcome back! Please log in.",
+      "noAccount":"Don't have an account?",
+      "register":"Register",
+      "username":"Username",
+      "email":"Email",
+      "password":"Password",
+      "forgotPassword":"Forgot Password?",
+      "loggedIn":"You are already logged in.",
+      "goToHome":"Go to Home"
+  },
   "person": {
       "firstName": "First Name",
       "surname": "Surname",
