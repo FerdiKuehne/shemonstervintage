@@ -1,6 +1,7 @@
 <template>
-  <div>
-    <h1>{{ $t("login.title") }}</h1>
+  <div class="login-wrapper">
+    <div class="login">
+      <h1>{{ $t("login.title") }}</h1>
    
       <form @submit.prevent="login">
         <div class="cofirmation-input-group">
@@ -32,6 +33,7 @@
         <button type="submit">Login</button>
         <p v-if="error">{{ error }}</p>
       </form>
+    </div>
   </div>
 </template>
 <script setup>
@@ -77,6 +79,21 @@ async function login() {
 </script>
 
 <style scoped>
+
+.login-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100vh;
+}
+
+.login {
+  width: 400px;
+  border: 1px solid #000;
+  padding: 1rem;
+}
+
 .cofirmation-input-group {
   position: relative;
   margin-bottom: 1.5rem;
@@ -86,7 +103,7 @@ async function login() {
   font-size: 16px;
   padding: 10px 10px 10px 5px;
   display: block;
-  width: 200px;
+  width: 100%;
   outline: none;
   border: none;
   border-bottom: 1px solid #515151;
