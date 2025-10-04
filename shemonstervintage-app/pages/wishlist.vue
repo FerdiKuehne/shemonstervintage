@@ -7,16 +7,16 @@
        <button class="wishlist-btn-close" @click="closePopup">
       <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="56"
-          height="56"
+          width="48"
+          height="48"
           class=""
-          viewBox="0 0 56 56"
+          viewBox="0 0 48 48"
           stroke="#000000"
           stroke-miterlimit="10"
         >
 
-        <line class="st0" x1="1.672" y1="1.672" x2="54.537" y2="54.537"/>
-        <line class="st0" x1="54.537" y1="1.672" x2="1.672" y2="54.537"/>
+        <line x1="1.672" y1="1.672" x2="46.746" y2="46.746"/>
+        <line x1="46.7467" y1="1.672" x2="1.672" y2="46.746"/>
        </svg>
 
        </button>
