@@ -1,7 +1,7 @@
 <template>
   
-
-   <div class="logo">SHEMONSTER</div>
+  <!--
+     <div class="logo">SHEMONSTER</div>
     <header>
     <ul class="main-nav">
       <li @click="moveCamera"><span class="num">01</span> Home</li>
@@ -19,6 +19,10 @@
       </li>
     </ul>
   </header>
+  
+  
+  -->
+
 
  
   

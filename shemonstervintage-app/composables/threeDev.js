@@ -58,7 +58,7 @@ async function init(
     1000
   );
   
-  camera.position.set(0, 0, CAMERA_RADIUS);
+  camera.position.set(0, 0, 4);
 
   // Renderer
   const renderer = new WebGLRenderer({ antialias:true });
