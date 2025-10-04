@@ -2,7 +2,25 @@
   <div class="wishlist">
 
     <div class="wishlist-item-wrapper">
-    <h2>Your Wishlist</h2>
+    <div class="wishlist-header">
+      <h2>Your Wishlist</h2>
+       <button class="wishlist-btn-close" @click="closePopup">
+      <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="48"
+          height="48"
+          class=""
+          viewBox="0 0 48 48"
+          stroke="#000000"
+          stroke-miterlimit="10"
+        >
+
+        <line x1="1.672" y1="1.672" x2="46.746" y2="46.746"/>
+        <line x1="46.7467" y1="1.672" x2="1.672" y2="46.746"/>
+       </svg>
+
+       </button>
+    </div>
     <div v-for="(item, i) in testData" :key="item.id" class="wishlist-item">
       <div
         @click="removeItem(item.id)"
@@ -55,7 +73,6 @@
       </h3>
       <button @click="testData = []">Clear Wishlist</button>
       <button @click="sendWishlist">Send</button>
-      <button @click="closePopup">Close</button>
     </div>
 
     <div v-if="openConfirmPopup" class="conformation-popup">
@@ -209,42 +226,75 @@ const testData = ref([
 
 
 .wishlist {
-  position: absolute; /* float above 3D background */
+  position: fixed; /* float above 3D background */
   top: 0; /* adjust spacing from top */
   right: 0;
   width: 420px;
   height: 100vh; /* fixed height panel */
-
-  background-color: rgb(255 255 255 / 0%);
   backdrop-filter: blur(10px);
+  border-left: 1px solid #000;
   z-index: 1000; /* above Three.js canvas */
 }
 
 .wishlist-item-wrapper {
   overflow-y: auto; /* internal scroll */
-  padding: 1rem 1rem 8.5rem 1rem;
+  padding: 79px 0 135px 0;
+  border-top: 1px solid #000;
   height: 100vh;
+  width: 420px;
+}
+
+.wishlist-item-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.wishlist-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  background-color: #ffffff;
   width: 100%;
+  height: 80px;
+  padding: 1rem;
+  border-bottom: 1px solid #000;
+  display: flex
+;
+    align-items: center;
 }
 
 .wishlist h2 {
-  color: #fff;
+  color: #000000;
+  margin: 0;;
+}
+
+.wishlist-btn-close {
+  position: absolute;
+  top: .75rem;
+  right: .75rem;
+  width: 56px;
+  height: 56px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  padding: 0;
 }
 
 .wishlist-item {
   display: flex;
   position: relative;
-  margin-bottom: 1rem;
+  border-bottom: 1px solid #000;
   background-color: #fff;
 }
 
 .item-details {
-  padding: 1rem;
+  padding: 1rem 1rem 1rem 0;
 }
 
 .wishlist-item-image {
   width: 150px;
   height: auto;
+  margin: 1rem;
 }
 
 .remove-item {
@@ -259,6 +309,13 @@ const testData = ref([
   background-color: #fff;
   padding: 1rem 1rem 3rem 1rem;
   width: 100%;
+  border-top: 1px solid #000;
+}
+
+.whishlist-empty {
+  position: absolute;
+  top: calc(80px + 1rem);
+  left: 1rem;
 }
 
 .whishlist-beschreibung::selection {

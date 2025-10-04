@@ -139,6 +139,14 @@ onMounted(async () => {
 });
 </script>
 
+<style>
+body::-webkit-scrollbar {
+  display: none;
+}
+
+</style>
+
+
 <style scoped>
 *,
 *:after,
@@ -147,6 +155,7 @@ onMounted(async () => {
   padding: 0;
   box-sizing: border-box;
 }
+
 
 .logo {
   position: fixed;
@@ -232,6 +241,10 @@ ul.main-nav li:hover:after {
   overflow-x: hidden;
   position: relative;   /* relative positioning */
   z-index: 0;           /* above the canvas */
+}
+
+.scroller::-webkit-scrollbar {
+  display: none;
 }
 
 .three-container {

@@ -53,4 +53,3 @@ onMounted(async () => {
 });
 </script>
 
-<style scoped></style>
