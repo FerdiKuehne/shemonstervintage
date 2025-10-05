@@ -50,7 +50,7 @@ function ensureEditorStyles() {
                       box-shadow: 0 6px 18px rgba(0,0,0,.35); }
     .re-zoom-label { font: 600 10px system-ui; color: #aab1c5; }
     .re-zoom-val   { font: 700 10px system-ui; color: #e6ebff; min-width: 38px; text-align: right; }
-    .re-zoom-range { width: 200px; height: 18px; }
+    .re-zoom-range { width: 200px; height: 18px; outline: none; }
 
     /* Measure Tooltip an der Maus */
     .re-measure { position: absolute; z-index: 3; padding: 2px 6px; border-radius: 6px;
