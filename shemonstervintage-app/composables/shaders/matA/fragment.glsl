@@ -23,7 +23,8 @@ vec3 samplePano(vec3 dir, vec3 rot) {
     float v = clamp(asin(clamp(dir.y, -1.0, 1.0)) / PI + 0.5, 0.0, 1.0);
     return texture2D(pano, vec2(u, v)).rgb;
 }
-void main() {
+
+/*void main() {
     vec2 ndc = (gl_FragCoord.xy / resolution) * 2.0 - 1.0;
     vec3 dir = rayFromNDC(ndc);
     vec3 panoCol = samplePano(dir, rotXYZ);
@@ -32,4 +33,9 @@ void main() {
     if(all(greaterThanEqual(uvRect, vec2(0.0))) && all(lessThanEqual(uvRect, vec2(1.0))))
         objCol = texture2D(objTex, uvRect);
     gl_FragColor = vec4(mix(panoCol, objCol.rgb, objCol.a), 1.0);
+}
+*/
+
+void main() {
+  gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0); // Bright magenta
 }

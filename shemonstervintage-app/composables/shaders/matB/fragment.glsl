@@ -3,6 +3,7 @@ varying vec2 vUv;
 uniform sampler2D src;
 uniform vec2 resolution;
 uniform float k1, k2;
+/*
 void main() {
     vec2 c = vec2(0.5);
     vec2 xy = vUv - c;
@@ -17,4 +18,9 @@ void main() {
         gl_FragColor = vec4(0.0);
     else
         gl_FragColor = texture2D(src, uv);
+}
+*/
+
+void main() {
+  gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0); // Bright magenta
 }

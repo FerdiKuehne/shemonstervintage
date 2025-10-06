@@ -6,6 +6,7 @@
     <li><NuxtLink to="/register">Register </NuxtLink></li>
     <li><button @click="isWishlistOpen = true">Wishlist</button></li>
   </ul>
+
   <header>
     <ul class="main-nav">
       <li>
@@ -236,6 +237,7 @@ ul.main-nav li:hover:after {
 }
 
 .three-container {
+   border: 5px solid red !important;
   pointer-events: auto;
   position: fixed;
   top: 0;

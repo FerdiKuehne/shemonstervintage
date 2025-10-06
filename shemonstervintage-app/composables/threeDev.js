@@ -71,7 +71,7 @@ async function init(
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  document.getElementById("three-root").appendChild(renderer.domElement);
+  container.appendChild(renderer.domElement);
   renderer.domElement.setAttribute("tabindex", "0");
   renderer.domElement.addEventListener("click", () =>
     renderer.domElement.focus()
@@ -167,6 +167,10 @@ async function init(
     },
   });
 
+renderer.domElement.style.display = 'block'
+
+  console.log("Canvas size:", renderer.domElement.width, renderer.domElement.height);
+
   console.log({pano});
   console.log("PANO DB: ", pano.db);
   console.log("PANO sceneB: ", pano.screenSceneB);
@@ -180,9 +184,7 @@ async function init(
 
   function animate() {
     if (animateObjects.length > 0) {
-      animateObjects.forEach((cb) => {
-        cb;
-      });
+      animateObjects.forEach((cb) => cb());
     }
     controls?.update();
 
@@ -209,14 +211,19 @@ async function init(
       renderer.clear(true, true, true);
       renderer.render(scene, camera);
       renderer.setRenderTarget(prev);
-
+      
       renderer.setRenderTarget(pano.rtCombined);
       renderer.clear(true, true, true);
       renderer.render(pano.screenSceneA, pano.fsCam);
       renderer.setRenderTarget(null);
-
+      
+      /*
       pano.passBMat.uniforms.src.value = pano.rtCombined.texture;
       renderer.render(pano.screenSceneB, pano.fsCam);
+      */
+renderer.setClearColor(new Color('blue'), 1.0) ;
+ renderer.clear();
+
     } else {
       renderer.render(scene, camera);
     }

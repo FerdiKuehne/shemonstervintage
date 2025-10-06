@@ -85,7 +85,10 @@ export async function createBackgroundPanoFromAPI(
     depthTest: false,
     depthWrite: false,
   });
-  screenSceneA.add(new Mesh(new PlaneGeometry(2, 2), passAMat));
+  const quadA = new Mesh(new PlaneGeometry(2, 2), passAMat);
+
+  screenSceneA.add(quadA);
+  console.log("Added quad to screenSceneA:", quadA);
 
   const passBMat = new ShaderMaterial({
     uniforms: {
@@ -99,7 +102,11 @@ export async function createBackgroundPanoFromAPI(
     depthTest: false,
     depthWrite: false,
   });
-  screenSceneB.add(new Mesh(new PlaneGeometry(2, 2), passBMat));
+
+  const quadB = new Mesh(new PlaneGeometry(2, 2), passBMat);
+
+  screenSceneB.add(quadB);
+  console.log("Added quad to screenSceneA:", quadB);
 
   return {
     screenSceneB: screenSceneB,
