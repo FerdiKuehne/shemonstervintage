@@ -4,10 +4,9 @@ CREATE TABLE IF NOT EXISTS customer_preferences (
     category VARCHAR(100) NOT NULL,          -- e.g., Clothes, Shoes
     sub_category VARCHAR(100) DEFAULT NULL,  -- e.g., T-Shirts, Jeans
     size VARCHAR(10) DEFAULT NULL,           -- e.g., M, L, 42
-    color VARCHAR(50) DEFAULT NULL,          -- e.g., Black, White
     style VARCHAR(100) DEFAULT NULL,         -- e.g., Casual, Formal
     brand VARCHAR(100) DEFAULT NULL,         -- e.g., Nike, Gucci
-    year YEAR DEFAULT NULL,                  -- e.g., 2018
+    decade YEAR DEFAULT NULL,                  -- e.g., 2018
     owner_note TEXT DEFAULT NULL,            -- only visible/editable by admins
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     

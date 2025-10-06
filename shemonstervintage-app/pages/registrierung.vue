@@ -15,7 +15,7 @@
           </div>
           <div class="cofirmation-input-group">
             <input
-              v-model="person.firstname"
+              v-model="person.name"
               class="cofirmation-input"
               type="text"
               placeholder=" "
@@ -151,11 +151,9 @@ const person = ref({
 });
 
 const register = async () => {
-  // Hier können Sie die Registrierung verarbeiten, z.B. Daten an einen Server senden
-  console.log("Registrierungsdaten:", person.value);
-  // Beispiel: Senden der Daten an einen API-Endpunkt
+
   try {
-    const response = await fetch("/api/register", {
+    const response = await fetch("http://localhost:8000/register.php", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -163,9 +161,11 @@ const register = async () => {
       body: JSON.stringify(person.value),
     });
     if (response.ok) {
-      console.log("Registrierung erfolgreich");
+        const data = await response.json(); // 👈 read the stream here
+      console.log("Registrierung erfolgreich",data);
     } else {
-      console.error("Registrierung fehlgeschlagen");
+        const data = await response.json();
+      console.error("Registrierung fehlgeschlagen", data);
     }
   } catch (error) {
     console.error("Fehler bei der Registrierung:", error);
@@ -203,13 +203,14 @@ onMounted(() => {
 
 
 .hammer {
-  animation: typewriterTap 0.2s cubic-bezier(0.33, 1, 0.68, 1); /* springy feel */
+  animation: ease-in 0.3s typewriterTap;
+
 }
 
 @keyframes typewriterTap {
-  0%   { transform: scaleY(1) translateY(0); }
-  30%  { transform: scaleY(0.85) translateY(2px); } /* key press down */
-  60%  { transform: scaleY(1.05) translateY(-1px); } /* slight bounce back */
-  100% { transform: scaleY(1) translateY(0); } /* rest */
+  0%   { transform: scaleY(1); }
+  30%  { transform: scaleY(0.85) ; } /* key press down */
+  60%  { transform: scaleY(1.05) ; } /* slight bounce back */
+  100% { transform: scaleY(1); } /* rest */
 }
 </style>

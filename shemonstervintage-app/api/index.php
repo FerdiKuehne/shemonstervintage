@@ -22,6 +22,10 @@ switch ($path) {
         require __DIR__ . '/wishlists.php';
         break;
 
+    case '/api/v1/register.php':
+            require __DIR__ . '/register.php';
+            break;     
+
     default:
         http_response_code(404);
         echo json_encode(["error" => "Not found"]);
