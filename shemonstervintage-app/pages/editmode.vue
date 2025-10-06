@@ -41,7 +41,7 @@ definePageMeta({
 
 let scene, camera, renderer, controls;
 
-let cubesFolder; // GUI Folder for cubes
+let cubesFolder, guiRef; // GUI Folder for cubes
 
 let mouseNDC, raycaster, cubes, params, pickables;
 
@@ -235,9 +235,6 @@ onMounted(async () => {
   });
   screenSceneB.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), passBMat));
 
-  /* ---------- GUI ---------- */
-  /* const gui = new GUI({ title: "Pano Settings" }); */
-
   params = {
     rotX_deg: 0,
     rotY_deg: 0,
@@ -262,7 +259,6 @@ onMounted(async () => {
     );
   };
 
-  /* PANO Settings GUI Init */
   const { gui, cameraFovCtrl } = createPanoSettingsGUI(
     camera,
     passAMat,
@@ -270,6 +266,8 @@ onMounted(async () => {
     params,
     updateRot
   );
+
+guiRef= gui;
 
   /* --- Helper: Grid-Höhe zentral setzen --- */
   const setGridY = (v) => {
@@ -644,6 +642,13 @@ onMounted(async () => {
 
   /* ---------- Initial GUI Sync ---------- */
   syncCamInfoFromCamera();
+});
+
+onBeforeUnmount(() => {
+  if (guiRef) {
+    guiRef.destroy();
+    guiRef = null;
+  }
 });
 </script>
 

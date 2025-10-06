@@ -1,12 +1,18 @@
 <template>
-  
-  <!--
-     <div class="logo">SHEMONSTER</div>
-    <header>
+  <div class="logo">SHEMONSTER</div>
+
+  <ul class="header-nav">
+    <li><NuxtLink to="/login">Login</NuxtLink></li>
+    <li><NuxtLink to="/register">Register </NuxtLink></li>
+    <li><button @click="isWishlistOpen = true">Wishlist</button></li>
+  </ul>
+  <header>
     <ul class="main-nav">
-      <li @click="moveCamera"><span class="num">01</span> Home</li>
       <li>
-        <NuxtLink to="/"><span class="num">02</span> About</NuxtLink>
+        <NuxtLink to="/"><span class="num">01</span> Home</NuxtLink>
+      </li>
+      <li>
+        <NuxtLink to="/about"><span class="num">02</span> About</NuxtLink>
       </li>
       <li>
         <NuxtLink to="/gallery"><span class="num">03</span> Gallery</NuxtLink>
@@ -19,28 +25,17 @@
       </li>
     </ul>
   </header>
-  
-  
-  -->
 
-
- 
-  
-
+  <Wishlist :isOpen="isWishlistOpen" @close="isWishlistOpen = false" />
 
   <div id="app">
     <div id="scroller" ref="scroller" class="scroller">
       <div id="three-root" class="three-container"></div>
     </div>
-  <!--
-      <button class="enter-btn" @click="moveCamera">{{ buttonText }}</button>
-    <NuxtLayout />
-  -->  
     <NuxtLayout />
   </div>
 
-
-   <canvas id="minimap" width="440" height="440"></canvas>
+  <canvas v-if="showCanvas" id="minimap" width="440" height="440"></canvas>
 
   <footer>
     <ul class="footer-nav">
@@ -55,64 +50,17 @@
 import gsap from "gsap";
 import { scrollerRef } from "@/composables/scroller.js";
 import { onMounted, ref } from "vue";
+import { useRoute, useNuxtApp } from "#imports";
+import Wishlist from "@/components/wishlist.vue";
 
-const buttonText = ref("Enter");
+const isWishlistOpen = ref(false);
+
 const scroller = scrollerRef;
+const route = useRoute();
 
-let cameraTween = null;
+const showCanvas = computed(() => route.path.endsWith("/editmode"));
 
 let $three = null;
-
-function getThreeObjects() {
-  const camera = $three.camera;
-  const controls = $three.controls;
-  const sphere = $three.backgroundSphere;
-  return { camera, controls, sphere };
-}
-
-function moveCamera() {
-  const { camera, controls, sphere } = getThreeObjects();
-  if (!camera || !controls || !sphere) return;
-  if (cameraTween) cameraTween.kill();
-
-  const goingIn = buttonText.value === "Enter"; // true when zooming in
-  const targetZ = goingIn ? 5 : 50;
-  buttonText.value = goingIn ? "Back" : "Enter";
-
-  const startTime = performance.now();
-
-  cameraTween = gsap.to(camera.position, {
-    duration: 1,
-    z: targetZ,
-    x: 0,
-    y: 0,
-    ease: "power2.inOut",
-    onUpdate: () => {
-      const elapsed = (performance.now() - startTime) * 0.001;
-      sphere.material.uniforms.uTime.value = elapsed;
-      controls.update();
-    },
-    onStart: () => {
-      gsap.to(sphere.material.uniforms.uAmplitude, {
-        value: 1.0,
-        duration: 0.3,
-        ease: "power2.inOut",
-      });
-    },
-    onComplete: () => {
-      gsap.to(sphere.material.uniforms.uAmplitude, {
-        value: 0.0,
-        duration: 0.3,
-        ease: "power2.out",
-        onComplete: () => {
-          sphere.material.uniforms.uTime.value = 0.0;
-        },
-      });
-      camera.position.x = 0;
-      camera.position.y = 0;
-    },
-  });
-}
 
 onMounted(async () => {
   if (!import.meta.dev) {
@@ -123,18 +71,6 @@ onMounted(async () => {
     console.log("Dev mode:", import.meta.dev);
 
     await $three.init();
-
-    if ($three.controls) {
-      $three.controls.enableRotate = true;
-      $three.controls.enableZoom = true;
-      $three.controls.enablePan = true;
-      $three.controls.enableDamping = true;
-      $three.controls.dampingFactor = 0.05;
-      $three.controls.update();
-    }
-    if (scroller.value) {
-      $three.setScroller(scroller.value);
-    }
   }
 });
 </script>
@@ -143,7 +79,6 @@ onMounted(async () => {
 body::-webkit-scrollbar {
   display: none;
 }
-
 
 .cofirmation-input-group {
   position: relative;
@@ -154,7 +89,7 @@ body::-webkit-scrollbar {
   font-size: 16px;
   padding: 10px 10px 10px 5px;
   display: block;
-  width:100%;
+  width: 100%;
   outline: none;
   border: none;
   border-bottom: 1px solid #515151;
@@ -166,11 +101,11 @@ body::-webkit-scrollbar {
   pointer-events: none;
   top: 10px;
   left: 5px;
-  transition: top .2s ease, font-size .2s ease, color .2s ease;
+  transition: top 0.2s ease, font-size 0.2s ease, color 0.2s ease;
 }
 
 .cofirmation-input:focus ~ .cofirmation-label,
-.cofirmation-input:not(:placeholder-shown) ~ .cofirmation-label  {
+.cofirmation-input:not(:placeholder-shown) ~ .cofirmation-label {
   top: -10px;
   font-size: 14px;
   color: #515151;
@@ -181,9 +116,7 @@ body::-webkit-scrollbar {
   border-color: #515151;
   box-shadow: inset 0 -3px 5px -3px #fffefe; /* only bottom */
 }
-
 </style>
-
 
 <style scoped>
 *,
@@ -193,7 +126,6 @@ body::-webkit-scrollbar {
   padding: 0;
   box-sizing: border-box;
 }
-
 
 .logo {
   position: fixed;
@@ -212,6 +144,25 @@ header {
   left: 1rem;
   z-index: 20;
   transform: translate(0, -50%);
+}
+
+ul.header-nav {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 20;
+  list-style: none;
+}
+
+ul.header-nav li {
+  margin: 0 0.5rem;
+}
+
+ul.header-nav li a {
+  font-size: 0.8rem;
+  text-decoration: none;
+  color: #000;
+  display: block;
 }
 
 ul.main-nav {
@@ -272,13 +223,12 @@ ul.main-nav li:hover:after {
   }
 }
 
-
 .scroller {
-  height: 200vh;        /* enough content to scroll */
-  overflow-y: auto;     /* enable scrolling */
+  height: 200vh; /* enough content to scroll */
+  overflow-y: auto; /* enable scrolling */
   overflow-x: hidden;
-  position: relative;   /* relative positioning */
-  z-index: 0;           /* above the canvas */
+  position: relative; /* relative positioning */
+  z-index: 0; /* above the canvas */
 }
 
 .scroller::-webkit-scrollbar {
@@ -290,12 +240,11 @@ ul.main-nav li:hover:after {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;  
+  width: 100%;
   height: 100%;
   z-index: 0;
   background: transparent;
 }
-
 
 canvas {
   display: block;
@@ -343,8 +292,6 @@ ul.footer-nav li a {
   color: #000;
   display: block;
 }
-
-
 
 .enter-btn {
   position: absolute;

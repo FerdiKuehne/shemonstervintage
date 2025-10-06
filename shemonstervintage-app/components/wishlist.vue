@@ -1,10 +1,9 @@
 <template>
-  <div class="wishlist">
-
+  <div v-if="isOpen" class="wishlist">
     <div class="wishlist-item-wrapper">
     <div class="wishlist-header">
       <h2>Your Wishlist</h2>
-       <button class="wishlist-btn-close" @click="closePopup">
+       <button class="wishlist-btn-close" @click="$emit('close')">
       <svg
           xmlns="http://www.w3.org/2000/svg"
           width="48"
@@ -141,6 +140,12 @@ import { ref, nextTick } from "vue";
 definePageMeta({
   layout: "three",
 });
+
+defineProps({
+  isOpen: Boolean
+});
+
+defineEmits(['close']);
 
 const contact = ref("");
 const openConfirmPopup = ref(false);

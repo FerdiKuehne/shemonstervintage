@@ -3,7 +3,8 @@
     "impressum": "Impressum",
     "privacyPolicy": "Datenschutzerklärung",
     "wunschliste": "Wunschliste",
-    "visitUndKontakt": "Anfahrt & Kontakt"
+    "visitUndKontakt": "Anfahrt & Kontakt",
+    "kontakt": "Kontakt"
   },
   "passwordReset": {
     "title": "Passwort zurücksetzen",

@@ -20,6 +20,8 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { XRButton } from "three/examples/jsm/webxr/XRButton.js";
 import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
 import { Observer } from "gsap/Observer";
+import { createBackgroundPanoFromAPI } from "@/composables/loadpano.js";
+
 import {
   ArToolkitContext,
   ArToolkitSource,
@@ -36,9 +38,13 @@ async function init(
   xrNeeded = false,
   itemClick = (v) => console.log(v)
 ) {
-  let controls, backgroundSphere, arToolkitSource, arToolkitContext;
+  let controls, backgroundSphere, arToolkitSource, arToolkitContext, pano;
   const animateObjects = [];
   const container = document.getElementById("three-root");
+  while (container.firstChild) {
+    container.removeChild(container.firstChild);
+  }
+
   const CAMERA_RADIUS = 1e-4;
 
   // Scene
@@ -57,17 +63,19 @@ async function init(
     0.001,
     1000
   );
-  
-  camera.position.set(0, 0, 4);
+
+  camera.position.set(0, 0, CAMERA_RADIUS);
 
   // Renderer
-  const renderer = new WebGLRenderer({ antialias:true });
+  const renderer = new WebGLRenderer({ antialias: true });
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.getElementById("three-root").appendChild(renderer.domElement);
-  renderer.domElement.setAttribute('tabindex','0');
-  renderer.domElement.addEventListener('click', ()=> renderer.domElement.focus());
+  renderer.domElement.setAttribute("tabindex", "0");
+  renderer.domElement.addEventListener("click", () =>
+    renderer.domElement.focus()
+  );
 
   if (xrNeeded) {
     renderer.xr.enabled = true;
@@ -124,8 +132,7 @@ async function init(
   }
 
   if (backgroundSphereNeeded) {
-    backgroundSphere = await createBackgroundSphereFromAPI();
-    scene.add(backgroundSphere);
+    pano = await createBackgroundPanoFromAPI(camera, renderer);
   }
 
   if (orbiterControlsNeeded) {
@@ -139,7 +146,7 @@ async function init(
     controls.target.set(0, 0, 0);
     controls.saveState();
   }
-  
+
   const raycaster = new Raycaster();
   const mouse = new Vector2();
 
@@ -155,10 +162,20 @@ async function init(
       raycaster.setFromCamera(mouse, camera);
       const hits = raycaster.intersectObjects([scene], true);
       if (!hits.length) return;
-     
+
       itemClick(hits[0].object);
-      
-    }})
+    },
+  });
+
+  console.log({pano});
+  console.log("PANO DB: ", pano.db);
+  console.log("PANO sceneB: ", pano.screenSceneB);
+  console.log("PANO sceneA: ", pano.screenSceneA);
+  console.log("PANO fsCam: ", pano.fsCam);
+  console.log("PANO rtCombined: ", pano.rtCombined);
+  console.log("PANO rtObjects: ", pano.rtObjects);
+  console.log("PANO passAMat: ", pano.passAMat);
+  console.log("PANO passBMat: ", pano.passBMat);
 
 
   function animate() {
@@ -175,10 +192,39 @@ async function init(
       }
     }
 
-    renderer.render(scene, camera);
+    if (backgroundSphereNeeded) {
+      const cur = new Vector2();
+
+      renderer.getDrawingBufferSize(cur);
+      if (cur.x !== pano.db.x || cur.y !== pano.db.y) {
+        pano.db.copy(cur);
+        pano.passAMat.uniforms.resolution.value.copy(pano.db);
+        pano.passBMat.uniforms.resolution.value.copy(pano.db);
+        pano.rtObjects.setSize(pano.db.x, pano.db.y);
+        pano.rtCombined.setSize(pano.db.x, pano.db.y);
+      }
+
+      const prev = renderer.getRenderTarget();
+      renderer.setRenderTarget(pano.rtObjects);
+      renderer.clear(true, true, true);
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(prev);
+
+      renderer.setRenderTarget(pano.rtCombined);
+      renderer.clear(true, true, true);
+      renderer.render(pano.screenSceneA, pano.fsCam);
+      renderer.setRenderTarget(null);
+
+      pano.passBMat.uniforms.src.value = pano.rtCombined.texture;
+      renderer.render(pano.screenSceneB, pano.fsCam);
+    } else {
+      renderer.render(scene, camera);
+    }
+
+    requestAnimationFrame(animate);
   }
 
-  renderer.setAnimationLoop(animate);
+  animate();
 
   window.addEventListener(
     "resize",
