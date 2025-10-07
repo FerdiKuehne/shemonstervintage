@@ -169,10 +169,13 @@ header {
 
 ul.header-nav {
   position: fixed;
-  top: 10px;
-  right: 10px;
+  top: 1rem;
+  right: 1rem;
   z-index: 20;
+  display: flex;
   list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 ul.header-nav li {
@@ -300,6 +303,7 @@ footer {
 ul.footer-nav {
   display: flex;
   list-style: none;
+  margin: 0;
 }
 
 ul.footer-nav li {
