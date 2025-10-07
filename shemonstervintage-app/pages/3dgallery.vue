@@ -113,6 +113,7 @@ onMounted(async () => {
   height: 100vh;
   display: block;
   position: relative;
+  overflow: hidden;
 }
 
 /* Overlay button styling */

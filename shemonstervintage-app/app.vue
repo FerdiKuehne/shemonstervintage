@@ -241,7 +241,7 @@ ul.main-nav li:hover:after {
 }
 
 .three-container {
-   border: 5px solid red !important;
+  border: 5px solid red !important;
   pointer-events: auto;
   position: fixed;
   top: 0;
@@ -250,6 +250,7 @@ ul.main-nav li:hover:after {
   height: 100%;
   z-index: 0;
   background: transparent;
+  overflow: hidden;
 }
 
 canvas {
