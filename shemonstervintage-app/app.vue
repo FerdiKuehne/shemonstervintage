@@ -271,6 +271,7 @@ ul.main-nav li:hover:after {
 canvas {
   display: block;
 }
+
 #minimap {
   position: fixed;
   left: 10px;
@@ -284,6 +285,7 @@ canvas {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   cursor: crosshair;
 }
+
 #minimap.dragging {
   cursor: grabbing;
 }
