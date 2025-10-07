@@ -4,7 +4,7 @@
   <ul class="header-nav">
     <li><NuxtLink to="/login">Login</NuxtLink></li>
     <li><NuxtLink to="/register">Register </NuxtLink></li>
-    <li><button @click="isWishlistOpen = true">Wishlist</button></li>
+    <li><button @click="isWishlistOpen = true" class="btn-wishlist">Wishlist</button></li>
   </ul>
 
   <header>
@@ -83,23 +83,10 @@ onMounted(async () => {
 </script>
 
 <style>
-.wishlist-fade-enter-active,
-.wishlist-fade-leave-active {
-  transition: opacity 10s ease-in;
-}
-
-.wishlist-fade-enter-from,
-.wishlist-fade-leave-to {
-  opacity: 0;
-}
-
-.wishlist-fade-enter-to,
-.wishlist-fade-leave-from {
-  opacity: 1;
-}
 
 :root {
   --main-color: #000;
+
   --white: #fff;
   --black: #000;
 }
@@ -125,6 +112,23 @@ body::-webkit-scrollbar {
   color: var(--black);
   padding: 1.25rem 1rem 0 170px;
 }
+
+.wishlist-fade-enter-active,
+.wishlist-fade-leave-active {
+  transition: transform .3s ease;
+  will-change: transform;
+}
+
+.wishlist-fade-enter-from,
+.wishlist-fade-leave-to {
+  transform: translateX(100%); 
+}
+
+.wishlist-fade-enter-to,
+.wishlist-fade-leave-from {
+  transform: translateX(0); 
+}
+
 
 .cofirmation-input-group {
   position: relative;

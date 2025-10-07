@@ -6,16 +6,16 @@
        <button class="wishlist-btn-close" @click="$emit('close')">
       <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="48"
-          height="48"
+          width="32"
+          height="32"
           class=""
-          viewBox="0 0 48 48"
+          viewBox="0 0 32 32"
           stroke="#000000"
           stroke-miterlimit="10"
         >
 
-        <line x1="1.672" y1="1.672" x2="46.746" y2="46.746"/>
-        <line x1="46.7467" y1="1.672" x2="1.672" y2="46.746"/>
+        <line x1="1.672" y1="1.672" x2="31.164" y2="31.164"/>
+        <line x1="31.164" y1="1.672" x2="1.672" y2="31.164"/>
        </svg>
 
        </button>
@@ -243,7 +243,7 @@ const testData = ref([
 
 .wishlist-item-wrapper {
   overflow-y: auto; /* internal scroll */
-  padding: 79px 0 133px 0;
+  padding: 60px 0 133px 0;
   border-top: 1px solid var(--black);
   height: 100vh;
   width: 420px;
@@ -260,7 +260,6 @@ const testData = ref([
   z-index: 1;
   background-color: var(--white);
   width: 100%;
-  height: 80px;
   padding: 1rem;
   border-bottom: 1px solid var(--black);
   display: flex;
@@ -278,8 +277,8 @@ const testData = ref([
 
 .wishlist-btn-close {
   position: absolute;
-  top: .75rem;
-  right: .75rem;
+  top: .15rem;
+  right: .15rem;
   width: 56px;
   height: 56px;
   border: none;
