@@ -27,7 +27,13 @@
     </ul>
   </header>
 
-  <Wishlist :isOpen="isWishlistOpen" @close="isWishlistOpen = false" />
+  <transition name="wishlist-fade">
+    <Wishlist
+      v-if="isWishlistOpen"
+      :isOpen="isWishlistOpen"
+      @close="isWishlistOpen = false"
+    />
+  </transition>
 
   <div id="app">
     <div id="scroller" ref="scroller" class="scroller">
@@ -77,7 +83,20 @@ onMounted(async () => {
 </script>
 
 <style>
+.wishlist-fade-enter-active,
+.wishlist-fade-leave-active {
+  transition: opacity 10s ease-in;
+}
 
+.wishlist-fade-enter-from,
+.wishlist-fade-leave-to {
+  opacity: 0;
+}
+
+.wishlist-fade-enter-to,
+.wishlist-fade-leave-from {
+  opacity: 1;
+}
 
 :root {
   --main-color: #000;
@@ -90,7 +109,7 @@ onMounted(async () => {
 *:before {
   margin: 0;
   padding: 0;
-  box-sizing: border-box; 
+  box-sizing: border-box;
 }
 
 body {
@@ -146,8 +165,6 @@ body::-webkit-scrollbar {
 </style>
 
 <style scoped>
-
-
 .logo {
   position: fixed;
   top: 1rem;
@@ -183,11 +200,11 @@ ul.header-nav li {
 }
 
 ul.header-nav li:first-child {
-  margin: 0 .5rem 0 0;
+  margin: 0 0.5rem 0 0;
 }
 
 ul.header-nav li:last-child {
-  margin: 0 0 0 .5rem;
+  margin: 0 0 0 0.5rem;
 }
 
 ul.header-nav li a {
@@ -320,11 +337,11 @@ ul.footer-nav li {
 }
 
 ul.footer-nav li:first-child {
-  margin: 0 .5rem 0 0;
+  margin: 0 0.5rem 0 0;
 }
 
 ul.footer-nav li:last-child {
-  margin: 0 0 0 .5rem;
+  margin: 0 0 0 0.5rem;
 }
 
 ul.footer-nav li a {
@@ -333,6 +350,4 @@ ul.footer-nav li a {
   color: var(--black);
   display: block;
 }
-
 </style>
-
