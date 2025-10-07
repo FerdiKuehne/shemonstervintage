@@ -77,6 +77,16 @@ onMounted(async () => {
 </script>
 
 <style>
+
+
+*,
+*:after,
+*:before {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 body::-webkit-scrollbar {
   display: none;
 }
@@ -120,13 +130,7 @@ body::-webkit-scrollbar {
 </style>
 
 <style scoped>
-*,
-*:after,
-*:before {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+
 
 .logo {
   position: fixed;
