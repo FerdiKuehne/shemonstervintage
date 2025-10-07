@@ -90,7 +90,11 @@ onMounted(async () => {
 *:before {
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+  box-sizing: border-box; 
+}
+
+body {
+  color: var(--black);
 }
 
 body::-webkit-scrollbar {
