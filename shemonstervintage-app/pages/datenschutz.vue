@@ -35,22 +35,22 @@
 </template>
 
 <script setup>
-import { onMounted } from "vue";
-definePageMeta({
-  layout: "three",
-});
-
-const { $three } = useNuxtApp();
-
-onMounted(async () => {
-  // wait until scene is ready
-  if (import.meta.dev) return;
-  await $three.ready;
-
-  $three.addAnimatedCallback("sphere", (delta) => {
-    if ($three.backgroundSphere) {
-      $three.backgroundSphere.position.x += delta;
-    }
+  import { onMounted } from "vue";
+  definePageMeta({
+    layout: "three",
   });
-});
+
+  const { $three } = useNuxtApp();
+
+  onMounted(async () => {
+    // wait until scene is ready
+    if (import.meta.dev) return;
+    await $three.ready;
+
+    $three.addAnimatedCallback("sphere", (delta) => {
+      if ($three.backgroundSphere) {
+        $three.backgroundSphere.position.x += delta;
+      }
+    });
+  });
 </script>

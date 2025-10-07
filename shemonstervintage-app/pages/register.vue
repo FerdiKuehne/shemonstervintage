@@ -187,30 +187,28 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.register-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100vh;
-}
+  .register-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100vh;
+  }
 
-.register {
-  width: 60%;
-  border: 1px solid #000;
-  padding: 1rem;
-}
+  .register {
+    width: 60%;
+    border: 1px solid var(--black);
+    padding: 1rem;
+  }
 
+  .hammer {
+    animation: ease-in 0.3s typewriterTap;
+  }
 
-.hammer {
-  animation: ease-in 0.3s typewriterTap;
-
-}
-
-@keyframes typewriterTap {
-  0%   { transform: scaleY(1); }
-  30%  { transform: scaleY(0.85) ; } /* key press down */
-  60%  { transform: scaleY(1.05) ; } /* slight bounce back */
-  100% { transform: scaleY(1); } /* rest */
-}
+  @keyframes typewriterTap {
+    0%   { transform: scaleY(1); }
+    30%  { transform: scaleY(0.85) ; } /* key press down */
+    60%  { transform: scaleY(1.05) ; } /* slight bounce back */
+    100% { transform: scaleY(1); } /* rest */
+  }
 </style>

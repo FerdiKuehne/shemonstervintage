@@ -19,23 +19,23 @@
 </template>
 
 <script setup>
-import AnfahrtUndMap from "~/components/anfahrt/AnfahrtUndMap.vue";
-import AnfahrtContact from "~/components/anfahrt/AnfahrtContact.vue";
-import Openinghours from "~/components/anfahrt/Openinghours.vue";
-import { onMounted, watchEffect, nextTick } from "vue";
-import { locationCameraShift } from "~/composables/screenplay.js";
+  import AnfahrtUndMap from "~/components/anfahrt/AnfahrtUndMap.vue";
+  import AnfahrtContact from "~/components/anfahrt/AnfahrtContact.vue";
+  import Openinghours from "~/components/anfahrt/Openinghours.vue";
+  import { onMounted, watchEffect, nextTick } from "vue";
+  import { locationCameraShift } from "~/composables/screenplay.js";
 
-definePageMeta({
-  layout: "three",
-});
+  definePageMeta({
+    layout: "three",
+  });
 
-const { $three } = useNuxtApp();
+  const { $three } = useNuxtApp();
 
-onMounted(async () => {
-if (import.meta.dev) return;
-  await $three.ready;
-  await nextTick();
-  locationCameraShift($three.camera);
+  onMounted(async () => {
+  if (import.meta.dev) return;
+    await $three.ready;
+    await nextTick();
+    locationCameraShift($three.camera);
 
-});
+  });
 </script>

@@ -90,7 +90,7 @@ async function login() {
 
 .login {
   width: 400px;
-  border: 1px solid #000;
+  border: 1px solid var(--black);
   padding: 1rem;
 }
 
