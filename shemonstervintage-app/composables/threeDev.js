@@ -133,6 +133,24 @@ async function init(
 
   if (backgroundSphereNeeded) {
     pano = await createBackgroundPanoFromAPI(camera, renderer);
+
+    renderer.domElement.style.display = "block";
+
+    console.log(
+      "Canvas size:",
+      renderer.domElement.width,
+      renderer.domElement.height
+    );
+
+    console.log({ pano });
+    console.log("PANO DB: ", pano.db);
+    console.log("PANO sceneB: ", pano.screenSceneB);
+    console.log("PANO sceneA: ", pano.screenSceneA);
+    console.log("PANO fsCam: ", pano.fsCam);
+    console.log("PANO rtCombined: ", pano.rtCombined);
+    console.log("PANO rtObjects: ", pano.rtObjects);
+    console.log("PANO passAMat: ", pano.passAMat);
+    console.log("PANO passBMat: ", pano.passBMat);
   }
 
   if (orbiterControlsNeeded) {
@@ -167,21 +185,6 @@ async function init(
     },
   });
 
-renderer.domElement.style.display = 'block'
-
-  console.log("Canvas size:", renderer.domElement.width, renderer.domElement.height);
-
-  console.log({pano});
-  console.log("PANO DB: ", pano.db);
-  console.log("PANO sceneB: ", pano.screenSceneB);
-  console.log("PANO sceneA: ", pano.screenSceneA);
-  console.log("PANO fsCam: ", pano.fsCam);
-  console.log("PANO rtCombined: ", pano.rtCombined);
-  console.log("PANO rtObjects: ", pano.rtObjects);
-  console.log("PANO passAMat: ", pano.passAMat);
-  console.log("PANO passBMat: ", pano.passBMat);
-
-
   function animate() {
     if (animateObjects.length > 0) {
       animateObjects.forEach((cb) => cb());
@@ -211,19 +214,18 @@ renderer.domElement.style.display = 'block'
       renderer.clear(true, true, true);
       renderer.render(scene, camera);
       renderer.setRenderTarget(prev);
-      
+
       renderer.setRenderTarget(pano.rtCombined);
       renderer.clear(true, true, true);
       renderer.render(pano.screenSceneA, pano.fsCam);
       renderer.setRenderTarget(null);
-      
+
       /*
       pano.passBMat.uniforms.src.value = pano.rtCombined.texture;
       renderer.render(pano.screenSceneB, pano.fsCam);
       */
-renderer.setClearColor(new Color('blue'), 1.0) ;
- renderer.clear();
-
+      renderer.setClearColor(new Color("blue"), 1.0);
+      renderer.clear();
     } else {
       renderer.render(scene, camera);
     }

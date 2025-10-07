@@ -17,7 +17,7 @@ definePageMeta({
 
 const containerHeight = ref(100); // vh
 
-let $three, grid;
+let $three;
 
 onMounted(async () => {
   if (import.meta.dev) {
@@ -37,7 +37,7 @@ onMounted(async () => {
     await $three.ready;
   }
 
-     grid = await initGrid(
+    const grid = await initGrid(
       $three.renderer,
       $three.camera,
       containerHeight,
@@ -45,24 +45,11 @@ onMounted(async () => {
     );
 
 
-    $three.camera.position.set(0, 0, 4);
 
     $three.scene.add(grid);
 
     console.log(grid);
 
 });
-
-onBeforeUnmount(() => {
-
-  if (grid) {
-    $three.scene.remove(grid);
-    if (Array.isArray(grid.material)) {
-      grid.material.forEach((mat) => mat.dispose());
-    }
-  }
-  // Clean up if necessary
-});
-
 </script>
 
