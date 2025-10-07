@@ -182,6 +182,14 @@ ul.header-nav li {
   margin: 0 0.5rem;
 }
 
+ul.header-nav li:first-child {
+  margin: 0 .5rem 0 0;
+}
+
+ul.header-nav li:last-child {
+  margin: 0 0 0 .5rem;
+}
+
 ul.header-nav li a {
   font-size: 0.8rem;
   text-decoration: none;
