@@ -237,13 +237,14 @@ const testData = ref([
   width: 420px;
   height: 100vh; /* fixed height panel */
   backdrop-filter: blur(10px);
+  background-color: var(--white);;
   border-left: 1px solid var(--black);
   z-index: 1000; /* above Three.js canvas */
 }
 
 .wishlist-item-wrapper {
   overflow-y: auto; /* internal scroll */
-  padding: 60px 0 133px 0;
+  padding: 60px 0 101px 0;
   border-top: 1px solid var(--black);
   height: 100vh;
   width: 420px;
@@ -314,7 +315,7 @@ const testData = ref([
   position: fixed;
   bottom: 0;
   background-color: var(--white);
-  padding: 1rem 1rem 3rem 1rem;
+  padding: 1rem;
   width: 100%;
   border-top: 1px solid var(--black);
 }

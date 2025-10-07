@@ -186,6 +186,7 @@ header {
   left: 1rem;
   z-index: 20;
   transform: translate(0, -50%);
+  mix-blend-mode: difference;
 }
 
 ul.header-nav {
@@ -230,8 +231,8 @@ ul.main-nav li {
   display: block;
   text-transform: uppercase;
   font-size: 1rem;
-  font-weight: bolder;
-  color: var(--black);
+  font-weight: 600;
+  color: var(--white);
   line-height: 2rem;
   transition: font-size 0.3s, line-height 0.3s;
 }
@@ -256,7 +257,7 @@ ul.main-nav li:hover .num {
 }
 
 ul.main-nav li a {
-  color: var(--black);
+  color: var(--white);
   text-decoration: none;
 }
 
