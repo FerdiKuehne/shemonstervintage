@@ -14,7 +14,7 @@ definePageMeta({
 
 <style scoped>
 
-.about-page{
+.about-page {
     position: fixed;
     top: 50%;
     left: 50%;

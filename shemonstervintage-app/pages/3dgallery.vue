@@ -108,34 +108,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.three-container {
-  width: 100%;
-  height: 100vh;
-  display: block;
-  position: relative;
-  overflow: hidden;
-}
 
-/* Overlay button styling */
-.enter-btn {
-  position: absolute;
-  left: 50%;
-  top: 70%;
-  transform: translate(
-    -50%,
-    30px
-  ); /* horizontally centered, 30px below center */
-  z-index: 10;
-  padding: 12px 24px;
-  font-size: 16px;
-  font-weight: 600;
-  border: none;
-  border-radius: 8px;
-  background-color: rgba(255, 255, 255, 0.9);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.enter-btn:hover {
-  background-color: rgba(255, 255, 255, 1);
-}
+
 </style>
