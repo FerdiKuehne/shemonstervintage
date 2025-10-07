@@ -137,7 +137,7 @@ body::-webkit-scrollbar {
 .cofirmation-input:focus {
   border-width: 2px;
   border-color: var(--black);
-  box-shadow: inset 0 -3px 5px -3px var(--white); /* only bottom */
+  box-shadow: inset 0 -3px 5px -3px var(--white);
 }
 </style>
 
@@ -253,7 +253,6 @@ ul.main-nav li:hover:after {
 }
 
 .three-container {
-  border: 5px solid red !important;
   pointer-events: auto;
   position: fixed;
   top: 0;

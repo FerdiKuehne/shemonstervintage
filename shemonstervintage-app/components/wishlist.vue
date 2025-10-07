@@ -243,7 +243,7 @@ const testData = ref([
 
 .wishlist-item-wrapper {
   overflow-y: auto; /* internal scroll */
-  padding: 79px 0 135px 0;
+  padding: 79px 0 133px 0;
   border-top: 1px solid var(--black);
   height: 100vh;
   width: 420px;
