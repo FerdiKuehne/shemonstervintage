@@ -15,10 +15,10 @@ definePageMeta({
 <style scoped>
 
 .about-page {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    background-color: red;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: calc(50% - 1rem);
 }
 
 

@@ -237,14 +237,14 @@ const testData = ref([
   width: 420px;
   height: 100vh; /* fixed height panel */
   backdrop-filter: blur(10px);
-  border-left: 1px solid #000;
+  border-left: 1px solid var(--black);
   z-index: 1000; /* above Three.js canvas */
 }
 
 .wishlist-item-wrapper {
   overflow-y: auto; /* internal scroll */
-  padding: 79px 0 135px 0;
-  border-top: 1px solid #000;
+  padding: 79px 0 133px 0;
+  border-top: 1px solid var(--black);
   height: 100vh;
   width: 420px;
 }
@@ -258,19 +258,22 @@ const testData = ref([
   top: 0;
   left: 0;
   z-index: 1;
-  background-color: #ffffff;
+  background-color: var(--white);
   width: 100%;
   height: 80px;
   padding: 1rem;
-  border-bottom: 1px solid #000;
-  display: flex
-;
-    align-items: center;
+  border-bottom: 1px solid var(--black);
+  display: flex;
+  align-items: center;
 }
 
 .wishlist h2 {
-  color: #000000;
-  margin: 0;;
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: bolder;
+  color: var(--black);
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .wishlist-btn-close {
@@ -288,8 +291,8 @@ const testData = ref([
 .wishlist-item {
   display: flex;
   position: relative;
-  border-bottom: 1px solid #000;
-  background-color: #fff;
+  border-bottom: 1px solid var(--black);
+  background-color: var(--white);
 }
 
 .item-details {
@@ -311,10 +314,10 @@ const testData = ref([
 .wishlist-actions {
   position: fixed;
   bottom: 0;
-  background-color: #fff;
+  background-color: var(--white);
   padding: 1rem 1rem 3rem 1rem;
   width: 100%;
-  border-top: 1px solid #000;
+  border-top: 1px solid var(--black);
 }
 
 .whishlist-empty {
@@ -325,7 +328,7 @@ const testData = ref([
 
 .whishlist-beschreibung::selection {
   color: white;
-  background: black;
+  background-color: var(--black);
 }
 
 .cofirmation-input-group {
@@ -340,7 +343,7 @@ const testData = ref([
   width: 200px;
   outline: none;
   border: none;
-  border-bottom: 1px solid #515151;
+  border-bottom: 1px solid var(--black);
   background: transparent;
 }
 
@@ -356,13 +359,13 @@ const testData = ref([
 .cofirmation-input:not(:placeholder-shown) ~ .cofirmation-label  {
   top: -10px;
   font-size: 14px;
-  color: #515151;
+  color: var(--black);
 }
 
 .cofirmation-input:focus {
   border-width: 2px;
-  border-color: #515151;
-  box-shadow: inset 0 -3px 5px -3px #fffefe; /* only bottom */
+  border-color: var(--black);
+  box-shadow: inset 0 -3px 5px -3px var(--white); /* only bottom */
 }
 
 </style>

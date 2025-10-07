@@ -15,18 +15,18 @@
 </template>
 
 <script setup>
-import { contactCameraShift } from "~/composables/screenplay.js";
-import { onMounted, nextTick } from "vue";
-definePageMeta({
-  layout: "three",
-});
-const { $three } = useNuxtApp();
+  import { contactCameraShift } from "~/composables/screenplay.js";
+  import { onMounted, nextTick } from "vue";
+  definePageMeta({
+    layout: "three",
+  });
+  const { $three } = useNuxtApp();
 
-onMounted(async () => {
-  if (!import.meta.dev) {
-    await $three.ready;
-    await nextTick();
-    contactCameraShift($three.camera);
-  }
-});
+  onMounted(async () => {
+    if (!import.meta.dev) {
+      await $three.ready;
+      await nextTick();
+      contactCameraShift($three.camera);
+    }
+  });
 </script>

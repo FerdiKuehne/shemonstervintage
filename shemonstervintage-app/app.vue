@@ -79,16 +79,32 @@ onMounted(async () => {
 <style>
 
 
+:root {
+  --main-color: #000;
+  --white: #fff;
+  --black: #000;
+}
+
 *,
 *:after,
 *:before {
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+  box-sizing: border-box; 
+}
+
+body {
+  color: var(--black);
 }
 
 body::-webkit-scrollbar {
   display: none;
+}
+
+.page-headline {
+  position: fixed;
+  color: var(--black);
+  padding: 1.25rem 1rem 0 170px;
 }
 
 .cofirmation-input-group {
@@ -103,7 +119,7 @@ body::-webkit-scrollbar {
   width: 100%;
   outline: none;
   border: none;
-  border-bottom: 1px solid #515151;
+  border-bottom: 1px solid var(--black);
   background: transparent;
 }
 
@@ -119,13 +135,13 @@ body::-webkit-scrollbar {
 .cofirmation-input:not(:placeholder-shown) ~ .cofirmation-label {
   top: -10px;
   font-size: 14px;
-  color: #515151;
+  color: var(--black);
 }
 
 .cofirmation-input:focus {
   border-width: 2px;
-  border-color: #515151;
-  box-shadow: inset 0 -3px 5px -3px #fffefe; /* only bottom */
+  border-color: var(--black);
+  box-shadow: inset 0 -3px 5px -3px var(--white);
 }
 </style>
 
@@ -139,7 +155,7 @@ body::-webkit-scrollbar {
   z-index: 1;
   font-size: 1.5rem;
   font-weight: bolder;
-  color: #000;
+  color: var(--black);
   letter-spacing: -1.5px;
 }
 
@@ -153,20 +169,31 @@ header {
 
 ul.header-nav {
   position: fixed;
-  top: 10px;
-  right: 10px;
+  top: 1rem;
+  right: 1rem;
   z-index: 20;
+  display: flex;
   list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 ul.header-nav li {
   margin: 0 0.5rem;
 }
 
+ul.header-nav li:first-child {
+  margin: 0 .5rem 0 0;
+}
+
+ul.header-nav li:last-child {
+  margin: 0 0 0 .5rem;
+}
+
 ul.header-nav li a {
   font-size: 0.8rem;
   text-decoration: none;
-  color: #000;
+  color: var(--black);
   display: block;
 }
 
@@ -183,7 +210,7 @@ ul.main-nav li {
   text-transform: uppercase;
   font-size: 1rem;
   font-weight: bolder;
-  color: #000;
+  color: var(--black);
   line-height: 2rem;
   transition: font-size 0.3s, line-height 0.3s;
 }
@@ -208,7 +235,7 @@ ul.main-nav li:hover .num {
 }
 
 ul.main-nav li a {
-  color: #000;
+  color: var(--black);
   text-decoration: none;
 }
 
@@ -241,7 +268,6 @@ ul.main-nav li:hover:after {
 }
 
 .three-container {
-  border: 5px solid red !important;
   pointer-events: auto;
   position: fixed;
   top: 0;
@@ -256,6 +282,7 @@ ul.main-nav li:hover:after {
 canvas {
   display: block;
 }
+
 #minimap {
   position: fixed;
   left: 10px;
@@ -263,12 +290,13 @@ canvas {
   z-index: 10000;
   width: 220px;
   height: 220px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--black);
   border-radius: 8px;
-  background: #0e0e10;
+  background-color: var(--black);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   cursor: crosshair;
 }
+
 #minimap.dragging {
   cursor: grabbing;
 }
@@ -283,6 +311,8 @@ footer {
 ul.footer-nav {
   display: flex;
   list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 ul.footer-nav li {
@@ -290,41 +320,19 @@ ul.footer-nav li {
 }
 
 ul.footer-nav li:first-child {
-  margin: 0 0.5rem 0 0;
+  margin: 0 .5rem 0 0;
+}
+
+ul.footer-nav li:last-child {
+  margin: 0 0 0 .5rem;
 }
 
 ul.footer-nav li a {
   font-size: 0.8rem;
   text-decoration: none;
-  color: #000;
+  color: var(--black);
   display: block;
 }
 
-.enter-btn {
-  position: absolute;
-  left: 50%;
-  bottom: 2rem;
-  transform: translate(-50%, 0);
-  z-index: 10;
-  padding: 12px 24px;
-  font-size: 16px;
-  font-weight: 600;
-  border: none;
-  border-radius: 8px;
-  background-color: rgba(255, 255, 255, 0.9);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.enter-btn:hover {
-  background-color: rgba(255, 255, 255, 1);
-}
 </style>
 
-<style>
-.page-headline {
-  position: fixed;
-  color: #000;
-  padding: 1.25rem 1rem 0 170px;
-}
-</style>
