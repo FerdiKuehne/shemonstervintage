@@ -18,6 +18,7 @@ definePageMeta({
   position: fixed;
   top: 50%;
   left: 50%;
+  width: calc(50% - 1rem);
 }
 
 
