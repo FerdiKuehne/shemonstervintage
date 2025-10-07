@@ -311,7 +311,11 @@ ul.footer-nav li {
 }
 
 ul.footer-nav li:first-child {
-  margin: 0 0.5rem 0 0;
+  margin: 0 .5rem 0 0;
+}
+
+ul.footer-nav li:last-child {
+  margin: 0 0 0 .5rem;
 }
 
 ul.footer-nav li a {
