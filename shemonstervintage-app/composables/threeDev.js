@@ -13,6 +13,8 @@ import {
   Raycaster,
   Vector2,
   SRGBColorSpace,
+  ShaderMaterial,
+  PlaneGeometry,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createBackgroundSphereFromAPI } from "@/composables/backgroundsphere.js";
@@ -29,6 +31,7 @@ import {
 } from "@ar-js-org/ar.js/three.js/build/ar-threex.js";
 import { gsap } from "gsap";
 gsap.registerPlugin(Observer);
+
 
 async function init(
   backgroundSphereNeeded = true,
@@ -131,8 +134,20 @@ async function init(
     marker.add(new Mesh(geometry, material));
   }
 
+  if (orbiterControlsNeeded) {
+    controls = new OrbitControls(camera, renderer.domElement);
+
+    controls.enablePan = false;
+    controls.enableZoom = false; // FOV via Wheel
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.rotateSpeed = 0.9;
+    controls.target.set(0, 0, 0);
+    controls.saveState();
+  }
+
   if (backgroundSphereNeeded) {
-    pano = await createBackgroundPanoFromAPI(camera, renderer);
+    pano = await createBackgroundPanoFromAPI(camera, controls, renderer);
 
     renderer.domElement.style.display = "block";
 
@@ -151,18 +166,8 @@ async function init(
     console.log("PANO rtObjects: ", pano.rtObjects);
     console.log("PANO passAMat: ", pano.passAMat);
     console.log("PANO passBMat: ", pano.passBMat);
-  }
 
-  if (orbiterControlsNeeded) {
-    controls = new OrbitControls(camera, renderer.domElement);
 
-    controls.enablePan = false;
-    controls.enableZoom = false; // FOV via Wheel
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.07;
-    controls.rotateSpeed = 0.9;
-    controls.target.set(0, 0, 0);
-    controls.saveState();
   }
 
   const raycaster = new Raycaster();
@@ -184,8 +189,9 @@ async function init(
       itemClick(hits[0].object);
     },
   });
-
-  function animate() {
+ renderer.setClearColor(0x000000, 0);
+ 
+function animate() {
     if (animateObjects.length > 0) {
       animateObjects.forEach((cb) => cb());
     }
@@ -198,8 +204,10 @@ async function init(
     }
 
     if (backgroundSphereNeeded) {
-      const cur = new Vector2();
+      pano.updateCamBasis();
 
+      // Resize buffers if needed
+      const cur = new Vector2();
       renderer.getDrawingBufferSize(cur);
       if (cur.x !== pano.db.x || cur.y !== pano.db.y) {
         pano.db.copy(cur);
@@ -209,23 +217,21 @@ async function init(
         pano.rtCombined.setSize(pano.db.x, pano.db.y);
       }
 
-      const prev = renderer.getRenderTarget();
-      renderer.setRenderTarget(pano.rtObjects);
-      renderer.clear(true, true, true);
-      renderer.render(scene, camera);
-      renderer.setRenderTarget(prev);
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(pano.rtObjects);
+    renderer.clear(true, true, true);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(prev);
 
-      renderer.setRenderTarget(pano.rtCombined);
-      renderer.clear(true, true, true);
-      renderer.render(pano.screenSceneA, pano.fsCam);
-      renderer.setRenderTarget(null);
+    renderer.setRenderTarget(pano.rtCombined);
+    renderer.clear(true, true, true);
+    renderer.render(pano.screenSceneA, pano.fsCam);
+    renderer.setRenderTarget(null);
 
-      /*
-      pano.passBMat.uniforms.src.value = pano.rtCombined.texture;
-      renderer.render(pano.screenSceneB, pano.fsCam);
-      */
-      renderer.setClearColor(new Color("blue"), 1.0);
-      renderer.clear();
+    pano.passBMat.uniforms.src.value = pano.rtCombined.texture;
+    renderer.render(pano.screenSceneB, pano.fsCam);
+      
+ 
     } else {
       renderer.render(scene, camera);
     }

@@ -13,6 +13,7 @@ import {
   PlaneGeometry,
   TextureLoader,
   MathUtils,
+  Texture,
 } from "three";
 
 import vertexShaderMatA from "./shaders/matA/vertex.glsl?raw";
@@ -20,8 +21,11 @@ import fragmentShaderMatA from "./shaders/matA/fragment.glsl?raw";
 import vertexShaderMatB from "./shaders/matB/vertex.glsl?raw";
 import fragmentShaderMatB from "./shaders/matB/fragment.glsl?raw";
 
+const CAMERA_RADIUS = 1e-4;
+
 export async function createBackgroundPanoFromAPI(
   camera,
+  controls,
   renderer,
   dpr = window.devicePixelRatio || 1
 ) {
@@ -47,18 +51,14 @@ export async function createBackgroundPanoFromAPI(
     depthBuffer: false,
   });
 
+
+  // Load texture asynchronously
   const panoTex = await new Promise((resolve, reject) => {
     new TextureLoader().load(
       textureUrl,
-      (loadedTexture) => {
-        console.log("Texture loaded successfully");
-        resolve(loadedTexture);
-      },
+      (loadedTexture) => resolve(loadedTexture),
       undefined,
-      (err) => {
-        console.error("Texture failed to load", err);
-        reject(err);
-      }
+      (err) => reject(err)
     );
   });
 
@@ -87,6 +87,8 @@ export async function createBackgroundPanoFromAPI(
   });
   const quadA = new Mesh(new PlaneGeometry(2, 2), passAMat);
 
+console.log("--------------------------------");
+
   screenSceneA.add(quadA);
   console.log("Added quad to screenSceneA:", quadA);
 
@@ -108,6 +110,33 @@ export async function createBackgroundPanoFromAPI(
   screenSceneB.add(quadB);
   console.log("Added quad to screenSceneA:", quadB);
 
+  const updateCamBasis = () => {
+    const dir = camera.position.clone().sub(controls.target);
+    if (dir.lengthSq() === 0) dir.set(0, 0, 1);
+    dir.normalize().multiplyScalar(CAMERA_RADIUS);
+    camera.position.copy(controls.target).add(dir);
+
+    camera.updateMatrixWorld();
+    const e = camera.matrixWorld.elements;
+    const right = new Vector3(e[0], e[1], e[2]).normalize();
+    const up = new Vector3(e[4], e[5], e[6]).normalize();
+    const zAxis = new Vector3(e[8], e[9], e[10]).normalize();
+    const m = new Matrix3();
+    m.set(
+      right.x,
+      up.x,
+      zAxis.x,
+      right.y,
+      up.y,
+      zAxis.y,
+      right.z,
+      up.z,
+      zAxis.z
+    );
+    passAMat.uniforms.camBasis.value.copy(m);
+    passAMat.uniforms.aspect.value = camera.aspect;
+  };
+
   return {
     screenSceneB: screenSceneB,
     screenSceneA: screenSceneA,
@@ -117,5 +146,6 @@ export async function createBackgroundPanoFromAPI(
     db: db,
     passAMat: passAMat,
     passBMat: passBMat,
+    updateCamBasis: updateCamBasis,
   };
 }
