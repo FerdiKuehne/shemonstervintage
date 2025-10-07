@@ -19,7 +19,7 @@ switch ($path) {
         break;
 
     case '/api/v1/texture.php':
-        require __DIR__ . '/wishlists.php';
+        require __DIR__ . '/texture.php';
         break;
 
     case '/api/v1/register.php':

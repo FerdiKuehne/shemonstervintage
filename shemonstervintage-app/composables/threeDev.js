@@ -32,7 +32,6 @@ import {
 import { gsap } from "gsap";
 gsap.registerPlugin(Observer);
 
-
 async function init(
   backgroundSphereNeeded = true,
   orbiterControlsNeeded = true,
@@ -41,7 +40,7 @@ async function init(
   xrNeeded = false,
   itemClick = (v) => console.log(v)
 ) {
-  let controls, backgroundSphere, arToolkitSource, arToolkitContext, pano;
+  let controls, backgroundSphere, arToolkitSource, arToolkitContext, pano,fsCam,passAMat;
   const animateObjects = [];
   const container = document.getElementById("three-root");
   while (container.firstChild) {
@@ -150,24 +149,13 @@ async function init(
     pano = await createBackgroundPanoFromAPI(camera, controls, renderer);
 
     renderer.domElement.style.display = "block";
-
+    fsCam = pano.fsCam;
     console.log(
       "Canvas size:",
       renderer.domElement.width,
       renderer.domElement.height
     );
-
-    console.log({ pano });
-    console.log("PANO DB: ", pano.db);
-    console.log("PANO sceneB: ", pano.screenSceneB);
-    console.log("PANO sceneA: ", pano.screenSceneA);
-    console.log("PANO fsCam: ", pano.fsCam);
-    console.log("PANO rtCombined: ", pano.rtCombined);
-    console.log("PANO rtObjects: ", pano.rtObjects);
-    console.log("PANO passAMat: ", pano.passAMat);
-    console.log("PANO passBMat: ", pano.passBMat);
-
-
+    passAMat = pano.passAMat;
   }
 
   const raycaster = new Raycaster();
@@ -189,9 +177,9 @@ async function init(
       itemClick(hits[0].object);
     },
   });
- renderer.setClearColor(0x000000, 0);
- 
-function animate() {
+  renderer.setClearColor(0x000000, 0);
+
+  function animate() {
     if (animateObjects.length > 0) {
       animateObjects.forEach((cb) => cb());
     }
@@ -217,21 +205,20 @@ function animate() {
         pano.rtCombined.setSize(pano.db.x, pano.db.y);
       }
 
-    const prev = renderer.getRenderTarget();
-    renderer.setRenderTarget(pano.rtObjects);
-    renderer.clear(true, true, true);
-    renderer.render(scene, camera);
-    renderer.setRenderTarget(prev);
+      const prev = renderer.getRenderTarget();
+      renderer.setRenderTarget(pano.rtObjects);
+      renderer.clear(true, true, true);
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(prev);
 
-    renderer.setRenderTarget(pano.rtCombined);
-    renderer.clear(true, true, true);
-    renderer.render(pano.screenSceneA, pano.fsCam);
-    renderer.setRenderTarget(null);
+      renderer.setRenderTarget(pano.rtCombined);
+      renderer.clear(true, true, true);
+      renderer.render(pano.screenSceneA, pano.fsCam);
+      renderer.setRenderTarget(null);
 
-    pano.passBMat.uniforms.src.value = pano.rtCombined.texture;
-    renderer.render(pano.screenSceneB, pano.fsCam);
-      
- 
+      pano.passBMat.uniforms.src.value = pano.rtCombined.texture;
+      renderer.render(pano.screenSceneB, pano.fsCam);
+
     } else {
       renderer.render(scene, camera);
     }
@@ -258,7 +245,8 @@ function animate() {
     controls,
     backgroundSphere,
     animateObjects,
-  };
+    fsCam,
+  passAMat  };
 }
 
 export { init };

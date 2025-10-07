@@ -29,13 +29,30 @@
     layout: "three",
   });
 
-  const { $three } = useNuxtApp();
+let $three;
 
-  onMounted(async () => {
-  if (import.meta.dev) return;
+onMounted(async () => {
+
+  if (import.meta.dev) {
+    const mod = await import("~/composables/threeDev.js"); // path to your function-based file
+    const devScene = await mod.init(true, true, false, false, false); // returns { scene, camera, renderer, controls, backgroundSphere, animateObjects }
+
+    // wrap devScene into plugin-like API
+    $three = {
+      ...devScene,
+      init: async () => devScene, // mimic plugin init
+      setScroller: (el) => {
+        devScene.scroller = el;
+      }, // mimic plugin scroller setter
+    };
+    locationCameraShift($three.camera, $three.passAMat, $three.controls)
+
+  } else {
+    $three = useNuxtApp().$three;
     await $three.ready;
-    await nextTick();
-    locationCameraShift($three.camera);
+    locationCameraShift($three.camera, $three.passAMat, $three.controls)
+  }
+  
+});
 
-  });
 </script>

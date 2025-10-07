@@ -10,6 +10,25 @@ let $three;
 
 onMounted(async () => {
 
+  if (import.meta.dev) {
+    const mod = await import("~/composables/threeDev.js"); // path to your function-based file
+    const devScene = await mod.init(true, true, false, false, false); // returns { scene, camera, renderer, controls, backgroundSphere, animateObjects }
+
+    // wrap devScene into plugin-like API
+    $three = {
+      ...devScene,
+      init: async () => devScene, // mimic plugin init
+      setScroller: (el) => {
+        devScene.scroller = el;
+      }, // mimic plugin scroller setter
+    };
+   
+homeCameraShift($three.camera)
+  } else {
+    $three = useNuxtApp().$three;
+    await $three.ready;
+    homeCameraShift($three.camera)
+  }
   
 });
 </script>
