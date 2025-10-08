@@ -75,6 +75,12 @@ export async function createBackgroundPanoFromAPI(
       objTex: { value: rtObjects.texture },
       pano: { value: panoTex },
       uTime: { value: 0.0 },
+      uVhsAmount: { value: 0.0 },
+      uGrain: { value: 0.0 },
+      uScanline: { value: 0.0 },
+      uVignette: { value: 0.0 },
+      uAmplitude: { value: 0.0 },
+      uOffset: { value: 0.0 },
       resolution: { value: db.clone() },
       fovY: { value: MathUtils.degToRad(camera.fov) },
       aspect: { value: camera.aspect },
@@ -87,6 +93,8 @@ export async function createBackgroundPanoFromAPI(
     depthWrite: false,
   });
   const quadA = new Mesh(new PlaneGeometry(2, 2), passAMat);
+
+
 
 console.log("--------------------------------");
 
