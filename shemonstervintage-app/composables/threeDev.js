@@ -5,6 +5,7 @@ import {
   WebGLRenderer,
   Color,
   Group,
+  Clock,
   BoxGeometry,
   MeshBasicMaterial,
   Mesh,
@@ -179,7 +180,10 @@ async function init(
   });
   renderer.setClearColor(0x000000, 0);
 
+  const clock = new Clock();
+
   function animate() {
+
     if (animateObjects.length > 0) {
       animateObjects.forEach((cb) => cb());
     }
@@ -191,8 +195,17 @@ async function init(
       }
     }
 
+     console.log(clock.getElapsedTime());
+
     if (backgroundSphereNeeded) {
       pano.updateCamBasis();
+
+      pano.passAMat.uniforms.uTime.value = clock.getElapsedTime(); 
+      pano.passAMat.uniforms.uVhsAmount.value = 0.8;
+      pano.passAMat.uniforms.uGrain.value = 0.7;
+      pano.passAMat.uniforms.uScanline.value = 0.6;
+      pano.passAMat.uniforms.uVignette.value = 0.7;
+
 
       // Resize buffers if needed
       const cur = new Vector2();

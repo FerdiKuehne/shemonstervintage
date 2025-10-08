@@ -22,7 +22,7 @@ onMounted(async () => {
         devScene.scroller = el;
       }, // mimic plugin scroller setter
     };
-    homeCameraShift($three.camera, $three.passAMat, $three.controls);
+    /*homeCameraShift($three.camera, $three.passAMat, $three.controls);*/
   } else {
     $three = useNuxtApp().$three;
     await $three.ready;
