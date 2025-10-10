@@ -195,20 +195,17 @@ async function init(
       }
     }
 
-     console.log(clock.getElapsedTime());
-
     if (backgroundSphereNeeded) {
       pano.updateCamBasis();
 
       pano.passAMat.uniforms.uTime.value = clock.getElapsedTime(); 
 
-      pano.passAMat.uniforms.uDesat.value        = 0.0;  // ~10% weniger Farbe
-      pano.passAMat.uniforms.uVignette.value     = 0.4;  // kräftig
-      pano.passAMat.uniforms.uScanlines.value    = 0.2;  // klar sichtbar
-      pano.passAMat.uniforms.uTriad.value        = 0.3;  // RGB-Subpixel deutlich
-      pano.passAMat.uniforms.uInterference.value = 0.4;  // diagonale Farbbänder sichtbar
-      pano.passAMat.uniforms.uStripes.value      = 0.2;  // dezente Flash-Stripes
-      pano.passAMat.uniforms.uStripeRate.value   = 0.3;  // gelegentlich
+      pano.passAMat.uniforms.uPeriod.value    = 5.0;   // alle 5s
+      pano.passAMat.uniforms.uDesat.value     = 0.0;   // leicht rausgenommen
+      pano.passAMat.uniforms.uVignette.value  = 0.0;   // sanfte Vignette
+      pano.passAMat.uniforms.uScanlines.value = 0.2;
+      pano.passAMat.uniforms.uTriad.value     = 0.3;
+
 
 
       // Resize buffers if needed

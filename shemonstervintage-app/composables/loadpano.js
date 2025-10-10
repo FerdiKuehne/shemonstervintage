@@ -85,6 +85,9 @@ export async function createBackgroundPanoFromAPI(
       uScanline: { value: 0.0 },
       uStripeAmount: { value: 0.0 },
       uStripeRate: { value: 0.0 },
+      uStripeSpeed: { value: 0.0 },
+      uPeriod: { value: 5.0 },
+      uStripeFade: { value: 0.0 },
       uStripes: { value: 0.0 },
       uCA: { value: 0.0 },
       uVignette: { value: 0.0 },
@@ -94,7 +97,6 @@ export async function createBackgroundPanoFromAPI(
       aspect: { value: camera.aspect },
       camBasis: { value: new Matrix3() },
       rotXYZ: { value: new Vector3(MathUtils.degToRad(2.30),MathUtils.degToRad(-67.1),MathUtils.degToRad(0)) },
-
 
 
     },

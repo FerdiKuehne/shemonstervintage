@@ -6,16 +6,12 @@ uniform float fovY, aspect;
 uniform mat3  camBasis;
 uniform vec3  rotXYZ;
 
-uniform float uTime;            // Sekunden
-
-// Regler (haben sinnvolle Defaults; es läuft auch ohne Setzen)
-uniform float uDesat;           // -1..+1 (0=Basis ~10% rausgenommen)
-uniform float uVignette;        // 0..1   (0=Basis, >0 stärker)
-uniform float uScanlines;       // 0..1   (0=Basis, >0 stärker)
-uniform float uTriad;           // 0..1   (RGB-Subpixel/Masken-Effekt)
-uniform float uInterference;    // 0..1   (diagonale Farbbänder)
-uniform float uStripes;         // 0..1   (horizontale Flash-Stripes Stärke)
-uniform float uStripeRate;      // 0..2   (Häufigkeit der Stripes)
+uniform float uTime;          // Sekunden
+uniform float uPeriod;        // Sek./Durchlauf (Default 5)
+uniform float uDesat;         // -1..+1   (leicht entsättigen rund um 0)
+uniform float uVignette;      // 0..1     (Vignette-Boost)
+uniform float uScanlines;     // 0..1
+uniform float uTriad;         // 0..1
 
 const float PI = 3.141592653589793;
 
@@ -38,12 +34,12 @@ vec3 samplePano(vec3 dir, vec3 rot){
     dir = normalize(applyEulerXYZ(dir, rot));
     float u = fract(atan(dir.z, dir.x)/(2.0*PI)+0.5);
     float v = clamp(asin(clamp(dir.y,-1.0,1.0))/PI+0.5,0.0,1.0);
-    return texture2D(pano, vec2(u,v)).rgb;
+    return texture2D(pano, vec2(u, v)).rgb;
 }
 vec3 sampleScene(vec2 ndc){
     vec3 dir = rayFromNDC(ndc);
     vec3 panoCol = samplePano(dir, rotXYZ);
-    vec2 uvRect = ndc*0.5+0.5;
+    vec2 uvRect = ndc*0.5 + 0.5;
     vec4 objCol = vec4(0.0);
     if(all(greaterThanEqual(uvRect, vec2(0.0))) && all(lessThanEqual(uvRect, vec2(1.0))))
         objCol = texture2D(objTex, uvRect);
@@ -52,10 +48,9 @@ vec3 sampleScene(vec2 ndc){
 
 // ---------- Utils ----------
 float luma709(vec3 c){ return dot(c, vec3(0.2126,0.7152,0.0722)); }
-float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
-float hash1(float x){ return fract(sin(x*1.6180339) * 43758.5453); }
+float hash1(float x){ return fract(sin(x*1.6180339)*43758.5453); }
+float hash2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
 
-// ---------- Hauptshader ----------
 void main(){
     vec2 res  = max(resolution, vec2(1.0));
     vec2 frag = gl_FragCoord.xy;
@@ -64,71 +59,100 @@ void main(){
     float y01 = frag.y/res.y;
     float t   = uTime;
 
-    // Szene
     vec3 color = sampleScene(ndc);
 
-    // ================== CRT MASK + SCANLINES ==================
-    // Basisstärken (damit’s sofort „richtig“ aussieht)
-    float scanAmt  = clamp(0.70 + uScanlines, 0.0, 2.0); // Liniendunklung
-    float triadAmt = clamp(0.60 + uTriad,     0.0, 2.0); // RGB-Subpixel
+    // ===== CRT: Scanlines + RGB Triad (dezent) =====
+    float scanAmt  = clamp(0.6 + uScanlines, 0.0, 2.0);
+    float triadAmt = clamp(0.5 + uTriad,     0.0, 2.0);
 
-    // 1) horizontale Scanlines (dicht, leicht flimmernd)
-    float line = 0.5 + 0.5 * sin(gl_FragCoord.y * 3.14159 + t*0.2);
-    color *= 1.0 - 0.35 * scanAmt * (1.0 - line);
+    // horizontale Scanlines (leicht)
+    float line = 0.5 + 0.5 * sin(gl_FragCoord.y * 3.14159 + t*0.15);
+    color *= 1.0 - 0.28 * scanAmt * (1.0 - line);
 
-    // 2) vertikale RGB-Triad-Maske (R/G/B periodisch, leicht animiert)
-    //   Frequenz skaliert mit Auflösung, damit es „fernsehig“ bleibt
-    float triadFreq = 1.5; // Basis-Perioden pro Pixelbreite
-    float phase = t*0.5;
-    float rM = 0.66 + 0.34 * sin((x01*res.x*triadFreq)*2.0*PI + phase + 0.0);
-    float gM = 0.66 + 0.34 * sin((x01*res.x*triadFreq)*2.0*PI + phase + 2.0944); // +120°
-    float bM = 0.66 + 0.34 * sin((x01*res.x*triadFreq)*2.0*PI + phase + 4.1888); // +240°
-    vec3 triadMask = mix(vec3(1.0), vec3(rM,gM,bM), 0.35 * triadAmt);
+    // vertikale RGB-Subpixel-Maske
+    float triadFreq = 1.3;
+    float ph = t*0.3;
+    float rM = 0.7 + 0.3 * sin((x01*res.x*triadFreq)*2.0*PI + ph + 0.0);
+    float gM = 0.7 + 0.3 * sin((x01*res.x*triadFreq)*2.0*PI + ph + 2.0944);
+    float bM = 0.7 + 0.3 * sin((x01*res.x*triadFreq)*2.0*PI + ph + 4.1888);
+    vec3 triadMask = mix(vec3(1.0), vec3(rM,gM,bM), 0.25 * triadAmt);
     color *= triadMask;
 
-    // ================== DIAGONALE INTERFERENZ-BÄNDER ==================
-    float interfAmt = clamp(0.60 + uInterference, 0.0, 2.0);
-    // leichte, langsame diagonale Farbmischung (R/G/B Phasenversatz)
-    float ang = radians(18.0); // leichte Schräge
-    float kx = cos(ang), ky = sin(ang);
-    float f  = 0.9;            // Frequenz
-    float base = (x01*kx + y01*ky) * res.y * f + t*0.8;
-    vec3 inter = vec3(
-        1.0 + 0.03*interfAmt * sin(base + 0.0),
-        1.0 + 0.03*interfAmt * sin(base + 2.1),
-        1.0 + 0.03*interfAmt * sin(base + 4.2)
-    );
-    color *= inter;
+    // ===== Rolling Stripes – deterministisch, alle ~5s =====
+    float period = (uPeriod<=0.0) ? 5.0 : uPeriod;  // Default 5 s
+    float cycle  = floor(t/period);
+    float phase  = fract(t/period);                 // 0..1 pro Durchlauf
 
-    // ================== HORIZONTALE FLASH-STRIPES (random, kurz) ==================
-    float stripeAmt  = clamp(0.30 + uStripes,    0.0, 2.0);
-    float stripeRate = clamp(1.00 + uStripeRate, 0.2, 3.0);
+    // 1–2 Stripes pro Durchlauf
+    int count = (hash1(cycle*3.3) > 0.6) ? 2 : 1;
 
-    float block = floor(t * stripeRate);           // wechselt grob pro Sektion
-    // bis zu zwei Stripes pro Block (sehr dezent)
-    for(int i=0;i<2;i++){
-        float seed  = block*13.37 + float(i);
-        float yC    = hash1(seed*3.1);
-        float w     = mix(0.006, 0.02, hash1(seed*5.7));
-        float amp   = mix(0.03, 0.10, hash1(seed*7.7));
-        float signA = (hash1(seed*9.9) > 0.5) ? 1.0 : -1.0;
-        float mask  = smoothstep(w, 0.0, abs(y01 - yC));
-        // leichtes Körnen entlang der Linie
-        float grain = hash(vec2(floor(x01*res.x*0.5), block))*0.5 + 0.5;
-        color += stripeAmt * mask * amp * signA * (0.8 + 0.2*grain);
+    // Lebensdauer (Anteil der Periode) + sanftes Fade
+    float lifeFrac = 0.55;
+    float fadeFrac = 0.18;
+
+    for (int i=0; i<2; i++){
+        if (i>=count) break;
+
+        float seed   = cycle*17.17 + float(i)*4.2;
+
+        // Startzeit (bei 2 Stripes leicht versetzt)
+        float start  = (count==2) ? mix(0.05, 0.20, hash1(seed*1.7)) + float(i)*0.08
+                                  : mix(0.20, 0.35, hash1(seed*1.7));
+        float endT   = start + lifeFrac;
+
+        // Aktiv-Phase 0/1 (Variable nicht 'active' nennen -> Reserviert!)
+        float actv = step(start, phase) * (1.0 - step(endT, phase));
+        if (actv < 0.5) continue;
+
+        // Zeitnormierung + weicher Envelope
+        float p = clamp((phase - start)/max(1e-4, lifeFrac), 0.0, 1.0);
+        float fadeIn  = smoothstep(0.0,        fadeFrac,     p);
+        float fadeOut = smoothstep(1.0, 1.0 -  fadeFrac,     p);
+        float env = fadeIn * fadeOut;
+
+        // vertikale Position (oben -> unten)
+        float yC = 1.0 - p;
+
+        // räumliche weiche Maske
+        float w     = mix(0.008, 0.020, hash1(seed*3.1));
+        float mask  = smoothstep(w, 0.0, abs(y01 - yC)) * env;
+
+        // Stärke + Polarität
+        float amp   = mix(0.03, 0.07,  hash1(seed*5.9));
+        float sign  = (hash1(seed*7.7) > 0.5) ? 1.0 : -1.0;
+
+        // Körnung entlang der Linie
+        float grain = hash2(vec2(floor(x01*res.x*0.6), cycle))*0.5 + 0.5;
+
+        // --- farbige Stripes: Luma + Farb-Tint separat ---
+
+        // 1) Luminanz-Flash (hell/dunkel)
+        float lumDelta = amp * sign * mask * (0.85 + 0.15*grain);
+        color += vec3(lumDelta);
+
+        // 2) Farb-Tint (magenta ODER grün), unabhängig vom Vorzeichen
+        float pick = hash1(seed*11.3);
+        vec3 tintMag = vec3(1.12, 0.92, 1.10);  // magenta-ish
+        vec3 tintGrn = vec3(0.92, 1.12, 0.95);  // grün-ish
+        vec3 tintCol = (pick > 0.5) ? tintMag : tintGrn;
+
+        // dezent, mit Fade gekoppelt
+        float tintAmt  = mix(0.08, 0.18, hash1(seed*12.7)) * env;
+        float tintMask = tintAmt * mask;
+
+        // Multiplikatives, farbiges „Bleeding“
+        color = mix(color, color * tintCol, tintMask);
     }
 
-    // ================== LEICHT ENTSÄTTIGEN ==================
+    // ===== leicht entsättigen + sanfte Vignette =====
     float gray = luma709(color);
-    float desatBase = 0.10;                    // ~10% weniger Farbe
-    float sat = clamp(1.0 - (desatBase + uDesat*0.5), 0.0, 1.2);
+    float sat  = clamp(1.0 - (0.10 + uDesat*0.5), 0.0, 1.2); // ~10% weniger Farbe
     color = mix(vec3(gray), color, sat);
 
-    // ================== KRÄFTIGE VIGNETTE ==================
     float R = length(ndc);
-    float vig = smoothstep(0.30, 1.0, R);
-    float vigStrength = clamp(1.00 + uVignette, 0.0, 2.0); // Basis schon stark
-    color *= mix(1.0, 1.0 - 0.60*vigStrength, vig);
+    float vig = smoothstep(0.35, 1.0, R);
+    float vigStrength = clamp(0.5 + uVignette, 0.0, 1.5);    // sanfter
+    color *= mix(1.0, 1.0 - 0.35*vigStrength, vig);
 
     gl_FragColor = vec4(clamp(color,0.0,1.0), 1.0);
 }
