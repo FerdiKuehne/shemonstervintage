@@ -90,6 +90,7 @@ export async function createBackgroundPanoFromAPI(
       uStripeFade: { value: 0.0 },
       uStripes: { value: 0.0 },
       uCA: { value: 0.0 },
+      uStripeColorBoost: { value: 0.0 },
       uVignette: { value: 0.0 },
       uOffset: { value: 0.0 },
       resolution: { value: db.clone() },

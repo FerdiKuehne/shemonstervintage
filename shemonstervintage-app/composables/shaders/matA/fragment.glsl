@@ -12,6 +12,7 @@ uniform float uDesat;         // -1..+1   (leicht entsättigen rund um 0)
 uniform float uVignette;      // 0..1     (Vignette-Boost)
 uniform float uScanlines;     // 0..1
 uniform float uTriad;         // 0..1
+uniform float uStripeColorBoost; // 0..2  (verstärkt Tint in den Stripes)
 
 const float PI = 3.141592653589793;
 
@@ -83,12 +84,12 @@ void main(){
     float cycle  = floor(t/period);
     float phase  = fract(t/period);                 // 0..1 pro Durchlauf
 
-    // 1–2 Stripes pro Durchlauf
-    int count = (hash1(cycle*3.3) > 0.6) ? 2 : 1;
+    int count = (hash1(cycle*3.3) > 0.6) ? 2 : 1;   // 1–2 Stripes pro Durchlauf
+    float lifeFrac = 0.55;                          // Anteil der Periode sichtbar
+    float fadeFrac = 0.18;                          // weiches Ein-/Ausblenden
 
-    // Lebensdauer (Anteil der Periode) + sanftes Fade
-    float lifeFrac = 0.55;
-    float fadeFrac = 0.18;
+    // Akkumaske für lokale Sättigungsanhebung in Stripes
+    float stripeSatMask = 0.0;
 
     for (int i=0; i<2; i++){
         if (i>=count) break;
@@ -100,7 +101,7 @@ void main(){
                                   : mix(0.20, 0.35, hash1(seed*1.7));
         float endT   = start + lifeFrac;
 
-        // Aktiv-Phase 0/1 (Variable nicht 'active' nennen -> Reserviert!)
+        // Aktiv-Phase 0/1 (kein reservierter Name verwenden)
         float actv = step(start, phase) * (1.0 - step(endT, phase));
         if (actv < 0.5) continue;
 
@@ -124,34 +125,38 @@ void main(){
         // Körnung entlang der Linie
         float grain = hash2(vec2(floor(x01*res.x*0.6), cycle))*0.5 + 0.5;
 
-        // --- farbige Stripes: Luma + Farb-Tint separat ---
-
-        // 1) Luminanz-Flash (hell/dunkel)
+        // --- 1) Luminanz-Flash (hell/dunkel) ---
         float lumDelta = amp * sign * mask * (0.85 + 0.15*grain);
         color += vec3(lumDelta);
 
-        // 2) Farb-Tint (magenta ODER grün), unabhängig vom Vorzeichen
+        // --- 2) Farb-Tint (magenta ODER grün) ---
         float pick = hash1(seed*11.3);
-        vec3 tintMag = vec3(1.12, 0.92, 1.10);  // magenta-ish
-        vec3 tintGrn = vec3(0.92, 1.12, 0.95);  // grün-ish
+        vec3 tintMag = vec3(1.25, 0.85, 1.20);  // kräftigeres Magenta
+        vec3 tintGrn = vec3(0.88, 1.22, 0.90);  // kräftigeres Grün
         vec3 tintCol = (pick > 0.5) ? tintMag : tintGrn;
 
-        // dezent, mit Fade gekoppelt
-        float tintAmt  = mix(0.08, 0.18, hash1(seed*12.7)) * env;
+        // Boostbarer Tint (multiplikativ + kleine additive Komponente)
+        float baseTint = mix(0.10, 0.22, hash1(seed*12.7));
+        float tintAmt  = baseTint * (1.0 + 1.5 * uStripeColorBoost) * env;
         float tintMask = tintAmt * mask;
 
-        // Multiplikatives, farbiges „Bleeding“
-        color = mix(color, color * tintCol, tintMask);
+        vec3 mulCol = mix(color, color * tintCol, clamp(tintMask, 0.0, 1.0));
+        vec3 addCol = mulCol + (tintCol - vec3(1.0)) * 0.15 * tintMask; // 0.15 ggf. erhöhen
+        color = addCol;
+
+        // für spätere Sättigungsanhebung merken
+        stripeSatMask = max(stripeSatMask, tintMask);
     }
 
-    // ===== leicht entsättigen + sanfte Vignette =====
+    // ===== leicht entsättigen (außer in Stripes) + sanfte Vignette =====
     float gray = luma709(color);
-    float sat  = clamp(1.0 - (0.10 + uDesat*0.5), 0.0, 1.2); // ~10% weniger Farbe
-    color = mix(vec3(gray), color, sat);
+    float satBase  = clamp(1.0 - (0.10 + uDesat*0.5), 0.0, 1.2);  // global ~10% weniger
+    float satLocal = mix(satBase, 1.05, clamp(stripeSatMask, 0.0, 1.0)); // in Stripes satter
+    color = mix(vec3(gray), color, satLocal);
 
     float R = length(ndc);
     float vig = smoothstep(0.35, 1.0, R);
-    float vigStrength = clamp(0.5 + uVignette, 0.0, 1.5);    // sanfter
+    float vigStrength = clamp(0.5 + uVignette, 0.0, 1.5);         // sanft
     color *= mix(1.0, 1.0 - 0.35*vigStrength, vig);
 
     gl_FragColor = vec4(clamp(color,0.0,1.0), 1.0);

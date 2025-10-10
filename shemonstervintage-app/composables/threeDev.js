@@ -200,12 +200,13 @@ async function init(
 
       pano.passAMat.uniforms.uTime.value = clock.getElapsedTime(); 
 
-      pano.passAMat.uniforms.uPeriod.value    = 5.0;   // alle 5s
-      pano.passAMat.uniforms.uDesat.value     = 0.0;   // leicht rausgenommen
-      pano.passAMat.uniforms.uVignette.value  = 0.0;   // sanfte Vignette
-      pano.passAMat.uniforms.uScanlines.value = 0.2;
-      pano.passAMat.uniforms.uTriad.value     = 0.3;
 
+      pano.passAMat.uniforms.uPeriod.value          = 5.0; // alle 5s
+      pano.passAMat.uniforms.uDesat.value           = 0.0;
+      pano.passAMat.uniforms.uVignette.value        = 0.0;
+      pano.passAMat.uniforms.uScanlines.value       = 0.2;
+      pano.passAMat.uniforms.uTriad.value           = 0.3;
+      pano.passAMat.uniforms.uStripeColorBoost.value= 0.6; // mehr Farbe in Stripes
 
 
       // Resize buffers if needed
