@@ -201,10 +201,14 @@ async function init(
       pano.updateCamBasis();
 
       pano.passAMat.uniforms.uTime.value = clock.getElapsedTime(); 
-      pano.passAMat.uniforms.uVhsAmount.value = 0.8;
-      pano.passAMat.uniforms.uGrain.value = 0.7;
-      pano.passAMat.uniforms.uScanline.value = 0.6;
-      pano.passAMat.uniforms.uVignette.value = 0.7;
+
+      pano.passAMat.uniforms.uDesat.value        = 0.0;  // ~10% weniger Farbe
+      pano.passAMat.uniforms.uVignette.value     = 0.4;  // kräftig
+      pano.passAMat.uniforms.uScanlines.value    = 0.2;  // klar sichtbar
+      pano.passAMat.uniforms.uTriad.value        = 0.3;  // RGB-Subpixel deutlich
+      pano.passAMat.uniforms.uInterference.value = 0.4;  // diagonale Farbbänder sichtbar
+      pano.passAMat.uniforms.uStripes.value      = 0.2;  // dezente Flash-Stripes
+      pano.passAMat.uniforms.uStripeRate.value   = 0.3;  // gelegentlich
 
 
       // Resize buffers if needed
