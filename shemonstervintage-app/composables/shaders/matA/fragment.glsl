@@ -101,7 +101,6 @@ void main(){
                                   : mix(0.20, 0.35, hash1(seed*1.7));
         float endT   = start + lifeFrac;
 
-        // Aktiv-Phase 0/1 (kein reservierter Name verwenden)
         float actv = step(start, phase) * (1.0 - step(endT, phase));
         if (actv < 0.5) continue;
 
@@ -156,8 +155,9 @@ void main(){
 
     float R = length(ndc);
     float vig = smoothstep(0.35, 1.0, R);
-    float vigStrength = clamp(0.5 + uVignette, 0.0, 1.5);         // sanft
+    float vigStrength = clamp(0.3 + uVignette, 0.0, 1.5);         // sanft
     color *= mix(1.0, 1.0 - 0.35*vigStrength, vig);
+
 
     gl_FragColor = vec4(clamp(color,0.0,1.0), 1.0);
 }
