@@ -197,7 +197,7 @@ body::-webkit-scrollbar {
   left: 1rem;
   z-index: 1;
   font-size: 1.5rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--black);
   letter-spacing: -1.5px;
 }
