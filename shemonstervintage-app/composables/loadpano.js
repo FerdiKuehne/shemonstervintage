@@ -75,23 +75,12 @@ export async function createBackgroundPanoFromAPI(
       objTex: { value: rtObjects.texture },
       pano: { value: panoTex },
       uTime: { value: 0.0 },
-      uDesat: { value: 0.0 },
-      uSaturation: { value: 0.0 },
-      uScanlines: { value: 0.0 },
-      uTriad: { value: 0.0 },
-      uInterference: { value: 0.0 },
-      uVhsAmount: { value: 0.0 },
-      uGrain: { value: 0.0 },
-      uScanline: { value: 0.0 },
-      uStripeAmount: { value: 0.0 },
-      uStripeRate: { value: 0.0 },
-      uStripeSpeed: { value: 0.0 },
-      uPeriod: { value: 5.0 },
-      uStripeFade: { value: 0.0 },
-      uStripes: { value: 0.0 },
-      uCA: { value: 0.0 },
-      uStripeColorBoost: { value: 0.0 },
-      uVignette: { value: 0.0 },
+      uSplit: { value: 6.0 },          // Pixelversatz
+      uAngle: { value: 0.0 },          // 0° = horizontal, 90° = vertikal
+      uRadial: { value: 0.0 },         // erst mal linear
+      uCenter: { value: new Vector2(0.5, 0.5) },
+      uFalloff: { value: 1.0 },        // für radialen Modus interessant
+      uMix: { value: 1.0 },            // voller Effekt
       uOffset: { value: 0.0 },
       resolution: { value: db.clone() },
       fovY: { value: MathUtils.degToRad(camera.fov) },

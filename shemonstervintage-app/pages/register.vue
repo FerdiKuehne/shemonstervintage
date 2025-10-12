@@ -199,6 +199,7 @@ onMounted(() => {
     width: 60%;
     border: 1px solid var(--black);
     padding: 1rem;
+    backdrop-filter: blur(15px);
   }
 
   .hammer {

@@ -12,7 +12,7 @@
     height="32"
     viewBox="0 0 64 64"
     fill="none"
-    stroke="#ffffff"
+    stroke="#000000"
     stroke-width="2"
     stroke-miterlimit="10"
   >
@@ -198,9 +198,8 @@ body::-webkit-scrollbar {
   z-index: 1;
   font-size: 1.5rem;
   font-weight: 500;
-  color: var(--white);
+  color: var(--black);
   letter-spacing: -1.5px;
-  mix-blend-mode: difference;
 }
 
 header {
@@ -209,7 +208,6 @@ header {
   left: 1rem;
   z-index: 20;
   transform: translate(0, -50%);
-  mix-blend-mode: difference;
 }
 
 ul.header-nav {
@@ -222,7 +220,6 @@ ul.header-nav {
   list-style: none;
   margin: 0;
   padding: 0;
-  mix-blend-mode: difference;
 }
 
 ul.header-nav li {
@@ -240,7 +237,7 @@ ul.header-nav li:last-child {
 ul.header-nav li a {
   font-size: 0.8rem;
   text-decoration: none;
-  color: var(--white);
+  color: var(--black);
   display: block;
 }
 
@@ -265,7 +262,7 @@ ul.main-nav li {
   text-transform: uppercase;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--white);
+  color: var(--black);
   line-height: 2rem;
   transition: font-size 0.3s, line-height 0.3s;
 }
@@ -290,7 +287,7 @@ ul.main-nav li:hover .num {
 }
 
 ul.main-nav li a {
-  color: var(--white);
+  color: var(--black);
   text-decoration: none;
 }
 
@@ -361,7 +358,6 @@ footer {
   bottom: 1rem;
   right: 1rem;
   z-index: 20;
-  mix-blend-mode: difference;
 }
 
 ul.footer-nav {
@@ -386,7 +382,7 @@ ul.footer-nav li:last-child {
 ul.footer-nav li a {
   font-size: 0.8rem;
   text-decoration: none;
-  color: var(--white);
+  color: var(--black);
   display: block;
 }
 </style>
