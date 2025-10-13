@@ -62,7 +62,7 @@ const loadFront = async (dpr) => {
 
     if (data.success) {
       batch++; // increment batch for next call
-      return [...images, ...urls]; // merge front images
+      return urls; // merge front images
     } else {
       console.error("API error:", data.message);
     }
