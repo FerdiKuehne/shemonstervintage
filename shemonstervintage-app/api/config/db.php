@@ -1,23 +1,11 @@
 <?php
-$host = "127.0.0.1";            // host on your Mac
-$port = 3306;                   // MySQL exposed port
-$dbname = "shemonstervintage";  // database name
-$user = "wishlist_user";        // MySQL user
-$pass = "wishlist_pass";        // MySQL password
-$charset = "utf8mb4";
+// config/db.php
 
-$dsn = "mysql:host=$host;port=$port;dbname=$dbname;charset=$charset";
-
-$options = [
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES => false,
+return [
+    'host' => getenv('DB_HOST') ?: '127.0.0.1',
+    'port' => getenv('DB_PORT') ?: 3306,
+    'name' => getenv('DB_NAME') ?: 'shemonstervintage',
+    'user' => getenv('DB_USER') ?: 'wishlist_user',
+    'pass' => getenv('DB_PASS') ?: 'wishlist_pass',
+    'charset' => getenv('DB_CHARSET') ?: 'utf8mb4',
 ];
-
-try {
-    $pdo = new PDO($dsn, $user, $pass, $options);
-} catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode(["message" => "Database connection failed", "error" => $e->getMessage()]);
-    exit();
-}

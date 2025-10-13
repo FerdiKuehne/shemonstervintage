@@ -20,6 +20,7 @@ const containerHeight = ref(100); // vh
 let $three, grid;
 
 onMounted(async () => {
+  const dpr = Math.round(window.devicePixelRatio || 1);
   if (import.meta.dev) {
     const mod = await import("~/composables/threeDev.js"); // path to your function-based file
     const devScene = await mod.init(false, false, false, false, false); // returns { scene, camera, renderer, controls, backgroundSphere, animateObjects }
@@ -38,6 +39,7 @@ onMounted(async () => {
   }
 
      grid = await initGrid(
+      dpr,
       $three.renderer,
       $three.camera,
       containerHeight,

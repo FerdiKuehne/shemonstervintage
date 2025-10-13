@@ -1,29 +1,11 @@
 <?php
+// config/app_config.php
+
+// Set default timezone
+date_default_timezone_set(getenv('APP_TIMEZONE') ?: 'Europe/Berlin');
+
 return [
-    // App settings
-    'app_name' => 'SheMonsterVintage API',
-    'environment' => 'development', // or 'production'
-    'debug' => true,
-
-    // Base URL (optional: useful if you deploy later)
-    'base_url' => 'http://localhost:8000/api',
-
-    // Logging
-    'log_path' => __DIR__ . '/../logs/php-error.log',
-
-    // Security
-    'allowed_origins' => [
-        'http://localhost:3000',  // your frontend (Vue)
-        // add production frontend domain later, e.g.:
-        // 'https://shemonsvintage.com'
-    ],
-
-    // Database info (optional if you prefer db.php)
-    'database' => [
-        'host' => 'db',
-        'name' => 'shemonstervintage',
-        'user' => 'root',
-        'pass' => 'rootpass',
-        'charset' => 'utf8mb4'
-    ]
+    'env' => getenv('APP_ENV') ?: 'development',
+    'debug' => getenv('APP_DEBUG') === 'true', // optional debug flag
+    'base_url' => getenv('BASE_URL') ?: 'http://localhost',
 ];

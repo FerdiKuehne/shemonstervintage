@@ -37,10 +37,42 @@ const geometry = new PlaneGeometry(targetWidth, targetHeight);
 
 gsap.registerPlugin(ScrollTrigger);
 
-const images = Array.from(
-  { length: 16 },
-  (_, i) => `https://picsum.photos/800/900?random=${i + 1}` // 8:9 format (400x600)
-);
+
+
+
+let images = []; 
+let backImage = [];
+let batch = 1;
+
+
+const loadFront = async (dpr) => {
+  console.log("Loading front images for batch:", batch, "with DPR:", dpr);
+  const url = `http://localhost:8000/stokes/gallery?type=front&batch=${batch}&dpr=${dpr}`;
+  console.log(url);
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    console.log("Parsed data:", data.data.front);
+    console.log("Data success status:", data.success);
+    const urls = Object.values(data.data.front);
+
+    console.log("Current images before merge:", urls);
+
+    if (data.success) {
+      batch++; // increment batch for next call
+      return [...images, ...urls]; // merge front images
+    } else {
+      console.error("API error:", data.message);
+    }
+
+  } catch (err) {
+    console.error("Fetch error:", err);
+  }
+};
+
+
 
 function getGridSize() {
   const rows = Math.ceil(grid.children.length / gridSize);
@@ -88,14 +120,18 @@ function setGridPosition(index, columns, object) {
   object.position.y = -(row * gapY);
 }
 
-async function loadGridImages(grid, images, renderer) {
+async function loadGridImages(dpr,grid, images, renderer) {
+  images = await loadFront(dpr);
+  console.log("Loading batch:", batch);
+  console.log("Total images to load:", images.length);
+  console.log(images);
   const promises = images.map((url, index) => {
     return new Promise((resolve, reject) => {
       const indexDelta = index + grid.children.length;
       const loader = new TextureLoader();
 
       loader.load(
-        url,
+        "http://localhost:8000" + url,
         (texture) => {
           texture.colorSpace = SRGBColorSpace;
           texture.minFilter = LinearFilter;
@@ -174,7 +210,7 @@ function updateContainerHeight(scrollerRef, camera) {
   ScrollTrigger.refresh();
 }
 
-function createScrollTrigger(camera, renderer, scrollContainer) {
+function createScrollTrigger(dpr, camera, renderer, scrollContainer) {
   getGridHeightInPx(camera);
 
   // create scrollTrigger without tweening grid.position internally
@@ -192,7 +228,7 @@ function createScrollTrigger(camera, renderer, scrollContainer) {
       if (grid.children.length < 200 && self.progress > 0.7 && !loadingMore) {
         loadingMore = true;
 
-        await loadGridImages(grid, images, renderer);
+        await loadGridImages(dpr, grid, images, renderer);
 
         // update container height based on camera frustum
         updateContainerHeight(scrollContainer, camera);
@@ -210,7 +246,7 @@ function createScrollTrigger(camera, renderer, scrollContainer) {
   });
 }
 
-async function initGrid(renderer, camera, containerHeight, scrollContainer) {
+async function initGrid(dpr, renderer, camera, containerHeight, scrollContainer) {
   getCureentGridSize();
   /* Center mid pre init */
   const totalWidth =
@@ -218,10 +254,10 @@ async function initGrid(renderer, camera, containerHeight, scrollContainer) {
   grid.position.x = -totalWidth / 2 + targetWidth / 2;
   grid.position.y = targetHeight;
 
-  await loadGridImages(grid, images, renderer);
+  await loadGridImages(dpr,grid, images, renderer);
   updateContainerHeight(scrollContainer, camera);
 
-  createScrollTrigger(camera, renderer, scrollContainer);
+  createScrollTrigger(dpr, camera, renderer, scrollContainer);
 
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;

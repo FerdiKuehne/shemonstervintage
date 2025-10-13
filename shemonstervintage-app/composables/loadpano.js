@@ -32,11 +32,13 @@ export async function createBackgroundPanoFromAPI(
   // Fetch device-specific texture with DPR parameter
   console.log("Device Pixel Ratio (DPR):", dpr);
   /* const res = await fetch(`/test/api/texture.php?dpr=${dpr}`); */
-  const res = await fetch(`http://localhost:8000/texture.php?dpr=${dpr}`);
+  const res = await fetch(`http://localhost:8000/stokes/background?=${dpr}`);
 
   /* produktiv */
   const data = await res.json();
-  let textureUrl = data.texture;
+console.log(data);
+
+  let textureUrl = "http://localhost:8000" + data.data.texture;
 
   console.log("Texture URL:", textureUrl);
 
