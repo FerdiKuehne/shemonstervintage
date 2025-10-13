@@ -205,12 +205,12 @@ async function init(
       pano.passAMat.uniforms.uMix = { value: 0.0 }; // Effekt standardmäßig aus
 
 
-      pano.passAMat.uniforms.uSplit.value   = 6.0;          // Pixelversatz
+      pano.passAMat.uniforms.uSplit.value   = 0.0;          // Pixelversatz
       pano.passAMat.uniforms.uAngle.value   = 0.0;          // 0° = horizontal, 90° = vertikal
       pano.passAMat.uniforms.uRadial.value  = 0.0;          // erst mal linear
       pano.passAMat.uniforms.uCenter.value  = new Vector2(0.5, 0.5);
-      pano.passAMat.uniforms.uFalloff.value = 1.0;          // für radialen Modus interessant
-      pano.passAMat.uniforms.uMix.value     = 1.0;          // voller Effekt
+      pano.passAMat.uniforms.uFalloff.value = 0.0;          // für radialen Modus interessant
+      pano.passAMat.uniforms.uMix.value     = 0.0;          // voller Effekt
 
 
 
