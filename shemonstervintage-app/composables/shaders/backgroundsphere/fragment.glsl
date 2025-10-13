@@ -9,6 +9,11 @@ uniform float uOffset;      // NEU: 0..1 (entspricht 0..360°)
 varying vec3 vNormal;
 varying vec2 vUv;
 
+
+vec4 tex = texture2D(uTexture, vUv);
+tex.rgb *= 1.3; // 30% heller
+gl_FragColor = tex;
+
 void main() {
     // Basis-UV (inkl. Flip für inside sphere)
     vec2 uv0 = vUv;
