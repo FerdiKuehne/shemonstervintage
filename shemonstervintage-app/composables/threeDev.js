@@ -164,6 +164,7 @@ async function init(
     passAMat.uniforms.uMix.value = 1.0; // Effekt aktiv
     passAMat.uniforms.fovY.value = MathUtils.degToRad(camera.fov);
 
+
     // --- Zustand für Bewegungs-Erkennung ---
     pano._motionState = {
       prevQuat: camera.quaternion.clone(),
@@ -235,13 +236,11 @@ async function init(
       // Schwelle + Mapping auf [0..20]
       const MOTION_ON = 0.2; // ab hier sichtbar
       const MOTION_MAX = 1.0; // Sättigung
-      const targetSplit = Math.max(
-        0,
-        Math.min(
-          50,
-          (50 * (motion - MOTION_ON)) / (MOTION_MAX - MOTION_ON)
-        )
-      );
+      const MAX_SPLIT = 50.0;        // oder 16.0
+      const targetSplit = Math.max(0, Math.min(
+        MAX_SPLIT,
+        (MAX_SPLIT * (motion - MOTION_ON)) / (MOTION_MAX - MOTION_ON)
+      ));
 
       // Sanftes Ansteigen/Abfallen
       const rise = 10.0; // höher = schneller Anstieg
