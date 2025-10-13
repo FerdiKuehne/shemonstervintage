@@ -4,7 +4,25 @@
   <ul class="header-nav">
     <li><NuxtLink to="/login">Login</NuxtLink></li>
     <li><NuxtLink to="/register">Register </NuxtLink></li>
-    <li><button @click="isWishlistOpen = true" class="btn-wishlist">Wishlist</button></li>
+    <li><button @click="isWishlistOpen = true" class="btn-wishlist">
+
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="32"
+    height="32"
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke="#000000"
+    stroke-width="2"
+    stroke-miterlimit="10"
+  >
+    <polygon points="51.081 59.656 32.276 47.43 13.463 59.656 13.463 3.737 51.081 3.737 51.081 59.656"/>
+    <line x1="32.264" y1="15.364" x2="32.264" y2="34.292"/>
+    <line x1="41.729" y1="24.828" x2="22.8" y2="24.828"/>
+  </svg>
+
+
+    </button></li>
   </ul>
 
   <header>
@@ -85,7 +103,8 @@ onMounted(async () => {
 <style>
 
 :root {
-  --main-color: #000;
+
+  --main-color: #f7a700;
 
   --white: #fff;
   --black: #000;
@@ -109,8 +128,10 @@ body::-webkit-scrollbar {
 
 .page-headline {
   position: fixed;
-  color: var(--black);
+  font-weight: 300;
+  color: var(--main-color);
   padding: 1.25rem 1rem 0 170px;
+  mix-blend-mode: difference;
 }
 
 .wishlist-fade-enter-active,
@@ -169,13 +190,14 @@ body::-webkit-scrollbar {
 </style>
 
 <style scoped>
+
 .logo {
   position: fixed;
   top: 1rem;
   left: 1rem;
   z-index: 1;
   font-size: 1.5rem;
-  font-weight: bolder;
+  font-weight: 600;
   color: var(--black);
   letter-spacing: -1.5px;
 }
@@ -186,7 +208,6 @@ header {
   left: 1rem;
   z-index: 20;
   transform: translate(0, -50%);
-  mix-blend-mode: difference;
 }
 
 ul.header-nav {
@@ -195,6 +216,7 @@ ul.header-nav {
   right: 1rem;
   z-index: 20;
   display: flex;
+  align-items: center;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -219,6 +241,14 @@ ul.header-nav li a {
   display: block;
 }
 
+.btn-wishlist {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+}
+
 ul.main-nav {
   list-style: none;
   margin: 0;
@@ -232,7 +262,7 @@ ul.main-nav li {
   text-transform: uppercase;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--white);
+  color: var(--black);
   line-height: 2rem;
   transition: font-size 0.3s, line-height 0.3s;
 }
@@ -257,7 +287,7 @@ ul.main-nav li:hover .num {
 }
 
 ul.main-nav li a {
-  color: var(--white);
+  color: var(--black);
   text-decoration: none;
 }
 

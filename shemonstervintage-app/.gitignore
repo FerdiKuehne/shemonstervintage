@@ -13,6 +13,9 @@ node_modules
 logs
 *.log
 
+# macOS system files
+.DS_Store
+
 # Misc
 .DS_Store
 .fleet
@@ -28,3 +31,8 @@ logs
 
 # Ignore everything in the img folder
 /api/public/img/*
+
+# Ignore all image uploads
+assets/images/
+!assets/images/.htaccess
+
