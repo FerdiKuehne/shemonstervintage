@@ -374,8 +374,7 @@ onMounted(() => {})
   cursor: pointer;
   line-height: 0;
 }
-.box-close:hover { opacity: .8; }
-.box-close:focus { outline: 2px solid var(--black); outline-offset: 2px; }
+.box-close:focus { outline: 0; outline-offset: 0; }
 
 /* Stepper */
 .wizard-header { margin-bottom: 3rem; }

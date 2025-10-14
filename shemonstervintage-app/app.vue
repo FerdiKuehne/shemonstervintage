@@ -147,7 +147,7 @@ body::-webkit-scrollbar { display: none; }
 
 h1 { 
   font-size: 1.5rem;
-  font-weight: bolder;
+  font-weight: 600;
   color: var(--black);
   letter-spacing: 0;
   text-transform: uppercase;
@@ -254,7 +254,7 @@ h1 {
 <style scoped>
 .logo {
   position: fixed;
-  top: 1rem;
+  top: .8rem;
   left: 1rem;
   z-index: 1;
   font-size: 1.5rem;
