@@ -158,7 +158,7 @@ body::-webkit-scrollbar {
 
 .cofirmation-input {
   font-size: 16px;
-  padding: 10px 10px 10px 5px;
+  padding: 10px 0 10px 0;
   display: block;
   width: 100%;
   outline: none;
@@ -171,7 +171,7 @@ body::-webkit-scrollbar {
   position: absolute;
   pointer-events: none;
   top: 10px;
-  left: 5px;
+  left: 0;
   transition: top 0.2s ease, font-size 0.2s ease, color 0.2s ease;
 }
 
