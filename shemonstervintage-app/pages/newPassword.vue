@@ -1,7 +1,11 @@
 <template>
   <div class="password-wrapper">
     <div class="password">
-      <h3>{{  $t("newPassword.title") }}</h3>
+      <div class="form-header">
+        <h3>{{  $t("newPassword.title") }}</h3>
+
+        <div>{{ $t("newPassword.passwordResetSuccess") }}</div>
+      </div>
       
       <div class="cofirmation-input-group">
         <input
@@ -23,8 +27,12 @@
         <label class="cofirmation-label">{{ $t("newPassword.confirmNewPassword") }}</label>
       </div>
   
-      <button @click="resetPassword">{{ $t("newPassword.submit") }}</button>
-      <div>{{ $t("newPassword.passwordResetSuccess") }}</div>
+        <div class="button-wrapper">
+          <div></div>
+          <div>
+            <button class="btn primary" @click="resetPassword">{{ $t("newPassword.submit") }}</button>
+          </div>  
+        </div>
     </div>
    </div>div> 
   </template>
@@ -89,7 +97,8 @@ const resetPassword = async () => {
 .password {
   width: 400px;
   border: 1px solid var(--black);
-  padding: 1rem;
+  padding: 2rem;
+  background-color:var(--white);
 }
 
 

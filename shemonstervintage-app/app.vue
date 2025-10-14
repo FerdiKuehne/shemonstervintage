@@ -126,6 +126,12 @@ body::-webkit-scrollbar {
   display: none;
 }
 
+
+h1 { 
+  margin: 0 0 1rem 0;
+}
+
+
 .page-headline {
   position: fixed;
   font-weight: 300;
@@ -151,14 +157,31 @@ body::-webkit-scrollbar {
 }
 
 
+
+
+.form-header {
+  margin: 0 0 3rem 0;;
+}
+
+.button-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+}
+
 .cofirmation-input-group {
   position: relative;
   margin-bottom: 1.5rem;
 }
 
+.cofirmation-input-group-wrap {
+  width: 100%;
+  position: relative;
+}
+
 .cofirmation-input {
   font-size: 16px;
-  padding: 10px 10px 10px 5px;
+  padding: 10px 0 10px 0;
   display: block;
   width: 100%;
   outline: none;
@@ -171,7 +194,7 @@ body::-webkit-scrollbar {
   position: absolute;
   pointer-events: none;
   top: 10px;
-  left: 5px;
+  left: 0;
   transition: top 0.2s ease, font-size 0.2s ease, color 0.2s ease;
 }
 
@@ -186,6 +209,28 @@ body::-webkit-scrollbar {
   border-width: 2px;
   border-color: var(--black);
   box-shadow: inset 0 -3px 5px -3px var(--white);
+}
+
+.btn {
+  border-radius: 0;
+}
+
+.btn.link {
+  background: transparent;
+  color: var(--black);
+  margin: 0 .5rem 0 0;
+  padding: 0;
+}
+
+.btn.small {
+  font-size: .8rem;
+  opacity: .8;
+}
+
+.btn.primary {
+  background: var(--black);
+  color: var(--white);
+  border: 1px solid var(--black);
 }
 </style>
 

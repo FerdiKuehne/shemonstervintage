@@ -70,8 +70,10 @@
           testData.reduce((total, item) => total + item.price, 0).toFixed(2)
         }}
       </h3>
-      <button @click="testData = []">Clear Wishlist</button>
-      <button @click="sendWishlist">Send</button>
+      <div class="button-wrapper">
+        <button class="btn link small" @click="testData = []">Clear Wishlist</button>
+        <button class="btn primary" @click="sendWishlist">Send</button>
+      </div>
     </div>
 
     <div v-if="openConfirmPopup" class="conformation-popup">

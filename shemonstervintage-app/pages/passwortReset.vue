@@ -1,10 +1,12 @@
 <template>
   <div class="pwforgot-wrapper">
     <div class="pwforgot">
-    <h3 class="pr_title">{{ $t("passwordReset.title") }}</h3>
-    <div class="pr_subtitle">
-        {{ $t("passwordReset.subtitle") }}
-    </div>
+      <div class="form-header">
+        <h3 class="pr_title">{{ $t("passwordReset.title") }}</h3>
+        <div class="pr_subtitle">
+            {{ $t("passwordReset.subtitle") }}
+        </div>
+      </div>
     
     
 
@@ -17,7 +19,14 @@
       />
       <label class="cofirmation-label">{{ $t("passwordReset.email") }}</label>
     </div>
-    <button @click="passwordReset" type="submit">{{ $t("passwordReset.submit") }}</button>
+
+
+    <div class="button-wrapper">
+      <div></div>
+      <div>
+        <button class="btn primary" @click="passwordReset" type="submit">{{ $t("passwordReset.submit") }}</button>
+      </div> 
+    </div> 
 
   </div>
  </div>
@@ -76,7 +85,8 @@ const passwordReset = async () => {
 .pwforgot {
   width: 400px;
   border: 1px solid var(--black);
-  padding: 1rem;
+  padding: 2rem;
+  background-color:var(--white);
 }
 
 </style>

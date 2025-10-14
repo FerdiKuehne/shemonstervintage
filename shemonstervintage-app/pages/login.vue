@@ -1,8 +1,9 @@
 <template>
   <div class="login-wrapper">
     <div class="login">
-      <h1>{{ $t("login.title") }}</h1>
-   
+      <div class="form-header">
+        <h1>{{ $t("login.title") }}</h1>
+      </div>
       <form @submit.prevent="login">
         <div class="cofirmation-input-group">
           <input
@@ -23,15 +24,20 @@
           />
           <label class="cofirmation-label">{{ $t("login.password") }}</label>
         </div>
-        <router-link to="/passwortReset">
-          <button type="button">{{ $t("login.forgotPassword") }}</button>
-        </router-link>
-        <router-link to="/registrierung">
-          <button type="button">{{ $t("login.register") }}</button>
-        </router-link>
 
-        <button type="submit">Login</button>
-        <p v-if="error">{{ error }}</p>
+        <div class="button-wrapper">
+          <div>
+            <router-link to="/passwortReset">
+              <button class="btn link small" type="button">{{ $t("login.forgotPassword") }}</button>
+            </router-link>
+            <router-link to="/registrierung">
+              <button class="btn link small" type="button">{{ $t("login.register") }}</button>
+            </router-link>
+          </div>
+
+          <button class="btn primary" type="submit">Login</button>
+          <p v-if="error">{{ error }}</p>
+        </div>
       </form>
     </div>
   </div>
@@ -80,6 +86,7 @@ async function login() {
 
 <style scoped>
 
+
 .login-wrapper {
   display: flex;
   align-items: center;
@@ -91,7 +98,10 @@ async function login() {
 .login {
   width: 400px;
   border: 1px solid var(--black);
-  padding: 1rem;
+  padding: 2rem;
+  background-color: var(--white);
 }
+
+
 
 </style>
