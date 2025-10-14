@@ -343,7 +343,7 @@ onMounted(() => {
 
 /* Stepper */
 .wizard-header { 
-  margin-bottom: 2rem; 
+  margin-bottom: 3rem; 
 }
 
 .steps { 
@@ -387,7 +387,7 @@ onMounted(() => {
   height: 2px;
   overflow: hidden;
   border-radius: 0;
-  background: transparent;
+  background: #f0f0f0;
 }
 .progress .bar { 
   height: 100%; 
