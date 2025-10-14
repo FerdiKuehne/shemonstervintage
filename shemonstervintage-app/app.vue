@@ -125,6 +125,7 @@ onMounted(async () => {
 </script>
 
 <style>
+
 :root {
   --main-color: #f7a700;
   --white: #fff;
@@ -138,6 +139,37 @@ onMounted(async () => {
   padding: 0;
   box-sizing: border-box;
 }
+
+/* Grundfarbe anpassen */
+:root {
+  --input-bg: #fff;        /* helles Theme */
+  --input-fg: #111;
+  /* --input-bg: #1a1b1e;  dunkles Beispiel */
+  /* --input-fg: #f5f6f7; */
+}
+
+/* Autofill überschreiben */
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--input-fg);
+  caret-color: var(--input-fg);
+
+  /* Trick: riesiger inset box-shadow überdeckt die Autofill-Farbe */
+  box-shadow: 0 0 0 1000px var(--input-bg) inset;
+
+  /* optional: Rahmen wiederherstellen */
+  border: 0 solid rgba(0,0,0,0);
+  border-bottom: 1px solid rgba(0,0,0,1);
+}
+
+/* Fokuszustand konsistent halten */
+input:-webkit-autofill:focus {
+  box-shadow: 0 0 0 1000px var(--input-bg) inset, 0 0 0 0 rgba(0,0,0,.0);
+}
+
+
+
 
 body {
   color: var(--black);
