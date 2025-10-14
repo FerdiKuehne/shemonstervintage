@@ -356,7 +356,7 @@ onMounted(() => {})
 
 .register { 
   position: relative;
-  width: 40%; 
+  width: 90%; 
   border: 1px solid var(--black); 
   padding: 1rem; 
   background-color: var(--white); 
