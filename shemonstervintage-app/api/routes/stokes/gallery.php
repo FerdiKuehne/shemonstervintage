@@ -1,18 +1,14 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', 'php://stdout');
+
 require_once __DIR__ . '/../../core/Response.php';
 require_once __DIR__ . '/../../vendor/Mobile-Detect-4.8.x/standalone/autoloader.php';
 require_once __DIR__ . '/../../vendor/Mobile-Detect-4.8.x/src/MobileDetectStandalone.php';
 
 use Detection\MobileDetectStandalone;
-use Detection\Exception\MobileDetectException;
-
-// ----------------------------
-// Disable HTML error output, log to file
-// ----------------------------
-ini_set('display_errors', 0);
-ini_set('log_errors', 1);
-ini_set('error_log', __DIR__ . '/../../logs/php_errors.log'); // make sure logs folder exists
-error_reporting(E_ALL);
 
 // ----------------------------
 // CORS headers
@@ -27,22 +23,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // ----------------------------
-// Device detection
+// GD helper
 // ----------------------------
-try {
-    $detect = new MobileDetectStandalone();
-    $isMobile = $detect->isMobile();
-    $isTablet = $detect->isTablet();
-    $isDesktop = !$isMobile && !$isTablet;
-} catch (MobileDetectException $e) {
-    $isMobile = $isTablet = false;
-    $isDesktop = true;
-}
-
-// ----------------------------
-// GD resizing helper
-// ----------------------------
-function createLowRes(string $sourcePath, string $destPath, int $maxWidth = 1024): bool
+function createLowRes($sourcePath, $destPath, $maxWidth = 1024): bool
 {
     if (!file_exists($sourcePath)) return false;
 
@@ -54,13 +37,12 @@ function createLowRes(string $sourcePath, string $destPath, int $maxWidth = 1024
     switch ($type) {
         case IMAGETYPE_JPEG: $src = imagecreatefromjpeg($sourcePath); break;
         case IMAGETYPE_PNG:  $src = imagecreatefrompng($sourcePath); break;
-        case IMAGETYPE_WEBP: $src = imagecreatefromwebp($sourcePath); break;
         default: return false;
     }
 
     $dst = imagecreatetruecolor($newWidth, $newHeight);
 
-    if ($type === IMAGETYPE_PNG || $type === IMAGETYPE_WEBP) {
+    if ($type === IMAGETYPE_PNG) {
         imagecolortransparent($dst, imagecolorallocatealpha($dst, 0, 0, 0, 127));
         imagealphablending($dst, false);
         imagesavealpha($dst, true);
@@ -78,20 +60,39 @@ function createLowRes(string $sourcePath, string $destPath, int $maxWidth = 1024
 }
 
 // ----------------------------
+// Generate DPR variants
+// ----------------------------
+function generateDprVariantsGD($baseName, $maxWidth, $sourcePath, $dir, $dprLevels): void
+{
+    foreach ($dprLevels as $dpr) {
+        $suffix = $dpr > 1 ? "_{$dpr}x" : "";
+        $target = "{$dir}/" . preg_replace('/\.(jpg|jpeg|png)$/i', "{$suffix}.webp", $baseName);
+        $resizeWidth = min($maxWidth * $dpr, 12288);
+        if (!file_exists($target)) {
+            createLowRes($sourcePath, $target, $resizeWidth);
+        }
+    }
+}
+
+// ----------------------------
 // Base directories
 // ----------------------------
-$frontDir = __DIR__ . '/../../public/img/gallery/front';
-$backDir  = __DIR__ . '/../../public/img/gallery/back';
+$frontDir = realpath(__DIR__ . '/../../public/img/gallery/front');
+$backDir  = realpath(__DIR__ . '/../../public/img/gallery/back');
 
-if (!is_dir($frontDir) || !is_dir($backDir)) {
+if (!$frontDir || !$backDir) {
     Response::error('Gallery folders not found', 500);
 }
 
 // ----------------------------
 // Gather images
 // ----------------------------
-$allFront = array_values(array_filter(scandir($frontDir), fn($f) => preg_match('/\.(jpg|jpeg|png)$/i', $f)));
-$allBack  = array_values(array_filter(scandir($backDir), fn($f) => preg_match('/\.(jpg|jpeg|png)$/i', $f)));
+$allFront = array_values(array_filter(scandir($frontDir), fn($f) =>
+    preg_match('/\.(jpg|jpeg)$/i', $f) && is_file("$frontDir/$f")
+));
+$allBack  = array_values(array_filter(scandir($backDir), fn($f) =>
+    preg_match('/\.(jpg|jpeg)$/i', $f) && is_file("$backDir/$f")
+));
 
 natsort($allFront);
 natsort($allBack);
@@ -99,29 +100,66 @@ $allFront = array_values($allFront);
 $allBack  = array_values($allBack);
 
 // ----------------------------
-// Query params (sanitize!)
+// Query params
 // ----------------------------
 $type  = $_GET['type'] ?? 'front';
 $batch = isset($_GET['batch']) && is_numeric($_GET['batch']) ? max(1, intval($_GET['batch'])) : 1;
 $index = isset($_GET['index']) && is_numeric($_GET['index']) ? intval($_GET['index']) : null;
-$perBatch = 8;
-$dpr = isset($_GET['dpr']) && is_numeric($_GET['dpr']) ? min(max(floatval($_GET['dpr']), 1), 3) : 1;
+$perBatch = 16;
+$dpr = isset($_GET['dpr']) && is_numeric($_GET['dpr']) ? min(max(floatval($_GET['dpr']), 1), 4) : 1;
 $dprInt = round($dpr);
 
 // ----------------------------
-// Helper: get DPR WebP URL
+// Batch validation
 // ----------------------------
-function getImageUrl(string $dir, string $filename, int $dpr): string
-{
-    $sourcePath = "{$dir}/{$filename}";
-    $target = preg_replace('/\.(jpg|jpeg|png)$/i', "_{$dpr}x.webp", $sourcePath);
+$maxBatch = ceil(count($allFront) / $perBatch);
+if ($batch > $maxBatch) {
+    Response::error("Batch {$batch} does not exist. Max batch is {$maxBatch}", 400);
+}
 
-    if (!file_exists($target)) {
-        createLowRes($sourcePath, $target, 1024 * $dpr);
+// ----------------------------
+// Device detection
+// ----------------------------
+$detect = new MobileDetectStandalone();
+$isMobile = $detect->isMobile();
+$isTablet = $detect->isTablet();
+$isDesktop = !$isMobile && !$isTablet;
+
+// ----------------------------
+// Pick DPR WebP files, auto-generate if missing
+// ----------------------------
+function pickDprFile(array $files, int $dpr, string $dir, int $maxWidth = 1024): array
+{
+    $result = [];
+    $dprLevels = [1, 2, 3, 4];
+
+    // Absolute path to your public folder
+    $publicPath = realpath(__DIR__ . '/../../public');
+
+    foreach ($files as $f) {
+        $sourcePath = "$dir/$f";
+
+        // Generate all DPR variants
+        generateDprVariantsGD($f, $maxWidth, $sourcePath, $dir, $dprLevels);
+
+        $baseName = pathinfo($f, PATHINFO_FILENAME);
+        $suffix = $dpr > 1 ? "_{$dpr}x" : "";
+        $fileName = $baseName . $suffix . '.webp';
+        $targetPath = "$dir/$fileName";
+
+        if (file_exists($targetPath)) {
+            // Make URL relative to public folder
+            $result[$f] = str_replace($publicPath, '', $targetPath);
+            // Ensure leading slash
+            if ($result[$f][0] !== '/') {
+                $result[$f] = '/' . $result[$f];
+            }
+        }
     }
 
-    return str_replace(__DIR__ . '/../../public', '', $target);
+    return $result;
 }
+
 
 // ----------------------------
 // Build response
@@ -132,18 +170,13 @@ try {
     if ($type === 'front') {
         $start = ($batch - 1) * $perBatch;
         $frontChunk = array_slice($allFront, $start, $perBatch);
-
-        $response['front'] = [];
-        foreach ($frontChunk as $img) {
-            $response['front'][$img] = getImageUrl($frontDir, $img, $dprInt);
-        }
+        $response['front'] = pickDprFile($frontChunk, $dprInt, $frontDir, 1024);
     } elseif ($type === 'back' && $index !== null) {
         if (!isset($allBack[$index])) {
             Response::error('Invalid index', 400);
         }
         $backFile = $allBack[$index];
-        $response['back'] = [];
-        $response['back'][$backFile] = getImageUrl($backDir, $backFile, $dprInt);
+        $response['back'] = pickDprFile([$backFile], $dprInt, $backDir, 1024);
     } else {
         Response::error('Invalid type', 400);
     }
@@ -154,5 +187,6 @@ try {
     Response::success($response);
 
 } catch (\Throwable $e) {
+    error_log("Gallery endpoint error: " . $e->getMessage());
     Response::error('Internal server error', 500);
 }

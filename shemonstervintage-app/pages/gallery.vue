@@ -10,10 +10,11 @@ import { initGrid, updateContainerHeight } from "@/composables/grid.js";
 import { galleryCameraShift } from "~/composables/screenplay.js";
 import { scrollerRef } from "@/composables/scroller.js";
 
-
 definePageMeta({
   layout: "three",
 });
+
+
 
 const containerHeight = ref(100); // vh
 
