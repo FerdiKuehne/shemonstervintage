@@ -211,8 +211,7 @@ definePageMeta({ layout: 'three' })
 const router = useRouter()
 
 function closeBox() {
-  if (window.history.length > 1) router.back()
-  else router.push('/')
+  router.push('/')   // immer Home
 }
 
 const steps = [
@@ -362,21 +361,6 @@ onMounted(() => {})
   padding: 1rem; 
   background-color: var(--white); 
 }
-
-/* Close (X) – wie Wishlist: kein Kreis, 32×32, transparent */
-.box-close {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  padding: 0;
-  border: none;
-  background: transparent;
-  width: 32px;
-  height: 32px;
-  cursor: pointer;
-  line-height: 0;
-}
-.box-close:focus { outline: 0; outline-offset: 0; }
 
 /* Stepper */
 .wizard-header { margin-bottom: 3rem; }

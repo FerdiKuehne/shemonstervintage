@@ -170,6 +170,23 @@ h1 {
 .wishlist-fade-enter-to,
 .wishlist-fade-leave-from   { transform: translateX(0); }
 
+
+
+/* Close (X) – wie Wishlist: kein Kreis, 32×32, transparent */
+.box-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  line-height: 0;
+}
+.box-close:focus { outline: 0; outline-offset: 0; }
+
 .form-header { margin: 0 0 3rem 0; position: relative;}
 
 
