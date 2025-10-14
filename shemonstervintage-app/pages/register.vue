@@ -19,17 +19,17 @@
         <div class="row">
           <!-- STEP 1: Person -->
           <template v-if="step === 0">
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="person.username" class="cofirmation-input hammer-input" type="text" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.username") }}</label>
               <p v-if="errors.username" class="err">{{ errors.username }}</p>
             </div>
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="person.name" class="cofirmation-input" type="text" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.firstName") }}</label>
               <p v-if="errors.name" class="err">{{ errors.name }}</p>
             </div>
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="person.surname" class="cofirmation-input" type="text" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.surname") }}</label>
               <p v-if="errors.surname" class="err">{{ errors.surname }}</p>
@@ -38,7 +38,7 @@
 
           <!-- STEP 2: Kontaktdaten -->
           <template v-else-if="step === 1">
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="person.email" class="cofirmation-input" type="email" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.email") }}</label>
               <p v-if="errors.email" class="err">{{ errors.email }}</p>
@@ -47,27 +47,27 @@
               <input v-model.trim="person.phone" class="cofirmation-input" type="tel" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.phone") }}</label>
             </div>
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="person.instagram" class="cofirmation-input" type="text" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.instagram") }}</label>
             </div>
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="person.street" class="cofirmation-input" type="text" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.street") }}</label>
             </div>
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="person.street_number" class="cofirmation-input" type="text" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.street_number") }}</label>
             </div>
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="person.zipcode" class="cofirmation-input" type="text" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.zipcode") }}</label>
             </div>
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="person.city" class="cofirmation-input" type="text" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.city") }}</label>
             </div>
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="person.country" class="cofirmation-input" type="text" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.country") }}</label>
             </div>
@@ -75,12 +75,12 @@
 
           <!-- STEP 3: Passwortvergabe -->
           <template v-else>
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="person.password" class="cofirmation-input" type="password" placeholder=" " />
               <label class="cofirmation-label">{{ $t("person.password") }}</label>
               <p v-if="errors.password" class="err">{{ errors.password }}</p>
             </div>
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <input v-model.trim="confirmPassword" class="cofirmation-input" type="password" placeholder=" " />
               <label class="cofirmation-label">{{ $t("auth.confirmPassword") || 'Passwort bestätigen' }}</label>
               <p v-if="errors.confirmPassword" class="err">{{ errors.confirmPassword }}</p>
