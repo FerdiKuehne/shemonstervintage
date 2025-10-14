@@ -81,41 +81,7 @@
     <NuxtLayout />
   </div>
 
-  <!-- Demo: Minimale Formularsektion -->
-  <main style="max-width: 560px; margin: 120px auto 0; padding: 0 16px;">
-    <h1 class="form-header">Kontakt</h1>
 
-    <div class="cofirmation-input-group">
-      <div class="cofirmation-input-group-wrap">
-        <input
-          class="cofirmation-input"
-          type="text"
-          id="name"
-          placeholder=" "
-          autocomplete="off"
-        />
-        <label class="cofirmation-label" for="name">Name</label>
-      </div>
-    </div>
-
-    <div class="cofirmation-input-group">
-      <div class="cofirmation-input-group-wrap">
-        <input
-          class="cofirmation-input"
-          type="email"
-          id="email"
-          placeholder=" "
-          autocomplete="off"
-        />
-        <label class="cofirmation-label" for="email">E-Mail</label>
-      </div>
-    </div>
-
-    <div class="button-wrapper">
-      <button class="btn link small">Abbrechen</button>
-      <button class="btn primary">Senden</button>
-    </div>
-  </main>
 
   <canvas v-if="showCanvas" id="minimap" width="440" height="440"></canvas>
 
