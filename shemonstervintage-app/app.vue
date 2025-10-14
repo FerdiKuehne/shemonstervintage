@@ -164,6 +164,7 @@ h1 {
 
 .page-content {
   position: absolute;
+  width: 100%;
 }
 
 .page-headline {
