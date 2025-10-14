@@ -7,6 +7,8 @@ require_once __DIR__ . '/../../vendor/PHPMailer/Exception.php';
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
+$config = require __DIR__ . '/../../config/mail.php';
+
 // ----------------------------
 // CORS & preflight
 // ----------------------------
@@ -93,15 +95,15 @@ $htmlBody = "
 try {
     $mail = new PHPMailer(true);
     $mail->isSMTP();
-    $mail->Host = 'w01ff580.kasserver.com'; // SMTP host
+    $mail->Host = getenv('MAIL_HOST'); // SMTP host
     $mail->SMTPAuth = true;
-    $mail->Username = 'm077c7fd';          // SMTP username
-    $mail->Password = '2m:FJcUe9sÄ+J4MF*NUTk'; // SMTP password
+    $mail->Username = getenv('MAIL_USER') ;          // SMTP username
+    $mail->Password = getenv('MAIL_PASS'); // SMTP password
     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
     $mail->Port = 587;
 
-    $mail->setFrom('info@shemonstervintage.com', 'shemonstervintage.com');
-    $mail->addAddress('info@shemonstervintage.com');  // internal
+    $mail->setFrom(getenv('MAIL_FROM'), getenv('MAIL_FROM_NAME') );
+    $mail->addAddress(getenv('MAIL_TO_INTERN'));  // internal
     $mail->addAddress($person['email']);              // copy to customer
 
     $mail->isHTML(true);

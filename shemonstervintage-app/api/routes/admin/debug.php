@@ -25,6 +25,7 @@ $app_config  = file_exists(__DIR__ . '/../../config/app_config.php') ? require _
 $auth_config = file_exists(__DIR__ . '/../../config/auth_config.php') ? require __DIR__ . '/../../config/auth_config.php' : null;
 $db_config   = file_exists(__DIR__ . '/../../config/db.php') ? require __DIR__ . '/../../config/db.php' : null;
 $jwt_config  = file_exists(__DIR__ . '/../../config/jwt.php') ? require __DIR__ . '/../../config/jwt.php' : null;
+$mail_config = file_exists(__DIR__ . '/../../config/mail.php') ? require __DIR__ . '/../../config/mail.php' : null; // ✅ added
 
 // Detect available routes
 $routes_root = realpath(__DIR__ . '/../../routes');
@@ -100,6 +101,7 @@ $debug_info = [
         'Auth Config' => $auth_config,
         'DB Config' => $db_config,
         'JWT Config' => $jwt_config,
+        'Mail Config' => $mail_config, // ✅ added
     ]),
     'Request Info' => $request_info,
     'Loaded Environment Variables' => mask_sensitive([
@@ -107,6 +109,10 @@ $debug_info = [
         'DB_NAME' => getenv('DB_NAME'),
         'DB_USER' => getenv('DB_USER'),
         'JWT_SECRET' => getenv('JWT_SECRET'),
+        'MAIL_HOST' => getenv('MAIL_HOST'),
+        'MAIL_USER' => getenv('MAIL_USER'),
+        'MAIL_PASS' => getenv('MAIL_PASS'),
+        'MAIL_FROM' => getenv('MAIL_FROM'),
     ]),
     'Database' => $db_info,
     'Available Routes' => $routes_list,

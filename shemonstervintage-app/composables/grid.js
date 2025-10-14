@@ -8,6 +8,7 @@ import {
   Mesh,
   Box3,
   Vector3,
+  MeshBasicMaterial,
   ShaderMaterial,
   Vector2,
 } from "three";
@@ -16,6 +17,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { nextTick } from "vue";
 import vertexShader from "./shaders/griditems/vertex.glsl?raw";
 import fragmentShader from "./shaders/griditems/fragment.glsl?raw";
+import { BasicShader } from "three-stdlib";
 
 let gridSize, currendGrid;
 let resizeTimeout;
@@ -23,15 +25,16 @@ let scrollHeight = 10;
 let loadingMore = false;
 let scrollTrigger;
 let gridWorldHeight = 0;
+let gridPosYOffset = 0.1;
 let gridHeightInPx = 0;
 
 /* Three js config */
-const gapX = 2.5; /* Adjusted gapX to better fit images */
-const gapY = 2.7; /* Adjusted gapY to better fit images */
+const gapX = 2.05; /* Adjusted gapX to better fit images */
+const gapY = 2.2; /* Adjusted gapY to better fit images */
 const targetHeight =
-  4.5 * 0.56; /* Adjusted targetHeight to maintain 8:9 aspect ratio */
+  4.5 * 0.46; /* Adjusted targetHeight to maintain 8:9 aspect ratio */
 const targetWidth =
-  4 * 0.56; /* Adjusted targetWidth to maintain 8:9 aspect ratio */
+  4 * 0.46; /* Adjusted targetWidth to maintain 8:9 aspect ratio */
 const grid = new Group();
 const geometry = new PlaneGeometry(targetWidth, targetHeight);
 
@@ -49,6 +52,7 @@ const loadFront = async (dpr) => {
   console.log("Loading front images for batch:", batch, "with DPR:", dpr);
   const url = `http://localhost:8000/stokes/gallery?type=front&batch=${batch}&dpr=${dpr}`;
   console.log(url);
+  console.log("Fetching front images from API...");
 
   try {
     const res = await fetch(url);
@@ -77,7 +81,7 @@ const loadFront = async (dpr) => {
 function getGridSize() {
   const rows = Math.ceil(grid.children.length / gridSize);
   const width = gridSize * targetWidth + (gridSize - 1) * (gapX - targetWidth);
-  const height = rows * targetHeight + (rows - 1) * (gapY - targetHeight);
+  const height = rows * targetHeight + (rows - 1) * (gapY - targetHeight) + gridPosYOffset;
   return { width, height };
 }
 
@@ -139,8 +143,7 @@ async function loadGridImages(dpr,grid, images, renderer) {
           texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
           texture.needsUpdate = true;
 
-          /* Tonek´s Area */
-
+        /*
           const material = new ShaderMaterial({
             vertexShader: vertexShader,
             fragmentShader: fragmentShader,
@@ -153,6 +156,10 @@ async function loadGridImages(dpr,grid, images, renderer) {
             },
             transparent: true,
           });
+          */
+          
+          const material = new MeshBasicMaterial({ map: texture });
+
           const mesh = new Mesh(geometry, material);
 
           setGridPosition(indexDelta, gridSize, mesh);
@@ -222,10 +229,10 @@ function createScrollTrigger(dpr, camera, renderer, scrollContainer) {
     onUpdate: async (self) => {
       // directly control grid y based on progress
       grid.position.y =
-        self.progress * (gridWorldHeight - 3 * targetHeight) + targetHeight;
+        self.progress * (gridWorldHeight - 3 * targetHeight) + targetHeight - gridPosYOffset;
 
       // load more images dynamically
-      if (grid.children.length < 200 && self.progress > 0.7 && !loadingMore) {
+      if (grid.children.length < 220 && self.progress > 0.7 && !loadingMore) {
         loadingMore = true;
 
         await loadGridImages(dpr, grid, images, renderer);
@@ -252,12 +259,28 @@ async function initGrid(dpr, renderer, camera, containerHeight, scrollContainer)
   const totalWidth =
     gridSize * targetWidth + (gridSize - 1) * (gapX - targetWidth);
   grid.position.x = -totalWidth / 2 + targetWidth / 2;
-  grid.position.y = targetHeight;
+  grid.position.y = targetHeight - gridPosYOffset;
 
   await loadGridImages(dpr,grid, images, renderer);
   updateContainerHeight(scrollContainer, camera);
 
   createScrollTrigger(dpr, camera, renderer, scrollContainer);
+
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  /* update grid pos and grid size */
+  getCureentGridSize();
+  updateGridPosition(gridSize);
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  gridWorldHeight = getGridSize().height;
+
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    updateContainerHeight(scrollContainer, camera);
+  }, 200);
+
+
 
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;

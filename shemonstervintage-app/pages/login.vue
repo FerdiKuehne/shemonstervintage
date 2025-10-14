@@ -93,7 +93,7 @@ async function login() {
     user.value = data.user;
     router.push("/dashboard");
   } catch (err) {
-    error.value = "Login failed";
+    error.value = "Login failed" +  err;
   }
 }
 </script>
