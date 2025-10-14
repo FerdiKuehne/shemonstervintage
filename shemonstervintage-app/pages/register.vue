@@ -235,19 +235,82 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.register-wrapper { display:flex; align-items:center; justify-content:center; width:100%; height:100vh; }
-.register { width:60%; border:1px solid var(--black); padding:2rem; background-color:var(--white); }
+.register-wrapper { 
+  display: flex; 
+  align-items: center; 
+  justify-content:center; 
+  width:100%; 
+  height:100vh; 
+}
+
+.register { 
+  width: 60%; 
+  border: 1px solid var(--black); 
+  padding: 2rem; 
+  background-color: var(--white); 
+}
 
 /* Stepper */
-.wizard-header { margin-bottom: 3rem; }
-.steps { display:flex; gap:1rem; align-items:center; margin-bottom: .5rem; flex-wrap: wrap;}
-.step { display:flex; align-items:center; gap:.5rem; opacity:.6; width: calc(33.333% - .67rem); }
-.step.active, .step.done { opacity:1; }
-.bullet { width:28px; height:28px; border-radius:50%; border:1px solid var(--black); display:grid; place-items:center; font-size:.9rem; }
-.step.done .bullet { background: var(--black); color: var(--white); }
-.label { font-weight:600; }
-.progress { height:2px; background: #eee; overflow:hidden; }
-.progress .bar { height:100%; background: var(--black); width:0; transition: width .25s ease; }
+.wizard-header { 
+  margin-bottom: 3rem; 
+}
+
+.steps { 
+  display:flex; 
+  align-items:center; 
+  flex-wrap: wrap;
+}
+
+.step { 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  opacity: 1; 
+  width: calc(33.333% - .67rem); 
+  position: relative;
+}
+
+.step.active, .step.done { 
+  opacity:1;  
+  filter: invert(1);
+}
+
+.bullet { 
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--black);
+  display: grid;
+  place-items: center;
+  font-size: .9rem;
+  position: absolute;
+  left: .5rem;
+}
+
+.step.done .bullet { 
+  background: var(--black); 
+  color: var(--white); 
+}
+
+.label { font-weight: 600; }
+
+.progress {
+   height: 40px;
+   overflow: hidden;
+   border-radius: 20px;
+   border: 1px solid var(--black);
+   margin: -32px 0 0 0;
+   overflow: hidden; 
+   background: transparent;
+}
+
+.progress .bar { 
+  height:100%; 
+  border-radius: 20px;
+  background: var(--black); 
+  width:0; 
+  transition: width .25s ease; 
+}
 
 /* Controls */
 .wizard-controls { display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem; }
