@@ -30,7 +30,7 @@
             <div class="col-6 input-group-wrap"> 
               <div class="cofirmation-input-group">
                 <div class="cofirmation-input-group-wrap">
-                  <input v-model.trim="person.username" class="cofirmation-input hammer-input" type="text" placeholder=" " />
+                  <input v-model.trim="person.username" class="cofirmation-input" type="text" placeholder=" " />
                   <label class="cofirmation-label">{{ $t("person.username") }}</label>
                 </div>
               </div>
@@ -321,14 +321,7 @@ async function submit () {
 }
 
 onMounted(() => {
-  const inputs = document.querySelectorAll('.hammer-input')
-  inputs.forEach((input) => {
-    input.addEventListener('input', () => {
-      input.classList.remove('hammer')
-      void input.offsetWidth
-      input.classList.add('hammer')
-    })
-  })
+
 })
 </script>
 
@@ -419,5 +412,5 @@ onMounted(() => {
 @keyframes typewriterTap { 0%{transform:scaleY(1)} 30%{transform:scaleY(.85)} 60%{transform:scaleY(1.05)} 100%{transform:scaleY(1)} }
 
 /* Small helper for errors */
-.err { color: #c62828; font-size: .85rem;  position: absolute; top: 48px; }
+.err { color: #999; font-size: .75rem;  position: absolute; top: 46px; }
 </style>
