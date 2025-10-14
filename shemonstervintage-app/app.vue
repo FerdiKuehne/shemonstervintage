@@ -226,6 +226,7 @@ h1 {
   width: 100%;
   display: flex;
   justify-content: space-between;
+  align-items: center;
 }
 
 /* === INPUTS – Basis, Label-Float & animierte Linie von der Mitte === */
@@ -294,7 +295,7 @@ h1 {
 }
 
 /* --- Buttons --- */
-.btn { border-radius: 0; }
+.btn { border-radius: 0; outline: 0 !important; box-shadow: 0 0 0 0 rgba(0,0,0,0) !important; border: 0 }
 .btn.link { background: transparent; color: var(--black); margin: 0 .5rem 0 0; padding: 0; }
 .btn.small { font-size: .8rem; opacity: .8; }
 .btn.primary { background: var(--black); color: var(--white); border: 1px solid var(--black); }
