@@ -162,6 +162,10 @@ h1 {
   letter-spacing: 0; text-transform: uppercase; margin: 0 0 1rem 0;
 }
 
+.page-content {
+  position: absolute;
+}
+
 .page-headline {
   position: fixed; font-weight: 300; color: var(--main-color);
   padding: 1rem 1rem 0 170px; mix-blend-mode: difference;

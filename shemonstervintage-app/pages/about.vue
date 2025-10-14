@@ -1,4 +1,8 @@
 <template>
+
+  <div class="container-fluid p-0">
+    <div class="page-headline">ABOUT</div>
+  </div>
   <div class="about-page">
     <h2>ABOUT</h2>
     <div>About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text</div>
