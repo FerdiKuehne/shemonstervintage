@@ -362,6 +362,38 @@ onMounted(() => {})
   background-color: var(--white); 
 }
 
+/* --- X rechts oben, über allem in der Box --- */
+.register {
+  position: relative;
+  z-index: 30; /* über Overlay/Three etc. */
+}
+
+.box-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  line-height: 0;
+  z-index: 31; /* über Inhalt der Box */
+}
+
+/* --- Error-Positionierung sauber unter dem Feld --- */
+.input-group-wrap {
+  position: relative;            /* Anker für .err */
+  padding-bottom: 1.25rem;       /* Platz für Fehlermeldung */
+}
+
+.cofirmation-input-group {
+  margin-bottom: 0;              /* Abstand kommt über padding-bottom */
+}
+
+
+
 /* Stepper */
 .wizard-header { margin-bottom: 3rem; }
 .steps { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem 1rem; margin-bottom: 1rem; justify-content: space-between; width: 100%; }
