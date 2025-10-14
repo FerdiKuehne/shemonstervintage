@@ -5,12 +5,20 @@
       <div class="wizard-header">
         <h1>{{ $t("person.register") }}</h1>
         <div class="steps">
-          <div v-for="(s, i) in steps" :key="s.key" class="step" :class="{ active: i === step, done: i < step }">
-            <div class="bullet">{{ i + 1 }}</div>
+          <div
+            v-for="(s, i) in steps"
+            :key="s.key"
+            class="step"
+            :class="{ current: i === step, done: isStepDone(i) }"
+          >
+            <div class="bullet">
+              <span v-if="isStepDone(i)">✓</span>
+              <span v-else>{{ i + 1 }}</span>
+            </div>
             <div class="label">{{ s.label }}</div>
           </div>
         </div>
-        <div class="progress">
+        <div class="progress" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
           <div class="bar" :style="{ width: progress + '%' }"></div>
         </div>
       </div>
@@ -51,7 +59,7 @@
                 <p v-if="errors.email" class="err">{{ errors.email }}</p>
               </div>  
             </div>
-            <div class="cofirmation-input-group col-6 p-0">
+            <div class="cofirmation-input-group col-6">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.phone" class="cofirmation-input" type="tel" placeholder=" " />
                 <label class="cofirmation-label">{{ $t("person.phone") }}</label>
@@ -143,9 +151,9 @@ import { onMounted, ref, computed } from 'vue'
 definePageMeta({ layout: 'three' })
 
 const steps = [
-  { key: 'person', label: 'Person' },
-  { key: 'contact', label: 'Kontaktdaten' },
-  { key: 'password', label: 'Passwort' }
+  { key: 'person', label: 'Person', fields: ['username','name','surname'] },
+  { key: 'contact', label: 'Kontaktdaten', fields: ['email','phone','instagram','street','street_number','zipcode','city','country'] },
+  { key: 'password', label: 'Passwort', fields: ['password','confirmPassword'] }
 ]
 
 const step = ref(0)
@@ -171,8 +179,50 @@ const person = ref({
 const confirmPassword = ref('')
 const errors = ref({})
 
-const progress = computed(() => Math.round(((step.value + 1) / steps.length) * 100))
+// --- PROGRESS: wächst pro ausgefülltem Feld ---
+// Konfiguration, was als "gefüllt" zählt
+const fieldConfig = [
+  { key: 'username', required: true },
+  { key: 'name', required: true },
+  { key: 'surname', required: true },
+  { key: 'email', required: true, validator: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) },
+  { key: 'phone', required: false },
+  { key: 'instagram', required: false },
+  { key: 'street', required: false },
+  { key: 'street_number', required: false },
+  { key: 'zipcode', required: false },
+  { key: 'city', required: false },
+  { key: 'country', required: false },
+  { key: 'password', required: true, validator: (v) => (v?.length || 0) >= 8 },
+  { key: 'confirmPassword', required: true, validator: () => confirmPassword.value === person.value.password }
+]
 
+const includeOptionalInProgress = true // falls false: nur required Felder zählen
+
+const totalFields = computed(() => fieldConfig.filter(f => includeOptionalInProgress || f.required).length)
+
+function getValue (key) {
+  if (key === 'confirmPassword') return confirmPassword.value
+  return person.value[key]
+}
+
+const completedFields = computed(() => {
+  return fieldConfig
+    .filter(f => includeOptionalInProgress || f.required)
+    .reduce((acc, f) => {
+      const val = getValue(f.key)
+      const hasVal = typeof val === 'string' ? val.trim().length > 0 : !!val
+      const isValid = f.validator ? f.validator(val) : true
+      return acc + (hasVal && isValid ? 1 : 0)
+    }, 0)
+})
+
+const progress = computed(() => {
+  const total = totalFields.value || 1
+  return Math.round((completedFields.value / total) * 100)
+})
+
+// Step-Validierung
 function validateCurrentStep () {
   const e = {}
   if (step.value === 0) {
@@ -195,6 +245,17 @@ function validateCurrentStep () {
 const canGoNext = computed(() => validateCurrentStep())
 const canSubmit = computed(() => validateCurrentStep())
 
+function isStepDone (idx) {
+  const keys = steps[idx].fields
+  return keys.every(k => {
+    const val = getValue(k)
+    const cfg = fieldConfig.find(f => f.key === k)
+    const hasVal = typeof val === 'string' ? val.trim().length > 0 : !!val
+    const valid = cfg?.validator ? cfg.validator(val) : true
+    return hasVal && valid
+  })
+}
+
 function next () {
   if (validateCurrentStep() && step.value < steps.length - 1) step.value++
 }
@@ -213,7 +274,6 @@ async function submit () {
     })
     const data = await response.json()
     if (!response.ok) throw data
-    // Erfolg: hier ggf. Routing, Toast etc.
     console.log('Registrierung erfolgreich', data)
   } catch (err) {
     console.error('Registrierung fehlgeschlagen', err)
@@ -244,7 +304,7 @@ onMounted(() => {
 }
 
 .register { 
-  width: 60%; 
+  width: 40%; 
   border: 1px solid var(--black); 
   padding: 2rem; 
   background-color: var(--white); 
@@ -252,28 +312,29 @@ onMounted(() => {
 
 /* Stepper */
 .wizard-header { 
-  margin-bottom: 3rem; 
+  margin-bottom: 2rem; 
 }
 
 .steps { 
-  display:flex; 
-  align-items:center; 
+  display: flex; 
+  align-items: center; 
   flex-wrap: wrap;
+  gap: .75rem 1rem;
+  margin-bottom: .5rem;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .step { 
   display: flex; 
   align-items: center; 
-  justify-content: center;
-  opacity: 1; 
-  width: calc(33.333% - .67rem); 
+  gap: .5rem;
   position: relative;
+  opacity: .7;
 }
 
-.step.active, .step.done { 
-  opacity:1;  
-  filter: invert(1);
-}
+.step.current { opacity: 1; }
+.step.done { opacity: 1; }
 
 .bullet { 
   width: 28px;
@@ -283,34 +344,31 @@ onMounted(() => {
   display: grid;
   place-items: center;
   font-size: .9rem;
-  position: absolute;
-  left: .5rem;
 }
 
-.step.done .bullet { 
-  background: var(--black); 
-  color: var(--white); 
-}
+.step.current .bullet { background: var(--black); color: var(--white); }
+.step.done .bullet { background: var(--black); color: var(--white); }
 
 .label { font-weight: 600; }
 
+/* Progressbar: wächst pro Feld */
 .progress {
-   height: 40px;
-   overflow: hidden;
-   border-radius: 20px;
-   border: 1px solid var(--black);
-   margin: -32px 0 0 0;
-   overflow: hidden; 
-   background: transparent;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid var(--black);
+  background: transparent;
 }
-
 .progress .bar { 
-  height:100%; 
-  border-radius: 20px;
+  height: 100%; 
   background: var(--black); 
   width:0; 
-  transition: width .25s ease; 
+  transition: width .2s linear; 
 }
+/* optionale "Ticks" unter der Progressbar – je Feld ein Tick */
+
+
+
 
 /* Controls */
 .wizard-controls { display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem; }
