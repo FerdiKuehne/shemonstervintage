@@ -126,6 +126,12 @@ body::-webkit-scrollbar {
   display: none;
 }
 
+
+h1 { 
+  margin: 0 0 1rem 0;
+}
+
+
 .page-headline {
   position: fixed;
   font-weight: 300;
@@ -156,6 +162,11 @@ body::-webkit-scrollbar {
   margin-bottom: 1.5rem;
 }
 
+.cofirmation-input-group-wrap {
+  width: 100%;
+  position: relative;
+}
+
 .cofirmation-input {
   font-size: 16px;
   padding: 10px 0 10px 0;
@@ -171,7 +182,7 @@ body::-webkit-scrollbar {
   position: absolute;
   pointer-events: none;
   top: 10px;
-  left: 12px;
+  left: 0;
   transition: top 0.2s ease, font-size 0.2s ease, color 0.2s ease;
 }
 
@@ -190,6 +201,18 @@ body::-webkit-scrollbar {
 
 .btn {
   border-radius: 0;
+}
+
+.btn.link {
+  background: transparent;
+  color: var(--black);
+  margin: 0 .5rem 0 0;
+  padding: 0;
+}
+
+.btn.small {
+  font-size: .8rem;
+  opacity: .8;
 }
 
 .btn.primary {
