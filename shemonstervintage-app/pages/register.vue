@@ -211,8 +211,7 @@ definePageMeta({ layout: 'three' })
 const router = useRouter()
 
 function closeBox() {
-  if (window.history.length > 1) router.back()
-  else router.push('/')
+  router.push('/')   // immer Home
 }
 
 const steps = [
@@ -363,7 +362,12 @@ onMounted(() => {})
   background-color: var(--white); 
 }
 
-/* Close (X) – wie Wishlist: kein Kreis, 32×32, transparent */
+/* --- X rechts oben, über allem in der Box --- */
+.register {
+  position: relative;
+  z-index: 30; /* über Overlay/Three etc. */
+}
+
 .box-close {
   position: absolute;
   top: 1rem;
@@ -375,8 +379,20 @@ onMounted(() => {})
   height: 32px;
   cursor: pointer;
   line-height: 0;
+  z-index: 31; /* über Inhalt der Box */
 }
-.box-close:focus { outline: 0; outline-offset: 0; }
+
+/* --- Error-Positionierung sauber unter dem Feld --- */
+.input-group-wrap {
+  position: relative;            /* Anker für .err */
+  padding-bottom: 1.25rem;       /* Platz für Fehlermeldung */
+}
+
+.cofirmation-input-group {
+  margin-bottom: 0;              /* Abstand kommt über padding-bottom */
+}
+
+
 
 /* Stepper */
 .wizard-header { margin-bottom: 3rem; }
