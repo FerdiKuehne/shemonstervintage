@@ -1,14 +1,19 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', 'php://stdout');
+
 require_once __DIR__ . '/../../core/Response.php';
 require_once __DIR__ . '/../../core/Helpers.php';
-require_once __DIR__ . '/../../app/database/connection.php';
-require_once __DIR__ . '/../../app/config/jwt.php';
+require_once __DIR__ . '/../../database/connect.php';
+require_once __DIR__ . '/../../config/jwt.php';
 require_once __DIR__ . '/../../vendor/jwt/src/JWT.php';
 
 use Firebase\JWT\JWT;
 
 // Load JWT config
-$config = require __DIR__ . '/../../app/config/jwt.php';
+$config = require __DIR__ . '/../../config/jwt.php';
 
 // ----------------------------
 // CORS & preflight
@@ -29,15 +34,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // ----------------------------
 // Read & sanitize input
 // ----------------------------
-$input = get_json_input();
-$email = sanitize($input['email'] ?? '');
+$input = json_decode(file_get_contents('php://input'), true);
+$email = trim($input['email'] ?? '');
 $password = $input['password'] ?? '';
 
 if (empty($email) || empty($password)) {
     Response::error('Email and password are required.', 400);
 }
 
-if (!validate_email($email)) {
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     Response::error('Invalid email format.', 422);
 }
 
@@ -45,7 +50,7 @@ if (!validate_email($email)) {
 // Connect to DB and fetch user
 // ----------------------------
 $db = Database::getConnection();
-$stmt = $db->prepare('SELECT id, email, password, name FROM users WHERE email = :email LIMIT 1');
+$stmt = $db->prepare('SELECT id, email, password_hash AS password, username AS name FROM customers WHERE email = :email LIMIT 1');
 $stmt->bindParam(':email', $email, PDO::PARAM_STR);
 $stmt->execute();
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -75,7 +80,7 @@ $jwt = JWT::encode($payload, $config['secret'], $config['algo']);
 // ----------------------------
 // Update last login
 // ----------------------------
-$update = $db->prepare('UPDATE users SET last_login = NOW() WHERE id = :id');
+$update = $db->prepare('UPDATE customers SET last_login = NOW() WHERE id = :id');
 $update->execute([':id' => $user['id']]);
 
 // ----------------------------
