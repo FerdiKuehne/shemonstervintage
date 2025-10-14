@@ -44,7 +44,7 @@
         <div class="row">
           <template v-if="step === 0">
             <!-- STEP 1: Person -->
-            <div class="col-6 input-group-wrap"> 
+            <div class="col-12 input-group-wrap"> 
               <div class="cofirmation-input-group">
                 <div class="cofirmation-input-group-wrap">
                   <input v-model.trim="person.username" class="cofirmation-input" type="text" placeholder=" " />
@@ -54,7 +54,9 @@
               <p v-if="errors.username" class="err">{{ errors.username }}</p> 
             </div>
 
-            <div class="col-6 input-group-wrap">  
+
+
+            <div class="col-12 input-group-wrap">  
               <div class="cofirmation-input-group">
                 <div class="cofirmation-input-group-wrap">
                   <input v-model.trim="person.name" class="cofirmation-input" type="text" placeholder=" " />
@@ -64,7 +66,7 @@
               <p v-if="errors.name" class="err">{{ errors.name }}</p>
             </div>
 
-            <div class="col-6 input-group-wrap">  
+            <div class="col-12 input-group-wrap">  
               <div class="cofirmation-input-group">
                 <div class="cofirmation-input-group-wrap">
                   <input v-model.trim="person.surname" class="cofirmation-input" type="text" placeholder=" " />
@@ -77,7 +79,7 @@
 
           <template v-else-if="step === 1">
             <!-- STEP 2: Kontaktdaten -->
-            <div class="col-6 input-group-wrap"> 
+            <div class="col-4 input-group-wrap"> 
               <div class="cofirmation-input-group">
                 <div class="cofirmation-input-group-wrap">
                   <input v-model.trim="person.email" class="cofirmation-input" type="email" placeholder=" " />
@@ -87,7 +89,7 @@
              <p v-if="errors.email" class="err">{{ errors.email }}</p>
             </div>
 
-           <div class="col-6 input-group-wrap"> 
+           <div class="col-4 input-group-wrap"> 
               <div class="cofirmation-input-group">
                 <div class="cofirmation-input-group-wrap">
                   <input v-model.trim="person.phone" class="cofirmation-input" type="tel" placeholder=" " />
@@ -96,7 +98,7 @@
              </div>
            </div>
 
-          <div class="col-6 input-group-wrap">   
+          <div class="col-4 input-group-wrap">   
             <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.instagram" class="cofirmation-input" type="text" placeholder=" " />
@@ -141,7 +143,7 @@
             </div>
           </div>  
 
-          <div class="col-6 input-group-wrap">  
+          <div class="col-12 input-group-wrap">  
             <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.country" class="cofirmation-input" type="text" placeholder=" " />
