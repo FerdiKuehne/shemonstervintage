@@ -324,7 +324,7 @@ header {
 ul.header-nav {
   position: fixed;
   top: 1rem;
-  right: 1rem;
+  right: .25rem;
   z-index: 20;
   display: flex;
   align-items: center;
