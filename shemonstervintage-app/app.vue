@@ -187,6 +187,16 @@ body::-webkit-scrollbar {
   border-color: var(--black);
   box-shadow: inset 0 -3px 5px -3px var(--white);
 }
+
+.btn {
+  border-radius: 0;
+}
+
+.btn.primary {
+  background: var(--black);
+  color: var(--white);
+  border: 1px solid var(--black);
+}
 </style>
 
 <style scoped>

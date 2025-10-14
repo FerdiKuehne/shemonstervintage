@@ -213,14 +213,14 @@ onMounted(() => {
 .register { width:60%; border:1px solid var(--black); padding:2rem; background-color:var(--white); }
 
 /* Stepper */
-.wizard-header { margin-bottom: 1rem; }
+.wizard-header { margin-bottom: 3rem; }
 .steps { display:flex; gap:1rem; align-items:center; margin-bottom: .5rem; flex-wrap: wrap;}
 .step { display:flex; align-items:center; gap:.5rem; opacity:.6; width: calc(33.333% - .67rem); }
 .step.active, .step.done { opacity:1; }
 .bullet { width:28px; height:28px; border-radius:50%; border:1px solid var(--black); display:grid; place-items:center; font-size:.9rem; }
 .step.done .bullet { background: var(--black); color: var(--white); }
 .label { font-weight:600; }
-.progress { height:1px; background: #eee; overflow:hidden; }
+.progress { height:2px; background: #eee; overflow:hidden; }
 .progress .bar { height:100%; background: var(--black); width:0; transition: width .25s ease; }
 
 /* Controls */
