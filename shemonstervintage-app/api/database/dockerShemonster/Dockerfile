@@ -8,7 +8,5 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /var/www/api
 
-FROM mysql:8.0
-
-# Copy init SQL into the container
-COPY init.sql /docker-entrypoint-initdb.d/init.sql
+# Optional: copy PHP code into container
+# COPY ./api /var/www/api
