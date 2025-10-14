@@ -9,3 +9,5 @@ return [
     'debug' => getenv('APP_DEBUG') === 'true', // optional debug flag
     'base_url' => getenv('BASE_URL') ?: 'http://localhost',
 ];
+
+

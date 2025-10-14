@@ -40,7 +40,7 @@ console.log(data);
 
   let textureUrl = "http://localhost:8000" + data.data.texture;
 
-  console.log("Texture URL:", textureUrl);
+  console.log("Texture URL:", textureUrl, window.devicePixelRatio );
 
   /* ---------- Pano + Post Pass ---------- */
 
