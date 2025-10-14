@@ -351,7 +351,7 @@ onMounted(() => {
   align-items: center; 
   flex-wrap: wrap;
   gap: .75rem 1rem;
-  margin-bottom: .5rem;
+  margin-bottom: 1rem;
   justify-content: space-between;
   width: 100%;
 }
@@ -384,10 +384,9 @@ onMounted(() => {
 
 /* Progressbar: wächst pro Feld */
 .progress {
-  height: 10px;
+  height: 2px;
   overflow: hidden;
-  border-radius: 999px;
-  border: 1px solid var(--black);
+  border-radius: 0;
   background: transparent;
 }
 .progress .bar { 

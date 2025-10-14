@@ -211,7 +211,7 @@ h1 { margin: 0 0 1rem 0; }
 /* Fokus irgendwo in der Gruppe (Input/Label etc.) */
 .cofirmation-input-group:focus-within::after {
   transform: translateX(-50%) scaleX(1); /* wächst nach außen */
-  height: 3px; /* wird dicker */
+  height: 2px; /* wird dicker */
 }
 
 /* Label float wie gehabt */
