@@ -1,9 +1,27 @@
 <template>
   <div class="login-wrapper">
     <div class="login">
+      <!-- Close (X) – identisch zur Register/Wishlist Variante -->
+      <button class="box-close" @click="closeBox" aria-label="Schließen">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+          fill="none"
+          stroke="#000000"
+          stroke-miterlimit="10"
+          aria-hidden="true"
+        >
+          <line x1="1.672" y1="1.672" x2="31.164" y2="31.164"/>
+          <line x1="31.164" y1="1.672" x2="1.672" y2="31.164"/>
+        </svg>
+      </button>
+
       <div class="form-header">
         <h1>{{ $t("login.title") }}</h1>
       </div>
+
       <form @submit.prevent="login">
         <div class="cofirmation-input-group">
           <input
@@ -42,13 +60,12 @@
     </div>
   </div>
 </template>
+
 <script setup>
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 
-definePageMeta({
-  layout: "three",
-});
+definePageMeta({ layout: "three" });
 
 const router = useRouter();
 const email = ref("");
@@ -56,27 +73,24 @@ const password = ref("");
 const user = ref(null);
 const error = ref("");
 
+function closeBox() {
+  if (window.history.length > 1) router.back();
+  else router.push("/");
+}
+
 async function login() {
   try {
     const response = await fetch("https://your-domain.com/api/login.php", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: email.value,
-        password: password.value,
-      }),
-      credentials: "include", // important if using PHP sessions with cookies
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.value, password: password.value }),
+      credentials: "include",
     });
 
-    if (!response.ok) {
-      throw new Error("Login failed");
-    }
+    if (!response.ok) throw new Error("Login failed");
 
     const data = await response.json();
-    user.value = data.user; // whatever your backend sends back
-
+    user.value = data.user;
     router.push("/dashboard");
   } catch (err) {
     error.value = "Login failed";
@@ -85,8 +99,6 @@ async function login() {
 </script>
 
 <style scoped>
-
-
 .login-wrapper {
   display: flex;
   align-items: center;
@@ -96,12 +108,26 @@ async function login() {
 }
 
 .login {
+  position: relative; /* für den Close-Button */
   width: 400px;
   border: 1px solid var(--black);
-  padding: 2rem;
+  padding: 1rem;
   background-color: var(--white);
 }
 
-
-
+/* Close (X) – wie in Wishlist/Register: kein Kreis, 32×32, transparent */
+.box-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  line-height: 0;
+}
+.box-close:hover { opacity: .8; }
+.box-close:focus { outline: 2px solid var(--black); outline-offset: 2px; }
 </style>

@@ -145,7 +145,14 @@ body {
 
 body::-webkit-scrollbar { display: none; }
 
-h1 { margin: 0 0 1rem 0; }
+h1 { 
+  font-size: 1.5rem;
+  font-weight: bolder;
+  color: var(--black);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  margin: 0 0 1rem 0;
+}
 
 .page-headline {
   position: fixed;
@@ -155,6 +162,7 @@ h1 { margin: 0 0 1rem 0; }
   mix-blend-mode: difference;
 }
 
+
 .wishlist-fade-enter-active,
 .wishlist-fade-leave-active { transition: transform .3s ease; will-change: transform; }
 .wishlist-fade-enter-from,
@@ -162,7 +170,8 @@ h1 { margin: 0 0 1rem 0; }
 .wishlist-fade-enter-to,
 .wishlist-fade-leave-from   { transform: translateX(0); }
 
-.form-header { margin: 0 0 3rem 0; }
+.form-header { margin: 0 0 3rem 0; position: relative;}
+
 
 .button-wrapper {
   width: 100%;

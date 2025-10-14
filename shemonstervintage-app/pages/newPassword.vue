@@ -97,7 +97,7 @@ const resetPassword = async () => {
 .password {
   width: 400px;
   border: 1px solid var(--black);
-  padding: 2rem;
+  padding: 1rem;
   background-color:var(--white);
 }
 
