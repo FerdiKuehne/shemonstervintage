@@ -206,7 +206,7 @@ async function submit () {
   if (!validateCurrentStep()) return
   submitting.value = true
   try {
-    const response = await fetch('http://localhost:8000/register.php', {
+    const response = await fetch('http://localhost:8000/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(person.value)
