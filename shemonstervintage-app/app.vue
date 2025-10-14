@@ -157,6 +157,18 @@ h1 {
 }
 
 
+
+
+.form-header {
+  margin: 0 0 3rem 0;;
+}
+
+.button-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+}
+
 .cofirmation-input-group {
   position: relative;
   margin-bottom: 1.5rem;

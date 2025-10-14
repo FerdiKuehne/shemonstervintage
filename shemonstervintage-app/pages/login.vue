@@ -102,14 +102,6 @@ async function login() {
   background-color: var(--white);
 }
 
-.form-header {
-  margin: 0 0 3rem 0;;
-}
 
-.button-wrapper {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-}
 
 </style>
