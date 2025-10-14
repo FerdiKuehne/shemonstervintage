@@ -4,14 +4,13 @@
 require_once __DIR__ . '/../../core/EnvLoader.php';
 require_once __DIR__ . '/../../core/Response.php';
 
-// Load environment if not already loaded
 EnvLoader::load(__DIR__ . '/../../.env');
 
-// Utility function to hide sensitive data
-function mask_sensitive($data): mixed {
+// Utility function to mask sensitive fields
+function mask_sensitive($data) {
     if (is_array($data)) {
         foreach ($data as $key => $value) {
-            if (preg_match('/(secret|pass|token|key)/i', $key)) {
+            if (preg_match('/(password|pass|secret|token|key)/i', $key)) {
                 $data[$key] = '[hidden]';
             } elseif (is_array($value)) {
                 $data[$key] = mask_sensitive($value);
@@ -27,10 +26,9 @@ $auth_config = file_exists(__DIR__ . '/../../config/auth_config.php') ? require 
 $db_config   = file_exists(__DIR__ . '/../../config/db.php') ? require __DIR__ . '/../../config/db.php' : null;
 $jwt_config  = file_exists(__DIR__ . '/../../config/jwt.php') ? require __DIR__ . '/../../config/jwt.php' : null;
 
-// Detect all available routes dynamically
+// Detect available routes
 $routes_root = realpath(__DIR__ . '/../../routes');
 $routes_list = [];
-
 if ($routes_root) {
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($routes_root, RecursiveDirectoryIterator::SKIP_DOTS)
@@ -43,7 +41,7 @@ if ($routes_root) {
     }
 }
 
-// Collect request info
+// Request info
 $request_info = [
     'method' => $_SERVER['REQUEST_METHOD'] ?? 'CLI',
     'uri' => $_SERVER['REQUEST_URI'] ?? null,
@@ -52,28 +50,36 @@ $request_info = [
 ];
 
 // ----------------------------
-// Database connection info
+// Database connection and full data
 // ----------------------------
 $db_info = null;
 try {
     $pdo = new PDO(
-        "mysql:host=" . getenv('DB_HOST') . ";dbname=" . getenv('DB_NAME') . ";charset=utf8mb4",
-        getenv('DB_USER'),
-        getenv('DB_PASS'),
+        'mysql:host=db;port=3306;dbname=shemonstervintage;charset=utf8mb4',
+        'wishlist_user',
+        'wishlist_pass',
         [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]
     );
 
-    // Fetch tables
     $stmt = $pdo->query("SHOW TABLES");
     $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $all_data = [];
+    foreach ($tables as $table) {
+        $data_stmt = $pdo->query("SELECT * FROM `$table`");
+        $rows = $data_stmt->fetchAll(PDO::FETCH_ASSOC);
+        $all_data[$table] = mask_sensitive($rows);
+    }
 
     $db_info = [
         'connected' => true,
         'tables' => $tables,
+        'rows' => $all_data,
     ];
+
 } catch (PDOException $e) {
     $db_info = [
         'connected' => false,
@@ -81,7 +87,7 @@ try {
     ];
 }
 
-// Prepare output
+// Build debug output
 $debug_info = [
     'Environment' => [
         'PHP Version' => phpversion(),

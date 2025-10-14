@@ -40,9 +40,6 @@ console.log(data);
 
   let textureUrl = "http://localhost:8000" + data.data.texture;
 
-  console.log("Texture URL:", textureUrl);
-  console.log("Texture DPR:", dpr);
-
   /* ---------- Pano + Post Pass ---------- */
 
   const db = new Vector2();

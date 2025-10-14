@@ -1,68 +1,52 @@
 <?php
-/**
- * Database Connection (Production-Ready)
- * --------------------------------------
- * Secure and reusable PDO connection handler.
- * Uses UTF-8MB4, exception mode, and environment-aware config.
- */
+// /api/database/connect.php
 
-require_once __DIR__ . '/../config/app_config.php';
-require_once __DIR__ . '/../../core/Response.php';
-
-final class Database
-{
+class Database {
     private static ?PDO $connection = null;
 
-    /**
-     * Prevent instantiation
-     */
-    private function __construct() {}
-    private function __clone() {}
-    private function __wakeup() {}
+    public static function getConnection(): PDO {
+        if (self::$connection === null) {
+            // Load configuration
+            $configPath = __DIR__ . '/../config/db.php';
+            if (!file_exists($configPath)) {
+                error_log("Database config not found at $configPath");
+                throw new Exception("Database configuration missing");
+            }
 
-    /**
-     * Returns a shared PDO instance.
-     * @return PDO
-     */
-    public static function getConnection(): PDO
-    {
-        if (self::$connection instanceof PDO) {
-            return self::$connection;
-        }
+            $config = require $configPath;
 
-        $dsn = sprintf(
-            'mysql:host=%s;dbname=%s;charset=utf8mb4',
-            DB_HOST,
-            DB_NAME
-        );
+            // Extract config values
+            $host     = $config['host'] ?? 'db';
+            $port     = $config['port'] ?? 3306;
+            $dbname   = $config['name'] ?? 'shemonstervintage';
+            $user     = $config['user'] ?? 'wishlist_user';
+            $pass     = $config['pass'] ?? 'wishlist_pass';
+            $charset  = $config['charset'] ?? 'utf8mb4';
 
-        $options = [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Throw exceptions
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Fetch as associative arrays
-            PDO::ATTR_EMULATE_PREPARES   => false,                  // Native prepared statements
-            PDO::ATTR_PERSISTENT         => true,                   // Persistent connection
-        ];
+            $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}";
 
-        try {
-            self::$connection = new PDO($dsn, DB_USER, DB_PASS, $options);
-        } catch (PDOException $e) {
-            self::handleConnectionError($e);
+            try {
+                self::$connection = new PDO($dsn, $user, $pass, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ]);
+            } catch (PDOException $e) {
+                error_log("Database connection failed: " . $e->getMessage());
+                // Return a clear JSON response for API
+                header('Content-Type: application/json', true, 500);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Database connection failed.',
+                    'details' => $e->getMessage(),
+                ]);
+                exit;
+            }
         }
 
         return self::$connection;
     }
 
-    /**
-     * Graceful database connection error handler.
-     */
-    private static function handleConnectionError(PDOException $e): void
-    {
-        error_log('[DB ERROR] ' . $e->getMessage());
-
-        // Use unified API JSON response for consistency
-        json_response([
-            'error' => 'Database connection failed.',
-            'details' => APP_ENV !== 'production' ? $e->getMessage() : null,
-        ], 500);
-    }
+    // Optional — avoid PHP warning for magic methods
+    public function __wakeup() {}
 }
