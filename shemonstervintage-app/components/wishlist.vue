@@ -272,7 +272,7 @@ const testData = ref([
 .wishlist h2 {
   margin: 0;
   font-size: 1.5rem;
-  font-weight: bolder;
+  font-weight: 600;
   color: var(--black);
   letter-spacing: 0;
   text-transform: uppercase;

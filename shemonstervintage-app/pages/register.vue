@@ -1,6 +1,23 @@
 <template>
   <div class="register-wrapper">
     <div class="register">
+      <!-- Close (X) – identisch zur Wishlist -->
+      <button class="box-close" @click="closeBox" aria-label="Schließen">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+          fill="none"
+          stroke="#000000"
+          stroke-miterlimit="10"
+          aria-hidden="true"
+        >
+          <line x1="1.672" y1="1.672" x2="31.164" y2="31.164"/>
+          <line x1="31.164" y1="1.672" x2="1.672" y2="31.164"/>
+        </svg>
+      </button>
+
       <!-- Stepper/Header -->
       <div class="wizard-header">
         <h1>{{ $t("person.register") }}</h1>
@@ -27,17 +44,19 @@
         <div class="row">
           <template v-if="step === 0">
             <!-- STEP 1: Person -->
-            <div class="col-6 input-group-wrap"> 
+            <div class="col-12 input-group-wrap"> 
               <div class="cofirmation-input-group">
                 <div class="cofirmation-input-group-wrap">
-                  <input v-model.trim="person.username" class="cofirmation-input hammer-input" type="text" placeholder=" " />
+                  <input v-model.trim="person.username" class="cofirmation-input" type="text" placeholder=" " />
                   <label class="cofirmation-label">{{ $t("person.username") }}</label>
                 </div>
               </div>
               <p v-if="errors.username" class="err">{{ errors.username }}</p> 
             </div>
 
-            <div class="col-6 input-group-wrap">  
+
+
+            <div class="col-12 input-group-wrap">  
               <div class="cofirmation-input-group">
                 <div class="cofirmation-input-group-wrap">
                   <input v-model.trim="person.name" class="cofirmation-input" type="text" placeholder=" " />
@@ -47,7 +66,7 @@
               <p v-if="errors.name" class="err">{{ errors.name }}</p>
             </div>
 
-            <div class="col-6 input-group-wrap">  
+            <div class="col-12 input-group-wrap">  
               <div class="cofirmation-input-group">
                 <div class="cofirmation-input-group-wrap">
                   <input v-model.trim="person.surname" class="cofirmation-input" type="text" placeholder=" " />
@@ -60,7 +79,7 @@
 
           <template v-else-if="step === 1">
             <!-- STEP 2: Kontaktdaten -->
-            <div class="col-6 input-group-wrap"> 
+            <div class="col-4 input-group-wrap"> 
               <div class="cofirmation-input-group">
                 <div class="cofirmation-input-group-wrap">
                   <input v-model.trim="person.email" class="cofirmation-input" type="email" placeholder=" " />
@@ -70,7 +89,7 @@
              <p v-if="errors.email" class="err">{{ errors.email }}</p>
             </div>
 
-           <div class="col-6 input-group-wrap"> 
+           <div class="col-4 input-group-wrap"> 
               <div class="cofirmation-input-group">
                 <div class="cofirmation-input-group-wrap">
                   <input v-model.trim="person.phone" class="cofirmation-input" type="tel" placeholder=" " />
@@ -79,7 +98,7 @@
              </div>
            </div>
 
-          <div class="col-6 input-group-wrap">   
+          <div class="col-4 input-group-wrap">   
             <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.instagram" class="cofirmation-input" type="text" placeholder=" " />
@@ -124,7 +143,7 @@
             </div>
           </div>  
 
-          <div class="col-6 input-group-wrap">  
+          <div class="col-12 input-group-wrap">  
             <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.country" class="cofirmation-input" type="text" placeholder=" " />
@@ -185,8 +204,16 @@
 
 <script setup>
 import { onMounted, ref, computed } from 'vue'
+import { useRouter } from '#imports'
 
 definePageMeta({ layout: 'three' })
+
+const router = useRouter()
+
+function closeBox() {
+  if (window.history.length > 1) router.back()
+  else router.push('/')
+}
 
 const steps = [
   { key: 'person', label: 'Person', fields: ['username','name','surname'] },
@@ -196,7 +223,7 @@ const steps = [
 
 const step = ref(0)
 const submitting = ref(false)
-const showTerms = false // ggf. auf true setzen und i18n-Keys bereitstellen
+const showTerms = false
 const acceptTerms = ref(false)
 
 const person = ref({
@@ -217,8 +244,6 @@ const person = ref({
 const confirmPassword = ref('')
 const errors = ref({})
 
-// --- PROGRESS: wächst pro ausgefülltem Feld ---
-// Konfiguration, was als "gefüllt" zählt
 const fieldConfig = [
   { key: 'username', required: true },
   { key: 'name', required: true },
@@ -235,8 +260,7 @@ const fieldConfig = [
   { key: 'confirmPassword', required: true, validator: () => confirmPassword.value === person.value.password }
 ]
 
-const includeOptionalInProgress = true // falls false: nur required Felder zählen
-
+const includeOptionalInProgress = true
 const totalFields = computed(() => fieldConfig.filter(f => includeOptionalInProgress || f.required).length)
 
 function getValue (key) {
@@ -260,7 +284,6 @@ const progress = computed(() => {
   return Math.round((completedFields.value / total) * 100)
 })
 
-// Step-Validierung
 function validateCurrentStep () {
   const e = {}
   if (step.value === 0) {
@@ -320,16 +343,7 @@ async function submit () {
   }
 }
 
-onMounted(() => {
-  const inputs = document.querySelectorAll('.hammer-input')
-  inputs.forEach((input) => {
-    input.addEventListener('input', () => {
-      input.classList.remove('hammer')
-      void input.offsetWidth
-      input.classList.add('hammer')
-    })
-  })
-})
+onMounted(() => {})
 </script>
 
 <style scoped>
@@ -342,71 +356,42 @@ onMounted(() => {
 }
 
 .register { 
+  position: relative;
   width: 40%; 
   border: 1px solid var(--black); 
-  padding: 2rem; 
+  padding: 1rem; 
   background-color: var(--white); 
 }
 
+/* Close (X) – wie Wishlist: kein Kreis, 32×32, transparent */
+.box-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  line-height: 0;
+}
+.box-close:focus { outline: 0; outline-offset: 0; }
+
 /* Stepper */
-.wizard-header { 
-  margin-bottom: 2rem; 
-}
-
-.steps { 
-  display: flex; 
-  align-items: center; 
-  flex-wrap: wrap;
-  gap: .75rem 1rem;
-  margin-bottom: .5rem;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.step { 
-  display: flex; 
-  align-items: center; 
-  gap: .5rem;
-  position: relative;
-  opacity: .7;
-}
-
+.wizard-header { margin-bottom: 3rem; }
+.steps { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem 1rem; margin-bottom: 1rem; justify-content: space-between; width: 100%; }
+.step { display: flex; align-items: center; gap: .5rem; position: relative; opacity: .7; }
 .step.current { opacity: 1; }
 .step.done { opacity: 1; }
-
-.bullet { 
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--black);
-  display: grid;
-  place-items: center;
-  font-size: .9rem;
-}
-
+.bullet { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--black); display: grid; place-items: center; font-size: .9rem; }
 .step.current .bullet { background: var(--black); color: var(--white); }
 .step.done .bullet { background: var(--black); color: var(--white); }
-
 .label { font-weight: 600; }
 
-/* Progressbar: wächst pro Feld */
-.progress {
-  height: 10px;
-  overflow: hidden;
-  border-radius: 999px;
-  border: 1px solid var(--black);
-  background: transparent;
-}
-.progress .bar { 
-  height: 100%; 
-  background: var(--black); 
-  width:0; 
-  transition: width .2s linear; 
-}
-/* optionale "Ticks" unter der Progressbar – je Feld ein Tick */
-
-
-
+/* Progressbar */
+.progress { height: 2px; overflow: hidden; border-radius: 0; background: #f0f0f0; }
+.progress .bar { height: 100%; background: var(--black); width:0; transition: width .2s linear; }
 
 /* Controls */
 .wizard-controls { display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem; }
@@ -414,10 +399,6 @@ onMounted(() => {
 .btn.primary { background: var(--black); color: var(--white); }
 .btn[disabled] { opacity:.5; cursor:not-allowed; }
 
-/* Existing styles */
-.hammer { animation: ease-in .3s typewriterTap; }
-@keyframes typewriterTap { 0%{transform:scaleY(1)} 30%{transform:scaleY(.85)} 60%{transform:scaleY(1.05)} 100%{transform:scaleY(1)} }
-
-/* Small helper for errors */
-.err { color: #c62828; font-size: .85rem;  position: absolute; top: 48px; }
+/* Fehler */
+.err { color: #999; font-size: .75rem; position: absolute; top: 46px; }
 </style>
