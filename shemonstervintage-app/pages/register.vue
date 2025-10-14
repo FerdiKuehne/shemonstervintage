@@ -25,103 +25,140 @@
 
       <div class="page registrierung container p-0">
         <div class="row">
-          <!-- STEP 1: Person -->
           <template v-if="step === 0">
-            <div class="cofirmation-input-group col-6">
-              <div class="cofirmation-input-group-wrap">
-                <input v-model.trim="person.username" class="cofirmation-input hammer-input" type="text" placeholder=" " />
-                <label class="cofirmation-label">{{ $t("person.username") }}</label>
-                <p v-if="errors.username" class="err">{{ errors.username }}</p>
+            <!-- STEP 1: Person -->
+            <div class="col-6 input-group-wrap"> 
+              <div class="cofirmation-input-group">
+                <div class="cofirmation-input-group-wrap">
+                  <input v-model.trim="person.username" class="cofirmation-input hammer-input" type="text" placeholder=" " />
+                  <label class="cofirmation-label">{{ $t("person.username") }}</label>
+                </div>
               </div>
+              <p v-if="errors.username" class="err">{{ errors.username }}</p> 
             </div>
-            <div class="cofirmation-input-group col-6">
-              <div class="cofirmation-input-group-wrap">
-                <input v-model.trim="person.name" class="cofirmation-input" type="text" placeholder=" " />
-                <label class="cofirmation-label">{{ $t("person.firstName") }}</label>
-                <p v-if="errors.name" class="err">{{ errors.name }}</p>
+
+            <div class="col-6 input-group-wrap">  
+              <div class="cofirmation-input-group">
+                <div class="cofirmation-input-group-wrap">
+                  <input v-model.trim="person.name" class="cofirmation-input" type="text" placeholder=" " />
+                  <label class="cofirmation-label">{{ $t("person.firstName") }}</label>
+                </div>
               </div>
+              <p v-if="errors.name" class="err">{{ errors.name }}</p>
             </div>
-            <div class="cofirmation-input-group col-6">
-              <div class="cofirmation-input-group-wrap">
-                <input v-model.trim="person.surname" class="cofirmation-input" type="text" placeholder=" " />
-                <label class="cofirmation-label">{{ $t("person.surname") }}</label>
-                <p v-if="errors.surname" class="err">{{ errors.surname }}</p>
+
+            <div class="col-6 input-group-wrap">  
+              <div class="cofirmation-input-group">
+                <div class="cofirmation-input-group-wrap">
+                  <input v-model.trim="person.surname" class="cofirmation-input" type="text" placeholder=" " />
+                  <label class="cofirmation-label">{{ $t("person.surname") }}</label>
+                </div>
               </div>
-           </div>
+              <p v-if="errors.surname" class="err">{{ errors.surname }}</p>
+            </div>
           </template>
 
-          <!-- STEP 2: Kontaktdaten -->
           <template v-else-if="step === 1">
-            <div class="cofirmation-input-group col-6">
-              <div class="cofirmation-input-group-wrap">
-                <input v-model.trim="person.email" class="cofirmation-input" type="email" placeholder=" " />
-                <label class="cofirmation-label">{{ $t("person.email") }}</label>
-                <p v-if="errors.email" class="err">{{ errors.email }}</p>
-              </div>  
+            <!-- STEP 2: Kontaktdaten -->
+            <div class="col-6 input-group-wrap"> 
+              <div class="cofirmation-input-group">
+                <div class="cofirmation-input-group-wrap">
+                  <input v-model.trim="person.email" class="cofirmation-input" type="email" placeholder=" " />
+                  <label class="cofirmation-label">{{ $t("person.email") }}</label>
+                </div>
+              </div>
+             <p v-if="errors.email" class="err">{{ errors.email }}</p>
             </div>
-            <div class="cofirmation-input-group col-6">
-              <div class="cofirmation-input-group-wrap">
-                <input v-model.trim="person.phone" class="cofirmation-input" type="tel" placeholder=" " />
-                <label class="cofirmation-label">{{ $t("person.phone") }}</label>
-              </div>  
-            </div>
-            <div class="cofirmation-input-group col-6">
+
+           <div class="col-6 input-group-wrap"> 
+              <div class="cofirmation-input-group">
+                <div class="cofirmation-input-group-wrap">
+                  <input v-model.trim="person.phone" class="cofirmation-input" type="tel" placeholder=" " />
+                  <label class="cofirmation-label">{{ $t("person.phone") }}</label>
+                </div>
+             </div>
+           </div>
+
+          <div class="col-6 input-group-wrap">   
+            <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.instagram" class="cofirmation-input" type="text" placeholder=" " />
                 <label class="cofirmation-label">{{ $t("person.instagram") }}</label>
               </div>
             </div>
-            <div class="cofirmation-input-group col-6">
+          </div>    
+
+          <div class="col-6 input-group-wrap">            
+            <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.street" class="cofirmation-input" type="text" placeholder=" " />
                 <label class="cofirmation-label">{{ $t("person.street") }}</label>
-              </div>  
+              </div>
             </div>
-            <div class="cofirmation-input-group col-6">
+         </div> 
+
+          <div class="col-6 input-group-wrap">       
+            <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.street_number" class="cofirmation-input" type="text" placeholder=" " />
                 <label class="cofirmation-label">{{ $t("person.street_number") }}</label>
               </div>
             </div>
-            <div class="cofirmation-input-group col-6">
+          </div>  
+
+          <div class="col-6 input-group-wrap">            
+            <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.zipcode" class="cofirmation-input" type="text" placeholder=" " />
                 <label class="cofirmation-label">{{ $t("person.zipcode") }}</label>
-              </div>  
+              </div>
             </div>
-            <div class="cofirmation-input-group col-6">
+          </div> 
+
+          <div class="col-6 input-group-wrap">  
+            <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.city" class="cofirmation-input" type="text" placeholder=" " />
                 <label class="cofirmation-label">{{ $t("person.city") }}</label>
               </div>
             </div>
-            <div class="cofirmation-input-group col-6">
+          </div>  
+
+          <div class="col-6 input-group-wrap">  
+            <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.country" class="cofirmation-input" type="text" placeholder=" " />
                 <label class="cofirmation-label">{{ $t("person.country") }}</label>
               </div>
             </div>
+          </div>
+
           </template>
 
-          <!-- STEP 3: Passwortvergabe -->
           <template v-else>
-            <div class="cofirmation-input-group col-6">
+            <!-- STEP 3: Passwortvergabe -->
+          <div class="col-6 input-group-wrap">              
+            <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="person.password" class="cofirmation-input" type="password" placeholder=" " />
                 <label class="cofirmation-label">{{ $t("person.password") }}</label>
-                <p v-if="errors.password" class="err">{{ errors.password }}</p>
               </div>
             </div>
-            <div class="cofirmation-input-group col-6">
+             <p v-if="errors.password" class="err">{{ errors.password }}</p>
+          </div>
+
+           <div class="col-6 input-group-wrap">               
+            <div class="cofirmation-input-group">
               <div class="cofirmation-input-group-wrap">
                 <input v-model.trim="confirmPassword" class="cofirmation-input" type="password" placeholder=" " />
                 <label class="cofirmation-label">{{ $t("auth.confirmPassword") || 'Passwort bestätigen' }}</label>
-                <p v-if="errors.confirmPassword" class="err">{{ errors.confirmPassword }}</p>
-              </div>  
+              </div>
             </div>
+            <p v-if="errors.confirmPassword" class="err">{{ errors.confirmPassword }}</p>
+           </div>
 
-            <!-- Optional: AGB / Datenschutz Checkbox -->
             <div class="cofirmation-input-group col-12" v-if="showTerms">
+              <!-- Optional: AGB / Datenschutz Checkbox -->
               <label class="checkbox">
                 <input type="checkbox" v-model="acceptTerms" />
                 <span>{{ $t('auth.acceptTerms') || 'Ich akzeptiere die AGB und Datenschutzbestimmungen' }}</span>
@@ -144,6 +181,7 @@
     </div>
   </div>
 </template>
+
 
 <script setup>
 import { onMounted, ref, computed } from 'vue'
@@ -381,5 +419,5 @@ onMounted(() => {
 @keyframes typewriterTap { 0%{transform:scaleY(1)} 30%{transform:scaleY(.85)} 60%{transform:scaleY(1.05)} 100%{transform:scaleY(1)} }
 
 /* Small helper for errors */
-.err { color: #c62828; font-size: .85rem; margin-top: .25rem; }
+.err { color: #c62828; font-size: .85rem;  position: absolute; top: 48px; }
 </style>
