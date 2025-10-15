@@ -26,47 +26,32 @@
 
     <li><NuxtLink to="/login">Login</NuxtLink></li>
     <li><NuxtLink to="/register">Register </NuxtLink></li>
+
+    <!-- Wishlist-Button -->
     <li>
-      <!-- WISHLIST BUTTON: mit GSAP-Bump + Icon-Switch -->
+      <!-- Wishlist-Button -->
       <button
         ref="wishlistBtn"
         @click="onWishlistClick"
         class="btn-wishlist"
         aria-label="Wishlist öffnen"
       >
-        <!-- Normal -->
-        <svg
-          v-if="!isWishlistInverted"
-          xmlns="http://www.w3.org/2000/svg"
-          width="32" height="32" viewBox="0 0 64 64" fill="none"
-          stroke="#000000" stroke-width="2" stroke-miterlimit="10"
-        >
-          <polygon points="51.081 59.656 32.276 47.43 13.463 59.656 13.463 3.737 51.081 3.737 51.081 59.656"/>
-          <line x1="32.264" y1="15.364" x2="32.264" y2="34.292"/>
-          <line x1="41.729" y1="24.828" x2="22.8"  y2="24.828"/>
-        </svg>
+        <span class="icon">
+          <!-- normal -->
+          <svg class="svg-normal" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="32" height="32" fill="none" stroke="#000" stroke-width="2" stroke-miterlimit="10">
+            <polygon points="51.081 59.656 32.276 47.43 13.463 59.656 13.463 3.737 51.081 3.737 51.081 59.656"/>
+            <line x1="32.264" y1="15.364" x2="32.264" y2="34.292"/>
+            <line x1="41.729" y1="24.828" x2="22.8"  y2="24.828"/>
+          </svg>
 
-        <!-- Invertiert -->
-        <svg
-          v-else
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 64 64"
-          width="32"
-          height="32"
-          fill="none"
-        >
-          <polygon
-            points="51.081 59.656 32.276 47.43 13.463 59.656 13.463 3.737 51.081 3.737 51.081 59.656"
-            stroke="#000"
-            stroke-width="2"
-            stroke-miterlimit="10"
-            fill="none"
-          />
-          <line x1="32.264" y1="15.364" x2="32.264" y2="34.292"
-            stroke="#fff" stroke-width="2" stroke-miterlimit="10" />
-          <line x1="41.729" y1="24.828" x2="22.8" y2="24.828"
-            stroke="#fff" stroke-width="2" stroke-miterlimit="10" />
-        </svg>
+          <!-- invertiert -->
+          <svg class="svg-inverted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="32" height="32" fill="none">
+            <polygon points="51.081 59.656 32.276 47.43 13.463 59.656 13.463 3.737 51.081 3.737 51.081 59.656"
+                    stroke="#000" stroke-width="2" stroke-miterlimit="10" fill="#000" />
+            <line x1="32.264" y1="15.364" x2="32.264" y2="34.292" stroke="#fff" stroke-width="2" stroke-miterlimit="10" />
+            <line x1="41.729" y1="24.828" x2="22.8"  y2="24.828" stroke="#fff" stroke-width="2" stroke-miterlimit="10" />
+          </svg>
+        </span>
       </button>
     </li>
   </ul>
@@ -127,8 +112,8 @@ import Wishlist from "@/components/wishlist.vue";
 const isWishlistOpen = ref(false);
 const isMenuOpen = ref(false);
 
-const isWishlistInverted = ref(false);  // <— Icon-Switch
-const wishlistBtn = ref(null);          // <— GSAP Target
+const isWishlistInverted = ref(false);  // Icon-Switch während der Animation
+const wishlistBtn = ref(null);          // GSAP Target
 
 const scroller = scrollerRef;
 const route = useRoute();
@@ -167,7 +152,7 @@ watch(isMenuOpen, (open) => {
 
 /* === Wishlist: GSAP-Bump + Icon-Wechsel === */
 function onWishlistClick() {
-  // Icon direkt invertieren, hält während der gesamten Bump-Animation
+  // Icon invertieren für die Dauer der Animation
   isWishlistInverted.value = true;
 
   const el = wishlistBtn.value;
@@ -183,7 +168,6 @@ function onWishlistClick() {
         repeat: 1,
         transformOrigin: "center center",
         onComplete: () => {
-          // Nach dem Yoyo zurück zum normalen Icon
           isWishlistInverted.value = false;
         }
       }
@@ -308,6 +292,38 @@ input:-webkit-autofill:focus {
   border: none; background-color: transparent; cursor: pointer; line-height: 0;
   color: var(--black);
 }
+
+/* FIX: kein Hintergrund mehr beim Fade */
+.btn-wishlist.inverted {
+  background: transparent;   /* oder Regel komplett löschen */
+}
+
+/* falls noch nicht gesetzt */
+.btn-wishlist {
+  background: transparent;
+  line-height: 0;
+}
+
+.btn-wishlist .icon {
+  position: relative;
+  display: inline-block;
+  width: 32px; height: 32px;
+}
+
+.btn-wishlist .icon svg {
+  position: absolute; inset: 0;
+  transition: opacity .22s ease;
+}
+
+.btn-wishlist .svg-normal   { opacity: 1; }
+.btn-wishlist .svg-inverted { opacity: 0; }
+
+.btn-wishlist.inverted .svg-normal   { opacity: 0; }
+.btn-wishlist.inverted .svg-inverted { opacity: 1; }
+
+
+
+
 @media (max-width: 991px) {
   .only-mobile { display: block; position: fixed; left: .25rem;}
 }
