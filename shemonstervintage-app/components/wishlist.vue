@@ -20,9 +20,11 @@
 
        </button>
     </div>
-    <div v-for="(item, i) in urls" :key="i" class="wishlist-item">
+    <transition-group name="list" tag="div">
+      <div v-for="(item, i) in urls" :key="i" class="wishlist-item" :class="{ 'new-item': i === urls.length - 1 }">
       <div
         class="remove-item"
+        @click="urls.splice(i, 1)"
         style="cursor: pointer"
       >
         <svg
@@ -61,6 +63,9 @@
         </div>
       </div> 
     </div>
+    </transition-group>
+
+
   </div> 
     <div v-if="urls.length === 0" class="whishlist-empty">
       <p>Your wishlist is empty.</p>
@@ -230,6 +235,24 @@ const testData = ref([
 ]);
 </script>
 <style scoped>
+
+.list-enter-active {
+  transition: all 0.5s ease;
+}
+.list-enter-from {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+.list-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Only apply animation to the last item */
+.wishlist-item:not(.new-item) {
+  transition: none !important;
+}
+
 
 
 .wishlist {
