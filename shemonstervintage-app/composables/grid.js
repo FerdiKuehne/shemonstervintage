@@ -271,9 +271,9 @@ async function loadGridImages(dpr, grid, imgs, renderer) {
 
           mesh.userData.url = "http://localhost:8000" + url;
 
-          svgIcon.userData.type = "icon";
+          iconGroup.userData.type = "icon";
 
-          clickableBtn.push(svgIcon);
+          clickableBtn.push(iconGroup);
           clickableBtn.push(mesh);
 
           mesh.userData.text =
@@ -548,19 +548,7 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
             window.dispatchEvent(new CustomEvent("wishlist:bump"));
           },
           onComplete: () => {
-            // After animation, return to original grid position
-            const element = document.getElementsByClassName("btn-wishlist")[0];
-
-            urls.value.push(target.userData.url);
-
-            gsap.to(element, {
-              backgroundColor: "#000",
-              duration: 0.5,
-              delay: 0.1,
-              yoyo: true,
-              repeat: 1,
-            });
-
+      
             grid.attach(target);
             target.position.copy(originalPosition);
             target.rotation.copy(originalRotation);
