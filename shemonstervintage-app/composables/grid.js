@@ -412,107 +412,129 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
 
       console.log(clickedObject.userData.type);
 
-      if (clickedObject.userData.type === "image") {
-        openImg = true;
+if (clickedObject.userData.type === "image") {
+  openImg = true;
 
-        // Save original parent and local transforms
-        const originalParent = clickedObject.parent;
-        const originalPosition = clickedObject.position.clone();
-        const originalRotation = clickedObject.rotation.clone();
-        const originalScale = clickedObject.scale.clone();
+  // Originale merken
+  const originalParent   = clickedObject.parent;
+  const originalPosition = clickedObject.position.clone();
+  const originalRotation = clickedObject.rotation.clone();
+  const originalScale    = clickedObject.scale.clone();
 
-        // Move object to scene while preserving world position
-        scene.attach(clickedObject);
+  // Zusätzlich Grid-Originale (für Rückweg sauber)
+  const originalGridPosition = grid.position.clone();
+  const originalGridRotation = grid.rotation.clone();
 
-        let positionX = clickedObject.position.x;
+  // Für freie Animation ins Scene-Root (Weltpose bleibt erhalten)
+  scene.attach(clickedObject);
 
-        const zPos = 1.0;
-        const frustumHeightZposImg =
-          2 * camera.position.z * Math.tan((camera.fov * Math.PI) / 360);
-        const frustumWidthZ = frustumHeightZposImg * camera.aspect;
+  // ---------- Zielpose berechnen (seitlich + zur Kamera) ----------
+  const dir = new Vector3();
+  camera.getWorldDirection(dir); // Blickrichtung der Kamera (normiert)
 
-        const scaleImg = (frustumHeightZposImg / targetHeight) * 0.75;
-        const positionNeu = targetWidth * scaleImg * 0.5;
+  // Seite bestimmen wie gehabt
+  const zPos = 1.0;
+  const halfFovRad = (camera.fov * Math.PI) / 360;
 
-        if (positionX > 0.0) {
-          positionX = -positionNeu;
-        } else if (positionX < 0.0) {
-          positionX = positionNeu;
-        } else {
-          positionX = Math.random() > 0.5 ? positionNeu : -positionNeu;
+  // finaler Basispunkt (seitlich + z)
+  let positionX = clickedObject.position.x;
+  const tmpDistHeight = 2 * camera.position.z * Math.tan(halfFovRad); // nur temporär für Seitversatz
+  const tmpWidth = tmpDistHeight * camera.aspect;
+
+  // wir bestimmen später noch den exakten Randabstand, placeholder:
+  const baseSide = positionX === 0 ? (Math.random() > 0.5 ? 1 : -1) : (positionX > 0 ? -1 : 1);
+
+  // Tiefe relativ zur Kamera (Grid weg, Objekt zur Kamera)
+  const depthShift = 1.5;
+  const gridAway = originalGridPosition.clone().add(dir.clone().multiplyScalar(depthShift));
+
+  // Erstmal vorläufiger Zielpunkt
+  const objBase = new Vector3(0, 0, zPos);
+  let objToward = objBase.clone().add(dir.clone().multiplyScalar(-depthShift));
+
+
+
+// ---------- Full-bleed (oben/unten bündig) + links/rechts wie vorher ----------
+  const dist = camera.position.distanceTo(objToward);
+  const visibleHeight = 2 * dist * Math.tan(halfFovRad);
+  const visibleWidth  = visibleHeight * camera.aspect;
+
+  // leichtes Overscan, damit keine Spalten bleiben
+  const OVERSCAN = 1.01; // 1% höher als Viewport
+  const scaleImg = (visibleHeight * OVERSCAN) / targetHeight;
+
+  // halbe Kartenbreite bei der neuen Skalierung
+  const halfItemWidth = (targetWidth * scaleImg) / 2;
+
+  // Abstand von der Mitte bis zur bündigen Kante
+  const edgeOffset = (visibleWidth / 2) - halfItemWidth;
+
+  // baseSide kommt von dir: -1 = links, +1 = rechts
+  positionX = baseSide * edgeOffset;
+
+  // Ziel X setzen (Y/Z bleiben)
+  objToward.setX(positionX);
+
+  // Bookmark-Icon ausblenden
+  if (clickedObject.children[0]) clickedObject.children[0].visible = false;
+
+  // ---------- Hinfahrt ----------
+  gsap.to(grid.rotation, { y: originalGridRotation.y + 1, duration: 0.5, ease: "power2.out" });
+  gsap.to(grid.position, { x: gridAway.x, y: gridAway.y, z: gridAway.z, duration: 0.5, ease: "power2.out" });
+
+  gsap.to(clickedObject.position, {
+    x: objToward.x, y: objToward.y, z: objToward.z,
+    duration: 0.5, ease: "power2.out"
+  });
+  gsap.to(clickedObject.scale, {
+    x: scaleImg, y: scaleImg, z: scaleImg,
+    duration: 0.5, ease: "power2.out"
+  });
+
+  imagesDescription.value = {
+    description:
+      "lorem ipsum dolor sit amet consetetur sadipscing elitr sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat sed diam voluptua. at vero eos et accusam et justo duo dolores et ea rebum stet clita kasd gubergren no sea takimata sanctus est lorem ipsum dolor sit amet",
+    url: clickedObject.userData.url,
+    side: positionX > 0 ? "left" : "right",
+    onClick: () => {
+      // ---------- Rückfahrt ----------
+      // 1) Grid-Rotation & -Position sauber zurück
+      gsap.to(grid.rotation, {
+        x: originalGridRotation.x, y: originalGridRotation.y, z: originalGridRotation.z,
+        duration: 0.5, ease: "power2.inOut"
+      });
+      gsap.to(grid.position, {
+        x: originalGridPosition.x, y: originalGridPosition.y, z: originalGridPosition.z,
+        duration: 0.5, ease: "power2.inOut"
+      });
+
+      // 2) Vor dem Rück-Tween wieder in den Original-Parent attachen.
+      //    Dadurch bleibt die Weltpose gleich (kein "Sprung"),
+      //    und wir tweenen lokal zurück auf originale Werte.
+      originalParent.attach(clickedObject);
+
+      // 3) Rotation/Position/Scale exakt auf die gemerkten Originale
+      gsap.to(clickedObject.rotation, {
+        x: originalRotation.x, y: originalRotation.y, z: originalRotation.z,
+        duration: 0.5, ease: "power2.inOut"
+      });
+      gsap.to(clickedObject.position, {
+        x: originalPosition.x, y: originalPosition.y, z: originalPosition.z,
+        duration: 0.5, ease: "power2.inOut"
+      });
+      gsap.to(clickedObject.scale, {
+        x: originalScale.x, y: originalScale.y, z: originalScale.z,
+        duration: 0.5, ease: "power2.inOut",
+        onComplete: () => {
+          if (clickedObject.children[0]) clickedObject.children[0].visible = true;
+          openImg = false;
         }
+      });
 
-        clickedObject.children[0].visible = false;
-
-        gsap.to(grid.rotation, {
-          x: grid.rotation.x + 1,
-          duration: 0.5,    
-        }
-        )
-
-        gsap.to(clickedObject.position, {
-          x: positionX,
-          y: 0,
-          z: zPos,
-          duration: 0.5,
-        });
-        gsap.to(clickedObject.scale, {
-          y: scaleImg,
-          x: scaleImg,
-          z: scaleImg,
-          duration: 0.5,
-          onComplete: () => {
-            console.log(
-              "height after scale: " + clickedObject.geometry.parameters.height
-            );
-          },
-        });
-
-        imagesDescription.value = {
-          description:
-            "lorem ipsum dolor sit amet consetetur sadipscing elitr sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat sed diam voluptua. at vero eos et accusam et justo duo dolores et ea rebum stet clita kasd gubergren no sea takimata sanctus est lorem ipsum dolor sit amet",
-          url: clickedObject.userData.url,
-          onClick: () => {
-            gsap.to(clickedObject.position, originalPosition);
-    
-            // Restore child visibility
-            clickedObject.children[0].visible = true;
-            originalParent.attach(clickedObject);
-
-            gsap.to(grid.rotation, {
-              x: grid.rotation.x - 1,
-              duration: 0.5,    
-            } 
-            )
-            gsap.to(clickedObject.rotation, {
-              x: clickedObject.rotation.x + 1,
-              duration: 0.5,    
-            } 
-            )
-
-            gsap.to(clickedObject.position, {
-              x: originalPosition.x,
-              y: originalPosition.y,
-              z: originalPosition.z,
-              duration: 0.5,
-            });
-            gsap.to(clickedObject.scale, {
-              y: originalScale.y,
-              x: originalScale.x,
-              z: originalScale.z,
-              duration: 0.5,
-              onComplete: () => {
-                
-          
-                openImg = false;
-              },
-            });
-            imagesDescription.value = null;
-
-          },
-          side: positionX > 0 ? "left" : "right",
-        };
-      } else {
+      imagesDescription.value = null;
+    },
+  };
+} else {
         const target = clickedObject.parent.parent; // The grid object
 
         const originalPosition = target.position.clone();
