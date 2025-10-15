@@ -32,20 +32,17 @@ import { urls, imagesDescription } from "./refsHelper.js";
 gsap.registerPlugin(ScrollTrigger);
 
 /* =========================
-   Config – deine Stellschrauben
+   Config
    ========================= */
-// Linienstärken
-const OUTLINE_THICKNESS_PX = 0.5; // Rahmen (Quad-Stroke) in px
-const PLUS_THICKNESS_PX    = 1.0; // Plus in px
+const OUTLINE_THICKNESS_PX = 0.5;
+const PLUS_THICKNESS_PX    = 1.0;
 
-// Icon-Skalierung/Koordinaten
-const ICON_SCALE = 0.003;   // SVG->Three Skalierung
-const SVG_UNITS_PER_PX = 2; // 64 Units ~ 32px → ca. 2 Units/px
-const VIEWBOX_SIZE = 64;    // 64×64
+const ICON_SCALE = 0.003;
+const SVG_UNITS_PER_PX = 2;
+const VIEWBOX_SIZE = 64;
 
-// Abstand des Icons von oben/rechts innerhalb der Karte (in World-Units)
-const ICON_MARGIN_X_WU = 0.265; // ~1rem nach innen (rechts)
-const ICON_MARGIN_Y_WU = 0.095; // ~1rem nach innen (oben)
+const ICON_MARGIN_X_WU = 0.265;
+const ICON_MARGIN_Y_WU = 0.095;
 
 /* Grid settings */
 let gridSize, currendGrid;
@@ -74,9 +71,20 @@ let frustumHeight, frustumWidth;
 
 let bookmarkIcon;
 
-// NEU: Hinge-Gruppen für linke/rechte Kante
+// Hinge-Gruppen
 let hingeLeft = null;
 let hingeRight = null;
+
+// Tiefen/Timing
+const DEPTH_GRID = 3.0;
+const DEPTH_OBJ  = 2.2;
+const OPEN_DUR   = 0.6;
+const CLOSE_DUR  = 0.5;
+const OPEN_EASE  = "power2.out";
+const CLOSE_EASE = "power2.inOut";
+
+// Warten bis das Vue-Description-Panel ausgeblendet ist, bevor das Grid zurückkommt
+const DESC_FADE_MS = 300; // passend zur <transition>
 
 /* =========================
    Helpers
@@ -104,67 +112,69 @@ function makeLineLoopFromXY(pointsXY, material, dx = 0, dy = 0) {
   return new LineLoop(geom, material);
 }
 
-/** Bookmark-Icon mit Quad-Stroke-Outline + einstellbarer Plus-Dicke */
+/** tiefes Klonen inkl. eigener Materialinstanzen */
+function cloneWithUniqueMaterials(node) {
+  const clone = node.clone(true);
+  clone.traverse((o) => {
+    if (o.material) {
+      if (Array.isArray(o.material)) o.material = o.material.map((m) => m.clone());
+      else o.material = o.material.clone();
+    }
+  });
+  return clone;
+}
+
+/** Bookmark-Icon – alle Teile als Icon markieren + stabile Draw-Order */
 function buildBookmarkIcon() {
   if (bookmarkIcon) return bookmarkIcon;
 
   const g = new Group();
 
-  // 1) OUTLINE als Polygonpunkte (wie dein Header-Icon)
-  const outlinePtsXY = [
-    52, 60,
-    32, 48,
-    12, 60,
-    12,  4,
-    52,  4,
-    52, 60
-  ];
-
-  // Material: echtes Schwarz
+  const outlinePtsXY = [52,60, 32,48, 12,60, 12,4, 52,4, 52,60];
   const outlineMat = new LineBasicMaterial({ color: 0x000000 });
-
-  // Offsets in SVG-Units für gewünschte Pixel-Dicke
   const off = (OUTLINE_THICKNESS_PX * SVG_UNITS_PER_PX) / 2;
 
-  // Quad-Stroke (8 Offsets + Mitte)
   [
-    [ 0,  0],
-    [ off, 0], [ -off, 0],
-    [ 0,  off], [ 0, -off],
-    [ off,  off], [ -off,  off],
-    [ off, -off], [ -off, -off]
-  ].forEach(([dx, dy]) => {
-    g.add(makeLineLoopFromXY(outlinePtsXY, outlineMat, dx, dy));
+    [0,0], [off,0],[-off,0], [0,off],[0,-off], [off,off],[-off,off], [off,-off],[-off,-off]
+  ].forEach(([dx,dy]) => {
+    const loop = makeLineLoopFromXY(outlinePtsXY, outlineMat.clone(), dx, dy);
+    loop.userData.isIcon = true;
+    loop.renderOrder = 10;
+    g.add(loop);
   });
 
-  // 2) PLUS – zwei Rechtecke, Dicke in px → SVG-Units
   const t = PLUS_THICKNESS_PX * SVG_UNITS_PER_PX;
-  const plusMat = new MeshBasicMaterial({ color: 0x000000 });
+  const plusMatV = new MeshBasicMaterial({ color: 0x000000 });
+  const plusMatH = new MeshBasicMaterial({ color: 0x000000 });
 
-  // Vertikal exakt zentriert: x=32, y: 15..33 (H=18)
   const vShape = rectShape(32 - t / 2, 15.0, t, 18.0);
   const vGeo   = new ShapeGeometry(vShape);
-  const vMesh  = new Mesh(vGeo, plusMat);
-  vMesh.position.z = 0.01;
+  const vMesh  = new Mesh(vGeo, plusMatV);
+  vMesh.position.z = 0.02;
+  vMesh.userData.isIcon = true;
+  vMesh.renderOrder = 10;
   g.add(vMesh);
 
-  // Horizontal exakt zentriert: y=24, x: 24..42 (W=18)
   const hShape = rectShape(24.0, 24 - t / 2, 18.0, t);
   const hGeo   = new ShapeGeometry(hShape);
-  const hMesh  = new Mesh(hGeo, plusMat);
-  hMesh.position.z = 0.01;
+  const hMesh  = new Mesh(hGeo, plusMatH);
+  hMesh.position.z = 0.02;
+  hMesh.userData.isIcon = true;
+  hMesh.renderOrder = 10;
   g.add(hMesh);
 
-  // 3) Unsichtbare Hitbox (für komfortables Klicken)
   const hitSize = 24;
   const hitGeom = new PlaneGeometry(hitSize, hitSize);
   const hitMat  = new MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false });
   const hitMesh = new Mesh(hitGeom, hitMat);
   hitMesh.name = "bookmark-hit";
-  hitMesh.position.set(32, 32, 0.02);
+  hitMesh.position.set(32,32,0.02);
+  hitMesh.userData.isIcon = true;
+  hitMesh.renderOrder = 10;
   g.add(hitMesh);
 
-  // 4) Pivot ins Zentrum setzen und dann skalieren
+  g.userData.isIcon = true;
+
   g.position.set(-VIEWBOX_SIZE / 2, -VIEWBOX_SIZE / 2, 0.01);
   g.scale.set(ICON_SCALE, -ICON_SCALE, ICON_SCALE);
 
@@ -172,20 +182,100 @@ function buildBookmarkIcon() {
   return bookmarkIcon;
 }
 
+/** alle Materialien unterhalb eines Roots */
+function collectMaterials(root) {
+  const mats = new Set();
+  root.traverse((o) => {
+    if (o.material) {
+      if (Array.isArray(o.material)) o.material.forEach((m) => mats.add(m));
+      else mats.add(o.material);
+    }
+  });
+  return Array.from(mats);
+}
+
+/**
+ * Materialien, die wir fürs Grid faden:
+ * - ganzes Grid
+ * - Icon-Knoten KOMPLETT ignorieren (damit deren States unberührt bleiben)
+ * - Subtree des geklickten Objekts ausschließen
+ */
+function collectGridFadeMaterials(root, excludeNodes = []) {
+  const excludeSet = new Set();
+  excludeNodes.forEach(n => n.traverse(o => excludeSet.add(o)));
+
+  const mats = new Set();
+  root.traverse((o) => {
+    if (excludeSet.has(o)) return;
+    if (o.userData?.isIcon) return; // Icons explizit NICHT anfassen!
+    if (o.material) {
+      if (Array.isArray(o.material)) o.material.forEach((m) => mats.add(m));
+      else mats.add(o.material);
+    }
+  });
+  return Array.from(mats);
+}
+
+/** Icon-Nodes (für einfaches sichtbar/unsichtbar schalten) */
+function collectIconNodes(root, excludeNodes = []) {
+  const excludeSet = new Set();
+  excludeNodes.forEach(n => n.traverse(o => excludeSet.add(o)));
+
+  const nodes = [];
+  root.traverse((o) => {
+    if (excludeSet.has(o)) return;
+    if (o.userData?.isIcon) nodes.push(o);
+  });
+  return nodes;
+}
+
+/** Original-Renderstates sichern & wiederherstellen (für Grid-Fade) */
+const originalState = new WeakMap();
+
+function prepareForFade(materials) {
+  materials.forEach((m) => {
+    if (!originalState.has(m)) {
+      originalState.set(m, {
+        transparent: !!m.transparent,
+        depthWrite:  m.depthWrite !== undefined ? m.depthWrite : true,
+        depthTest:   m.depthTest  !== undefined ? m.depthTest  : true,
+        opacity:     m.opacity !== undefined ? m.opacity : 1,
+      });
+    }
+    if (!m.transparent) { m.transparent = true; m.needsUpdate = true; }
+    m.depthWrite = false;
+    m.depthTest  = false;
+  });
+}
+
+function restoreAfterFade(materials) {
+  materials.forEach((m) => {
+    const st = originalState.get(m);
+    if (st) {
+      m.transparent = st.transparent;
+      m.depthWrite  = st.depthWrite;
+      m.depthTest   = st.depthTest;
+      m.opacity     = st.opacity;
+      m.needsUpdate = true;
+      originalState.delete(m);
+    } else {
+      m.opacity = 1;
+      m.needsUpdate = true;
+    }
+  });
+}
+
+/* =========================
+   Data
+   ========================= */
 const loadFront = async (dpr) => {
   const url = `http://localhost:8000/stokes/gallery?type=front&batch=${batch}&dpr=${dpr}`;
   try {
     const res  = await fetch(url);
     const data = await res.json();
-
     const urls = Object.values(data.data.front);
-
-    if (data.success) {
-      batch++; // increment batch for next call
-      return urls; // merge front images
-    } else {
-      console.error("API error:", data.message);
-    }
+    if (data.success) { batch++; return urls; }
+    else console.error("API error:", data.message);
   } catch (err) {
     console.error("Fetch error:", err);
     return [];
@@ -196,10 +286,8 @@ function getGridSize() {
   const rows   = Math.ceil(grid.children.length / gridSize);
   const width  = gridSize * targetWidth + (gridSize - 1) * (gapX - targetWidth);
   const height = rows * targetHeight + (rows - 1) * (gapY - targetHeight) + gridPosYOffset;
-
   return { width, height };
 }
-
 function getObjectSize(obj) {
   const box  = new Box3().setFromObject(obj);
   const size = box.getSize(new Vector3());
@@ -243,28 +331,15 @@ async function loadGridImages(dpr, grid, imgs, renderer) {
           texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
           texture.needsUpdate = true;
 
-          /*
-          const material = new ShaderMaterial({
-            vertexShader: vertexShader,
-            fragmentShader: fragmentShader,
-            uniforms: {
-              uTexture: { value: texture },
-              uCenter: { value: new Vector2(0.5, 0.5) },
-              uRadius: { value: 0.5 },
-              uFeather: { value: 0.2 },
-              uStrength: { value: 0.2 },
-            },
-            transparent: true,
-          });
-          */
-
           const material = new MeshBasicMaterial({ map: texture });
           const mesh = new Mesh(geometry, material);
 
-          // Icon klonen & sauber IN die Ecke schieben (1rem inside → subtract)
-          const iconGroup = buildBookmarkIcon().clone(true);
-          iconGroup.position.x =  targetWidth  / 2 - ICON_MARGIN_X_WU; // rechts nach innen
-          iconGroup.position.y =  targetHeight / 2 - ICON_MARGIN_Y_WU; // oben  nach innen
+          // Icon klonen – eigene Materials + Icon-Flag + renderOrder
+          const iconTemplate = buildBookmarkIcon();
+          const iconGroup = cloneWithUniqueMaterials(iconTemplate);
+          iconGroup.position.x =  targetWidth  / 2 - ICON_MARGIN_X_WU;
+          iconGroup.position.y =  targetHeight / 2 - ICON_MARGIN_Y_WU;
+          iconGroup.traverse(o => { o.userData.isIcon = true; o.renderOrder = 10; });
           mesh.add(iconGroup);
 
           mesh.userData.url = "http://localhost:8000" + url;
@@ -274,20 +349,15 @@ async function loadGridImages(dpr, grid, imgs, renderer) {
           clickableBtn.push(iconGroup);
           clickableBtn.push(mesh);
 
-          mesh.userData.text =
-            "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.";
+          mesh.userData.text = "Lorem ipsum ...";
           mesh.userData.type = "image";
-       
-          // Nur die Hitbox in die Klickliste
+
           const hit = iconGroup.getObjectByName("bookmark-hit");
           clickableBtn.push(hit || iconGroup);
-
-          mesh.userData.url = "http://localhost:8000" + url;
 
           setGridPosition(indexDelta, gridSize, mesh);
           grid.add(mesh);
           resolve();
-
         },
         undefined,
         (err) => { console.error("Error loading texture:", err); reject(err); }
@@ -354,11 +424,14 @@ function createScrollTrigger(dpr, camera, renderer, scrollContainer) {
   });
 }
 
+/* =========================
+   App
+   ========================= */
 async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollContainer) {
 
   getCureentGridSize();
   buildBookmarkIcon();
-  
+
   const totalWidth = gridSize * targetWidth + (gridSize - 1) * (gapX - targetWidth);
   grid.position.x = -totalWidth / 2 + targetWidth / 2;
   grid.position.y = targetHeight - gridPosYOffset;
@@ -367,7 +440,6 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
   updateContainerHeight(scrollContainer, camera);
   createScrollTrigger(dpr, camera, renderer, scrollContainer);
 
-  // NEU: Hinge-Gruppen einmalig anlegen
   if (!hingeLeft)  { hingeLeft  = new Group(); scene.add(hingeLeft); }
   if (!hingeRight) { hingeRight = new Group(); scene.add(hingeRight); }
 
@@ -390,12 +462,10 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
     resizeTimeout = setTimeout(() => updateContainerHeight(scrollContainer, camera), 200);
   });
 
-  // Raycaster for detecting clicks
   const raycaster = new Raycaster();
   const mouse = new Vector2();
   let openImg = false;
 
-  // Klick auf das Icon
   function onMouseClick(event) {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -408,182 +478,154 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
       if (clickedObject.userData.type === "image") {
         openImg = true;
 
-        // Originale merken
         const originalParent   = clickedObject.parent;
         const originalPosition = clickedObject.position.clone();
         const originalRotation = clickedObject.rotation.clone();
         const originalScale    = clickedObject.scale.clone();
 
-        // Für Rückbau: originaler Grid-Parent
         const originalGridParent = grid.parent;
 
-        // Objekt fürs freie Animieren lösen (Welt-Transform bleibt erhalten)
         scene.attach(clickedObject);
 
-        // ---------- Zielpose berechnen (seitlich + zur Kamera) ----------
         const dir = new Vector3();
-        camera.getWorldDirection(dir); // Blickrichtung der Kamera (normiert)
+        camera.getWorldDirection(dir);
 
-        // Seite bestimmen
         const zPos = 1.0;
         const halfFovRad = (camera.fov * Math.PI) / 360;
 
         let positionX = clickedObject.position.x;
         const baseSide = positionX === 0 ? (Math.random() > 0.5 ? 1 : -1) : (positionX > 0 ? -1 : 1);
 
-        // Tiefe relativ zur Kamera (Grid weg, Objekt zur Kamera)
-        const depthShift = 1.5;
-
-        // Erstmal vorläufiger Zielpunkt fürs Objekt
         const objBase = new Vector3(0, 0, zPos);
-        let objToward = objBase.clone().add(dir.clone().multiplyScalar(-depthShift));
+        let objToward = objBase.clone().add(dir.clone().multiplyScalar(-DEPTH_OBJ));
 
-        // ---------- Full-bleed (oben/unten bündig) + links/rechts wie vorher ----------
         const dist = camera.position.distanceTo(objToward);
         const visibleHeight = 2 * dist * Math.tan(halfFovRad);
         const visibleWidth  = visibleHeight * camera.aspect;
 
-        // Overscan, damit keine Spalten bleiben
-        const OVERSCAN = 1.01; // 1% höher als Viewport
+        const OVERSCAN = 1.01;
         const scaleImg = (visibleHeight * OVERSCAN) / targetHeight;
 
-        // halbe Kartenbreite bei der neuen Skalierung
         const halfItemWidth = (targetWidth * scaleImg) / 2;
-
-        // Abstand von der Mitte bis zur bündigen Kante
         const edgeOffset = (visibleWidth / 2) - halfItemWidth;
 
-        // baseSide: -1 = links, +1 = rechts
         positionX = baseSide * edgeOffset;
-
-        // Ziel X setzen (Y/Z bleiben)
         objToward.setX(positionX);
 
-        // Bookmark-Icon ausblenden
-        if (clickedObject.children[0]) clickedObject.children[0].visible = false;
+        // --- ICONS: sofort raus, kein Material-Fade ---
+        const clickedIcon = clickedObject.children[0] || null;
+        if (clickedIcon) clickedIcon.visible = false;
 
-        // ---------- HINGE-Setup: Kante wählen & Grid an Hinge hängen ----------
-        // Grid-Bounds in Weltkoordinaten
+        const allGridIcons = collectIconNodes(grid, [clickedObject]);
+        allGridIcons.forEach(n => n.visible = false);
+
+        // Hinge-Setup
         const gridBox = new Box3().setFromObject(grid);
         const leftEdgeX  = gridBox.min.x;
         const rightEdgeX = gridBox.max.x;
         const midY = (gridBox.min.y + gridBox.max.y) * 0.5;
         const midZ = (gridBox.min.z + gridBox.max.z) * 0.5;
 
-        // Hinge-Positionen updaten (liegen im Scene-Root)
         hingeLeft.position.set(leftEdgeX,  midY, midZ);
         hingeRight.position.set(rightEdgeX, midY, midZ);
 
-        // Je nach Seite Hinge wählen:
-        // Objekt geht nach rechts (baseSide=+1) → links kippen
-        // Objekt geht nach links  (baseSide=-1) → rechts kippen
         const activeHinge = (baseSide > 0) ? hingeLeft : hingeRight;
 
-        // Original Hinge-Transform merken
         const originalHingePos = activeHinge.position.clone();
         const originalHingeRot = activeHinge.rotation.clone();
 
-        // Sicherstellen, dass Hinge im Scene-Root hängt, dann Grid unter Hinge hängen
         scene.attach(activeHinge);
         activeHinge.attach(grid);
 
-        // Tiefen-Shift am Hinge (statt am Grid)
-        const hingeAway = activeHinge.position.clone().add(dir.clone().multiplyScalar(depthShift));
+        const hingeAway = activeHinge.position.clone().add(dir.clone().multiplyScalar(DEPTH_GRID));
 
-        // ---------- Hinfahrt ----------
-        // Tür-artiges Kippen um Y an der gewählten Kante + in die Tiefe fahren
-        const ANGLE = 0.6;                 // ≈ 34°, anpassen nach Geschmack
-        const sign  = (baseSide > 0) ? +1 : -1; // rechts andocken → +, links → -
+        // Nur Grid-Flächen faden (Icons & geklicktes Objekt ausgeschlossen)
+        const gridMats = collectGridFadeMaterials(grid, [clickedObject]);
 
-        gsap.to(activeHinge.rotation, {
-          y: originalHingeRot.y + sign * ANGLE,
-          duration: 0.5,
-          ease: "power2.out",
+        const ANGLE = 0.6;
+        const sign  = (baseSide > 0) ? +1 : -1;
+
+        const tl = gsap.timeline({
+          defaults: { duration: OPEN_DUR, ease: OPEN_EASE },
+          onComplete: () => {
+            imagesDescription.value = {
+              description:
+                "lorem ipsum dolor sit amet consetetur sadipscing elitr sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat sed diam voluptua. at vero eos et accusam et justo duo dolores et ea rebum stet clita kasd gubergren no sea takimata sanctus est lorem ipsum dolor sit amet",
+              url: clickedObject.userData.url,
+              side: positionX > 0 ? "left" : "right",
+              onClick: () => {
+                // 1) Description zuerst ausfaden
+                imagesDescription.value = null;
+
+                // 2) Objekt zurückfahren
+                originalParent.attach(clickedObject);
+                gsap.to(clickedObject.rotation, {
+                  x: originalRotation.x, y: originalRotation.y, z: originalRotation.z,
+                  duration: CLOSE_DUR, ease: CLOSE_EASE
+                });
+                gsap.to(clickedObject.position, {
+                  x: originalPosition.x, y: originalPosition.y, z: originalPosition.z,
+                  duration: CLOSE_DUR, ease: CLOSE_EASE
+                });
+                gsap.to(clickedObject.scale, {
+                  x: originalScale.x, y: originalScale.y, z: originalScale.z,
+                  duration: CLOSE_DUR, ease: CLOSE_EASE
+                });
+
+                // 3) Nach dem Description-Fade: Grid zurück + Grid-Mats auf 1
+                const startGridReturn = () => {
+                  const tlClose = gsap.timeline({ defaults: { duration: CLOSE_DUR, ease: CLOSE_EASE } });
+
+                  tlClose.to(activeHinge.rotation, {
+                    x: originalHingeRot.x, y: originalHingeRot.y, z: originalHingeRot.z
+                  }, 0);
+                  tlClose.to(activeHinge.position, {
+                    x: originalHingePos.x, y: originalHingePos.y, z: originalHingePos.z,
+                    onComplete: () => {
+                      if (originalGridParent) originalGridParent.attach(grid);
+                      else scene.attach(grid);
+                    }
+                  }, 0);
+
+                  // Grid-Opacity IN
+                  prepareForFade(gridMats);
+                  tlClose.to(gridMats, { opacity: 1 }, 0);
+
+                  // Am Ende: Render-States wiederherstellen und **alle Icons nur sichtbar schalten**
+                  tlClose.add(() => {
+                    restoreAfterFade(gridMats);
+                    const allIconsNow = collectIconNodes(grid);
+                    allIconsNow.forEach(n => n.visible = true); // kein Fade → stabile States
+                    if (clickedIcon) clickedIcon.visible = true;
+                    openImg = false;
+                  });
+                };
+
+                gsap.delayedCall(DESC_FADE_MS / 1000, startGridReturn);
+              },
+            };
+          }
         });
-        gsap.to(activeHinge.position, {
-          x: hingeAway.x,
-          y: hingeAway.y,
-          z: hingeAway.z,
-          duration: 0.5,
-          ease: "power2.out",
-        });
 
-        // Objekt: zur Kamera + skalieren
-        gsap.to(clickedObject.position, {
-          x: objToward.x, y: objToward.y, z: objToward.z,
-          duration: 0.5, ease: "power2.out"
-        });
-        gsap.to(clickedObject.scale, {
-          x: scaleImg, y: scaleImg, z: scaleImg,
-          duration: 0.5, ease: "power2.out"
-        });
+        // Grid-Mats vorbereiten (Icons & clickedObject sind ausgeschlossen)
+        tl.call(() => { prepareForFade(gridMats); }, null, 0);
 
-        // ---------- Panel + Rückweg ----------
-        imagesDescription.value = {
-          description:
-            "lorem ipsum dolor sit amet consetetur sadipscing elitr sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat sed diam voluptua. at vero eos et accusam et justo duo dolores et ea rebum stet clita kasd gubergren no sea takimata sanctus est lorem ipsum dolor sit amet",
-          url: clickedObject.userData.url,
-          side: positionX > 0 ? "left" : "right",
-          onClick: () => {
-            // 1) Erst Objekt zurück in Original-Parent hängen, dann lokal zurück tweenen
-            originalParent.attach(clickedObject);
-
-            gsap.to(clickedObject.rotation, {
-              x: originalRotation.x, y: originalRotation.y, z: originalRotation.z,
-              duration: 0.5, ease: "power2.inOut"
-            });
-            gsap.to(clickedObject.position, {
-              x: originalPosition.x, y: originalPosition.y, z: originalPosition.z,
-              duration: 0.5, ease: "power2.inOut"
-            });
-            gsap.to(clickedObject.scale, {
-              x: originalScale.x, y: originalScale.y, z: originalScale.z,
-              duration: 0.5, ease: "power2.inOut",
-              onComplete: () => {
-                if (clickedObject.children[0]) clickedObject.children[0].visible = true;
-                openImg = false;
-              }
-            });
-
-            // 2) Hinge (Kippgelenk) wieder auf Original-Transform fahren
-            gsap.to(activeHinge.rotation, {
-              x: originalHingeRot.x,
-              y: originalHingeRot.y, // wichtig: y zurücksetzen
-              z: originalHingeRot.z,
-              duration: 0.5,
-              ease: "power2.inOut",
-            });
-            gsap.to(activeHinge.position, {
-              x: originalHingePos.x,
-              y: originalHingePos.y,
-              z: originalHingePos.z,
-              duration: 0.5,
-              ease: "power2.inOut",
-              onComplete: () => {
-                // 3) Grid zurück an den ursprünglichen Parent hängen
-                if (originalGridParent) {
-                  originalGridParent.attach(grid);
-                } else {
-                  scene.attach(grid); // Fallback: zurück ins Scene-Root
-                }
-              }
-            });
-
-            imagesDescription.value = null;
-          },
-        };
+        // Hinfahrt
+        tl.to(activeHinge.rotation, { y: originalHingeRot.y + sign * ANGLE }, 0)
+          .to(activeHinge.position, { x: hingeAway.x, y: hingeAway.y, z: hingeAway.z }, 0)
+          .to(clickedObject.position, { x: objToward.x, y: objToward.y, z: objToward.z }, 0)
+          .to(clickedObject.scale, { x: scaleImg, y: scaleImg, z: scaleImg }, 0)
+          .to(gridMats, { opacity: 0 }, 0);
 
       } else {
-        const target = clickedObject.parent.parent; // The grid object
+        const target = clickedObject.parent.parent;
 
         const originalPosition = target.position.clone();
         const originalRotation = target.rotation.clone();
         const originalScale = target.scale.clone();
 
-        // Move to scene root (so it can animate independently of grid)
         scene.attach(target);
 
-        // Optional: move to front for better visibility
         const frontPosition = {
           x: frustumWidth / 2 - 0.2,
           y: frustumHeight / 2 - 0.2,
@@ -592,20 +634,19 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
 
         let scale = 0.02;
 
-        // Animate to front
         gsap.to(target.position, {
           x: frontPosition.x,
           y: frontPosition.y,
           z: frontPosition.z,
-          duration: 0.5,
-          ease: "power2.out"
+          duration: OPEN_DUR,
+          ease: OPEN_EASE
         });
         gsap.to(target.scale, {
           y: scale,
           x: scale,
           z: scale,
-          duration: 1,
-          ease: "power2.out",
+          duration: OPEN_DUR + 0.4,
+          ease: OPEN_EASE,
           onStart: () => {
             window.dispatchEvent(new CustomEvent("wishlist:bump"));
           },
