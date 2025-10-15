@@ -387,11 +387,6 @@ onMounted(() => {})
   z-index: 31; /* über Inhalt der Box */
 }
 
-/* --- Error-Positionierung sauber unter dem Feld --- */
-.input-group-wrap {
-  position: relative;            /* Anker für .err */
-  padding-bottom: 1.25rem;       /* Platz für Fehlermeldung */
-}
 
 .cofirmation-input-group {
   margin-bottom: 0;              /* Abstand kommt über padding-bottom */
