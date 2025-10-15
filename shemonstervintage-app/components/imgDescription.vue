@@ -46,7 +46,7 @@ defineProps({
   top: 0px;
   background-color: rgba(255, 255, 255, 1);
   z-index: 30;
-  padding: 4rem 1rem;
+  padding: 4rem 1rem 10rem 1rem;
   width: 50vw;
   height: 100vh;
   display: flex;

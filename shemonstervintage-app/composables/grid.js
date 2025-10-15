@@ -11,6 +11,7 @@ import {
   Vector3,
   MeshBasicMaterial,
   Vector2,
+  Vector4,
   LineBasicMaterial,
   BufferGeometry,
   Float32BufferAttribute,
@@ -19,6 +20,7 @@ import {
   ShapeGeometry,
   ExtrudeGeometry,
   Raycaster,
+  ShaderMaterial,
 } from "three";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -85,6 +87,82 @@ const CLOSE_EASE = "power2.inOut";
 
 // Warten bis das Vue-Description-Panel ausgeblendet ist, bevor das Grid zurückkommt
 const DESC_FADE_MS = 300; // passend zur <transition>
+
+/* =========================
+   Screen-Space Crop Shader
+   ========================= */
+const cropVertex = /* glsl */`
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+// cropFragment (neu, ohne #include)
+const cropFragment = /* glsl */`
+  precision mediump float;
+  uniform sampler2D map;
+  uniform vec2 uViewport;   // Pixel (width, height)
+  uniform vec4 uCrop;       // Pixel rect: (x, y, w, h)
+  varying vec2 vUv;
+
+  void main() {
+    vec2 frag = gl_FragCoord.xy;
+    vec2 minR = uCrop.xy;
+    vec2 maxR = uCrop.xy + uCrop.zw;
+
+    // außerhalb des 50%-Rects: verwerfen
+    if (frag.x < minR.x || frag.x > maxR.x || frag.y < minR.y || frag.y > maxR.y) {
+      discard;
+    }
+
+    gl_FragColor = texture2D(map, vUv);
+  }
+`;
+
+function makeCropMaterial(texture, renderer, side /* 'left' | 'right' */) {
+  const size = renderer.getSize(new THREE.Vector2());
+  const vw = size.x;
+  const vh = size.y;
+
+  const cropX = (side === "right") ? Math.floor(vw * 0.5) : 0;
+  const crop = new THREE.Vector4(cropX, 0, Math.floor(vw * 0.5), vh);
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      map:       { value: texture },
+      uViewport: { value: new THREE.Vector2(vw, vh) },
+      uCrop:     { value: crop },
+    },
+    vertexShader:   cropVertex,
+    fragmentShader: cropFragment,
+    transparent: false,
+  });
+
+  // Wichtig: keine Three-Chunks → kein ToneMapping hier
+  mat.toneMapped = false;
+  return mat;
+}
+
+function updateCropUniforms(cropMat, renderer, side) {
+  if (!cropMat || !cropMat.uniforms?.uViewport) return;
+  const size = renderer.getSize(new Vector2());
+  const vw = size.x, vh = size.y;
+  cropMat.uniforms.uViewport.value.set(vw, vh);
+  const cropX = (side === "right") ? Math.floor(vw * 0.5) : 0;
+  cropMat.uniforms.uCrop.value.set(cropX, 0, Math.floor(vw * 0.5), vh);
+  cropMat.uniforms.uViewport.needsUpdate = true;
+  cropMat.uniforms.uCrop.needsUpdate = true;
+}
+
+// Aktiver Crop-Zustand für das vorgezogene Objekt
+let activeCrop = {
+  mesh: null,
+  originalMaterial: null,
+  cropMaterial: null,
+  side: "left",
+};
 
 /* =========================
    Helpers
@@ -460,6 +538,11 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
     renderer.setSize(window.innerWidth, window.innerHeight);
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => updateContainerHeight(scrollContainer, camera), 200);
+
+    // >>> Crop-Uniforms bei aktivem Objekt aktualisieren
+    if (activeCrop.mesh && activeCrop.cropMaterial) {
+      updateCropUniforms(activeCrop.cropMaterial, renderer, activeCrop.side);
+    }
   });
 
   const raycaster = new Raycaster();
@@ -545,6 +628,13 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
         const ANGLE = 0.6;
         const sign  = (baseSide > 0) ? +1 : -1;
 
+        // --- Seite (für Crop) bestimmen
+        const side = positionX > 0 ? "left" : "right"; // Objekt auf rechter Bildschirmhälfte → Crop links; und umgekehrt
+        // Actually: Wir docken das Objekt an der Seite an, auf der es steht:
+        // Wenn positionX > 0, steht es rechts → wir wollen die RECHTE Hälfte zeigen:
+        // Korrigiert:
+        const cropSide = positionX > 0 ? "right" : "left";
+
         const tl = gsap.timeline({
           defaults: { duration: OPEN_DUR, ease: OPEN_EASE },
           onComplete: () => {
@@ -557,7 +647,15 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
                 // 1) Description zuerst ausfaden
                 imagesDescription.value = null;
 
-                // 2) Objekt zurückfahren
+                // 2) Objekt-Material zurücksetzen (Crop aus)
+                if (activeCrop.mesh === clickedObject) {
+                  clickedObject.material = activeCrop.originalMaterial;
+                  activeCrop.mesh = null;
+                  activeCrop.originalMaterial = null;
+                  activeCrop.cropMaterial = null;
+                }
+
+                // 3) Objekt zurückfahren
                 originalParent.attach(clickedObject);
                 gsap.to(clickedObject.rotation, {
                   x: originalRotation.x, y: originalRotation.y, z: originalRotation.z,
@@ -572,7 +670,7 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
                   duration: CLOSE_DUR, ease: CLOSE_EASE
                 });
 
-                // 3) Nach dem Description-Fade: Grid zurück + Grid-Mats auf 1
+                // 4) Nach dem Description-Fade: Grid zurück + Grid-Mats auf 1 + Icons sichtbar
                 const startGridReturn = () => {
                   const tlClose = gsap.timeline({ defaults: { duration: CLOSE_DUR, ease: CLOSE_EASE } });
 
@@ -595,8 +693,8 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
                   tlClose.add(() => {
                     restoreAfterFade(gridMats);
                     const allIconsNow = collectIconNodes(grid);
-                    allIconsNow.forEach(n => n.visible = true); // kein Fade → stabile States
-                    if (clickedIcon) clickedIcon.visible = true;
+                    allIconsNow.forEach(n => n.visible = true);
+                    if (clickedObject.children[0]) clickedObject.children[0].visible = true;
                     openImg = false;
                   });
                 };
@@ -610,7 +708,19 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
         // Grid-Mats vorbereiten (Icons & clickedObject sind ausgeschlossen)
         tl.call(() => { prepareForFade(gridMats); }, null, 0);
 
-        // Hinfahrt
+        // >>> VOR der Hinfahrt: Crop-Material setzen
+        tl.call(() => {
+          const tex = clickedObject.material?.map;
+          if (tex) {
+            activeCrop.originalMaterial = clickedObject.material;
+            activeCrop.side = cropSide;
+            activeCrop.cropMaterial = makeCropMaterial(tex, renderer, cropSide);
+            clickedObject.material = activeCrop.cropMaterial;
+            activeCrop.mesh = clickedObject;
+          }
+        }, null, 0);
+
+        // Hinfahrt (Grid kippt/weg, Objekt nach vorn)
         tl.to(activeHinge.rotation, { y: originalHingeRot.y + sign * ANGLE }, 0)
           .to(activeHinge.position, { x: hingeAway.x, y: hingeAway.y, z: hingeAway.z }, 0)
           .to(clickedObject.position, { x: objToward.x, y: objToward.y, z: objToward.z }, 0)
