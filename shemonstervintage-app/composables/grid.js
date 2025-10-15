@@ -79,7 +79,7 @@ const CLOSE_EASE = "power2.inOut";
 const DESC_FADE_MS = 300;
 
 /* =========================
-   NDC-basierter Crop-Shader (Maske fährt mit dem Objekt)
+   NDC-Cropshader (Maske klebt am Bild)
    ========================= */
 const cropVertex = /* glsl */`
   varying float vNdcX;
@@ -87,7 +87,7 @@ const cropVertex = /* glsl */`
   void main() {
     vUv = uv;
     vec4 clip = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    vNdcX = clip.x / clip.w;           // NDC X in [-1..+1]
+    vNdcX = clip.x / clip.w;           // NDC X [-1..+1]
     gl_Position = clip;
   }
 `;
@@ -95,31 +95,43 @@ const cropVertex = /* glsl */`
 const cropFragment = /* glsl */`
   precision highp float;
   uniform sampler2D map;
-  uniform float uCenterNDC;   // Ziel-/Ist-Maskenmitte in NDC
-  uniform float uHalfWidthNDC;// halbe Maskenbreite in NDC
+  uniform float uCenterNDC;
+  uniform float uHalfWidthNDC;
   varying float vNdcX;
   varying vec2  vUv;
 
+  // sRGB <-> Linear helpers (ohne three-Chunks)
+  vec3 SRGBToLinear(vec3 c)  { return pow(c, vec3(2.2)); }
+  vec3 LinearToSRGB(vec3 c)  { return pow(c, vec3(1.0/2.2)); }
+
   void main() {
-    // volle Höhe, horizontale Beschneidung in NDC
     if (abs(vNdcX - uCenterNDC) > uHalfWidthNDC) discard;
-    gl_FragColor = texture2D(map, vUv);
+
+    vec4 tex = texture2D(map, vUv);
+
+    // Wie MeshBasic: sRGB-Texture -> Linear arbeiten -> zurück nach sRGB ausgeben
+    vec3 lin = SRGBToLinear(tex.rgb);
+    vec3 outSRGB = LinearToSRGB(lin);
+
+    gl_FragColor = vec4(outSRGB, tex.a);
   }
 `;
 
 function makeAnimatedCropMaterial(texture) {
   const mat = new ShaderMaterial({
     uniforms: {
-      map:            { value: texture },
-      uCenterNDC:     { value: 0.0 },
-      uHalfWidthNDC:  { value: 1.0 }, // wird direkt beim Start korrekt gesetzt
+      map:           { value: texture },
+      uCenterNDC:    { value: 0.0 },
+      uHalfWidthNDC: { value: 1.0 },
     },
     vertexShader:   cropVertex,
     fragmentShader: cropFragment,
     transparent: true,
-    depthWrite: false,   // reduziert Z-Artefakte beim Faden
+    depthWrite: false,
   });
-  mat.toneMapped = false;
+
+  mat.toneMapped = true; 
+
   return mat;
 }
 
@@ -146,69 +158,55 @@ const LOCAL_CORNERS = [
   new Vector3( targetWidth/2, -targetHeight/2, 0), // BR
 ];
 
-// gibt NDC.x eines Weltpunkts zurück
+// NDC.x eines Weltpunkts
 function worldToNdcX(world, camera) {
   _tmpV.copy(world).project(camera);
   return _tmpV.x; // -1..+1
 }
 
 function captureMeshScreenNdc(mesh, camera) {
-  // aktuelle Screenbreite des Meshes in NDC: min/max der 4 Ecken
+  // Breite (für halfStart) aus Ecken
   const ndcXs = LOCAL_CORNERS.map(c => worldToNdcX(mesh.localToWorld(c.clone()), camera));
   const minX = Math.min(...ndcXs);
   const maxX = Math.max(...ndcXs);
-  const centerNow = (minX + maxX) * 0.5;
-  const halfNow   = (maxX - minX) * 0.5;
+  const halfNow = (maxX - minX) * 0.5;
 
-  // Zentrum des Mesh-URSPRUNGs (für saubere Mittenführung)
-  const originNdc = worldToNdcX(mesh.localToWorld(new Vector3(0,0,0)), camera);
+  // Mitte aus Ursprung (robust & glatt)
+  const centerNow = worldToNdcX(mesh.localToWorld(new Vector3(0,0,0)), camera);
 
-  // Für die Maske nehmen wir die echte Breite (halfNow), die Mitte aber am besten den Ursprung
-  // (dein Plane ist um den Ursprung gebaut, passt zum Scale/Position-Tween)
-  return { centerNdc: originNdc, halfNdc: halfNow };
+  return { halfNdc: halfNow, centerNdc: centerNow };
 }
 
-/** anim state für die Maske */
+/** Crop-Anim State */
 let activeCrop = {
   mesh: null,
   originalMaterial: null,
   cropMaterial: null,
-  side: "left",          // "left" → Zielzentrum -0.5, "right" → +0.5
-  centerStart: 0,
-  halfStart: 0,
-  centerEnd: 0,
-  halfEnd: 0,
-  _captured: false,
+  halfStart: 0, // Start-Halbbreite (NDC)
 };
 
-function updateCropForMeshNDC(mesh, camera, cropMat, progress, anim) {
-  if (!mesh || !cropMat) return;
+/**
+ * FIX: Maskenmitte = Bildmitte (jeder Frame)
+ * → Bild bleibt stets mittig beschnitten.
+ * Wir tweenen nur die Halbbreite zur 50vw-Maske.
+ */
+function updateCropUniformDynamic(mesh, camera, progress) {
+  if (!mesh || !activeCrop.cropMaterial) return;
 
-  // Start einmalig erfassen (aus aktueller Projektion)
-  if (!anim._captured) {
-    const { centerNdc, halfNdc } = captureMeshScreenNdc(mesh, camera);
-    anim.centerStart = centerNdc;
-    anim.halfStart   = halfNdc;
-    anim._captured   = true;
-  }
+  const L = (a,b,t)=> a + (b-a)*t;
 
-  // Zielwerte: 50vw → halbe Breite = 0.5 (NDC), Zentrum bei ±0.5 (25vw/75vw)
-  anim.centerEnd = (anim.side === "right") ?  +0.5 : -0.5;
-  anim.halfEnd   = 0.5;
+  const { halfNdc: imgHalf, centerNdc: imgCenter } = captureMeshScreenNdc(mesh, camera);
+  const half = L(activeCrop.halfStart, 0.5, progress);
 
-  const lerp = (a,b,t)=> a + (b-a)*t;
-
-  const center = lerp(anim.centerStart, anim.centerEnd, progress);
-  const half   = lerp(anim.halfStart,   anim.halfEnd,   progress);
-
-  cropMat.uniforms.uCenterNDC.value    = center;
-  cropMat.uniforms.uHalfWidthNDC.value = half;
-  cropMat.uniforms.uCenterNDC.needsUpdate    = true;
-  cropMat.uniforms.uHalfWidthNDC.needsUpdate = true;
+  const u = activeCrop.cropMaterial.uniforms;
+  u.uCenterNDC.value     = imgCenter;
+  u.uHalfWidthNDC.value  = half;
+  u.uCenterNDC.needsUpdate    = true;
+  u.uHalfWidthNDC.needsUpdate = true;
 }
 
 /* =========================
-   Fade-Helper (unverändert)
+   Fade-Helper
    ========================= */
 function collectGridFadeMaterials(root, excludeNodes = []) {
   const excludeSet = new Set();
@@ -266,7 +264,7 @@ function restoreAfterFade(materials) {
 }
 
 /* =========================
-   Data / Grid / Scroll (wie gehabt)
+   Data / Grid / Scroll
    ========================= */
 const loadFront = async (dpr) => {
   const url = `http://localhost:8000/stokes/gallery?type=front&batch=${batch}&dpr=${dpr}`;
@@ -494,10 +492,8 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
         const OVERSCAN = 1.01;
         const scaleImg = (visibleHeight * OVERSCAN) / targetHeight;
 
-        const halfItemWidth = (targetWidth * scaleImg) / 2;
-        const edgeOffset = (visibleWidth / 2) - halfItemWidth;
-
-        positionX = baseSide * edgeOffset;
+        const centerOffsetWorld = (visibleWidth * 0.25) * baseSide;
+        positionX = centerOffsetWorld;
         objToward.setX(positionX);
 
         // ICONS: sofort raus
@@ -532,9 +528,6 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
         const ANGLE = 0.6;
         const sign  = (baseSide > 0) ? +1 : -1;
 
-        // Seite (für finalen 50vw-Anker) bestimmen:
-        const cropSide = positionX > 0 ? "right" : "left";
-
         const tl = gsap.timeline({
           defaults: { duration: OPEN_DUR, ease: OPEN_EASE },
           onComplete: () => {
@@ -553,7 +546,6 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
                   activeCrop.mesh = null;
                   activeCrop.originalMaterial = null;
                   activeCrop.cropMaterial = null;
-                  activeCrop._captured = false;
                 }
 
                 // Objekt zurückfahren
@@ -603,20 +595,25 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
         // Fade vorbereiten
         tl.call(() => { prepareForFade(gridMats); }, null, 0);
 
-        // >>> VOR der Hinfahrt: Crop-Material setzen & animieren (NDC-basiert)
+        // >>> VOR der Hinfahrt: Crop-Material setzen
         tl.call(() => {
           const tex = clickedObject.material?.map;
           if (tex) {
             activeCrop.originalMaterial = clickedObject.material;
-            activeCrop.side = cropSide;
             activeCrop.cropMaterial = makeAnimatedCropMaterial(tex);
             clickedObject.material = activeCrop.cropMaterial;
             activeCrop.mesh = clickedObject;
-            activeCrop._captured = false; // Startwerte bei erster onUpdate erfassen
+
+            // Startbreite (klein im Grid)
+            const { halfNdc } = captureMeshScreenNdc(clickedObject, camera);
+            activeCrop.halfStart = Math.min(halfNdc, 0.5);
+
+            // initiale Uniforms
+            updateCropUniformDynamic(clickedObject, camera, 0);
           }
         }, null, 0);
 
-        // Dummy-Progress (0..1) synchron zur OPEN-Dauer
+        // Dummy-Progress 0→1 für Halbbreiten-Tween (Maske folgt Bildmitte automatisch)
         const cropProg = { t: 0 };
         tl.to(cropProg, {
           t: 1,
@@ -624,7 +621,7 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
           ease: OPEN_EASE,
           onUpdate: () => {
             if (activeCrop.mesh && activeCrop.cropMaterial) {
-              updateCropForMeshNDC(activeCrop.mesh, camera, activeCrop.cropMaterial, cropProg.t, activeCrop);
+              updateCropUniformDynamic(activeCrop.mesh, camera, cropProg.t);
             }
           }
         }, 0);
@@ -674,7 +671,7 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
 }
 
 /* =========================
-   Bookmark-Icon Bau (unverändert)
+   Bookmark-Icon Bau
    ========================= */
 function buildBookmarkIcon() {
   if (bookmarkIcon) return bookmarkIcon;
@@ -697,16 +694,16 @@ function buildBookmarkIcon() {
   const plusMatV = new MeshBasicMaterial({ color: 0x000000 });
   const plusMatH = new MeshBasicMaterial({ color: 0x000000 });
 
-  const rectShape = (x,y,w,h)=>{ const s=new Shape(); s.moveTo(x,y); s.lineTo(x+w,y); s.lineTo(x+w,y+h); s.lineTo(x,y+h); s.lineTo(x,y); return s; };
+  const rectShapeFn = (x,y,w,h)=>{ const s=new Shape(); s.moveTo(x,y); s.lineTo(x+w,y); s.lineTo(x+w,y+h); s.lineTo(x,y+h); s.lineTo(x,y); return s; };
 
-  const vGeo   = new ShapeGeometry(rectShape(32 - t / 2, 15.0, t, 18.0));
+  const vGeo   = new ShapeGeometry(rectShapeFn(32 - t / 2, 15.0, t, 18.0));
   const vMesh  = new Mesh(vGeo, plusMatV);
   vMesh.position.z = 0.02;
   vMesh.userData.isIcon = true;
   vMesh.renderOrder = 10;
   g.add(vMesh);
 
-  const hGeo   = new ShapeGeometry(rectShape(24.0, 24 - t / 2, 18.0, t));
+  const hGeo   = new ShapeGeometry(rectShapeFn(24.0, 24 - t / 2, 18.0, t));
   const hMesh  = new Mesh(hGeo, plusMatH);
   hMesh.position.z = 0.02;
   hMesh.userData.isIcon = true;
