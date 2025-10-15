@@ -761,6 +761,8 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
             window.dispatchEvent(new CustomEvent("wishlist:bump"));
           },
           onComplete: () => {
+            console.log("URL:", target.userData.url);
+            urls.value.push(target.userData.url);
             grid.attach(target);
             target.position.copy(originalPosition);
             target.rotation.copy(originalRotation);

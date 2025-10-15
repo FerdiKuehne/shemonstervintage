@@ -73,7 +73,7 @@ function closeBox() {
 
 async function login() {
   try {
-    const response = await fetch("https://your-domain.com/api/login.php", {
+    const response = await fetch("http://localhost:8000/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: email.value, password: password.value }),
