@@ -3,44 +3,69 @@
 
   <ul class="header-nav">
     <!-- Mobile Toggle -->
-<li class="only-mobile">
-  <button
-    class="btn-menu"
-    @click="isMenuOpen = !isMenuOpen"
-    aria-controls="mobile-menu"
-    :aria-expanded="isMenuOpen ? 'true' : 'false'"
-    :aria-label="isMenuOpen ? 'Menü schließen' : 'Menü öffnen'"
-  >
-    <!-- Icon wechselt zwischen Hamburger und X -->
-    <svg v-if="!isMenuOpen" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <line x1="3" y1="6"  x2="21" y2="6"/>
-      <line x1="3" y1="12" x2="21" y2="12"/>
-      <line x1="3" y1="18" x2="21" y2="18"/>
-    </svg>
-    <svg v-else xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <line x1="5" y1="5" x2="19" y2="19"/>
-      <line x1="19" y1="5" x2="5" y2="19"/>
-    </svg>
-  </button>
-</li>
+    <li class="only-mobile">
+      <button
+        class="btn-menu"
+        @click="isMenuOpen = !isMenuOpen"
+        aria-controls="mobile-menu"
+        :aria-expanded="isMenuOpen ? 'true' : 'false'"
+        :aria-label="isMenuOpen ? 'Menü schließen' : 'Menü öffnen'"
+      >
+        <!-- Icon wechselt zwischen Hamburger und X -->
+        <svg v-if="!isMenuOpen" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6"  x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+        <svg v-else xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="5" y1="5" x2="19" y2="19"/>
+          <line x1="19" y1="5" x2="5" y2="19"/>
+        </svg>
+      </button>
+    </li>
 
     <li><NuxtLink to="/login">Login</NuxtLink></li>
     <li><NuxtLink to="/register">Register </NuxtLink></li>
     <li>
-      <button @click="isWishlistOpen = true" class="btn-wishlist">
+      <!-- WISHLIST BUTTON: mit GSAP-Bump + Icon-Switch -->
+      <button
+        ref="wishlistBtn"
+        @click="onWishlistClick"
+        class="btn-wishlist"
+        aria-label="Wishlist öffnen"
+      >
+        <!-- Normal -->
         <svg
+          v-if="!isWishlistInverted"
           xmlns="http://www.w3.org/2000/svg"
-          width="32"
-          height="32"
-          viewBox="0 0 64 64"
-          fill="none"
-          stroke="#000000"
-          stroke-width="2"
-          stroke-miterlimit="10"
+          width="32" height="32" viewBox="0 0 64 64" fill="none"
+          stroke="#000000" stroke-width="2" stroke-miterlimit="10"
         >
           <polygon points="51.081 59.656 32.276 47.43 13.463 59.656 13.463 3.737 51.081 3.737 51.081 59.656"/>
           <line x1="32.264" y1="15.364" x2="32.264" y2="34.292"/>
-          <line x1="41.729" y1="24.828" x2="22.8" y2="24.828"/>
+          <line x1="41.729" y1="24.828" x2="22.8"  y2="24.828"/>
+        </svg>
+
+        <!-- Invertiert -->
+        <svg
+          v-else
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 64 64"
+          width="32"
+          height="32"
+          fill="none"
+        >
+          <polygon
+            points="51.081 59.656 32.276 47.43 13.463 59.656 13.463 3.737 51.081 3.737 51.081 59.656"
+            stroke="#000"
+            stroke-width="2"
+            stroke-miterlimit="10"
+            fill="none"
+          />
+          <line x1="32.264" y1="15.364" x2="32.264" y2="34.292"
+            stroke="#fff" stroke-width="2" stroke-miterlimit="10" />
+          <line x1="41.729" y1="24.828" x2="22.8" y2="24.828"
+            stroke="#fff" stroke-width="2" stroke-miterlimit="10" />
         </svg>
       </button>
     </li>
@@ -51,7 +76,7 @@
     <ul class="main-nav">
       <li><NuxtLink to="/"        @click="isMenuOpen = false"><span class="num">01</span> Home</NuxtLink></li>
       <li><NuxtLink to="/about"   @click="isMenuOpen = false"><span class="num">02</span> About</NuxtLink></li>
-      <li><NuxtLink to="/gallery" @click="isMenuOpen = false"><span class="num">03</span> Gallery</NuxtLink></li>
+      <li><NuxtLink to="/gallery" @click="isMenuOpen = false"><span class="num">03</span> Sabotage</NuxtLink></li>
       <li><NuxtLink to="/anfahrt" @click="isMenuOpen = false"><span class="num">04</span> Location</NuxtLink></li>
       <li><NuxtLink to="/kontakt" @click="isMenuOpen = false"><span class="num">05</span> Contact</NuxtLink></li>
     </ul>
@@ -81,8 +106,6 @@
     <NuxtLayout />
   </div>
 
-
-
   <canvas v-if="showCanvas" id="minimap" width="440" height="440"></canvas>
 
   <footer>
@@ -102,7 +125,10 @@ import { useRoute, useNuxtApp } from "#imports";
 import Wishlist from "@/components/wishlist.vue";
 
 const isWishlistOpen = ref(false);
-const isMenuOpen = ref(false); // <-- Toggle-State fürs mobile Menü
+const isMenuOpen = ref(false);
+
+const isWishlistInverted = ref(false);  // <— Icon-Switch
+const wishlistBtn = ref(null);          // <— GSAP Target
 
 const scroller = scrollerRef;
 const route = useRoute();
@@ -115,6 +141,7 @@ const onKey = (e) => {
   if (e.key === "Escape") {
     isMenuOpen.value = false;
     isWishlistOpen.value = false;
+    isWishlistInverted.value = false;
   }
 };
 
@@ -137,6 +164,35 @@ onBeforeUnmount(() => {
 watch(isMenuOpen, (open) => {
   document.documentElement.style.overflow = open ? "hidden" : "";
 });
+
+/* === Wishlist: GSAP-Bump + Icon-Wechsel === */
+function onWishlistClick() {
+  // Icon direkt invertieren, hält während der gesamten Bump-Animation
+  isWishlistInverted.value = true;
+
+  const el = wishlistBtn.value;
+  if (el) {
+    gsap.fromTo(
+      el,
+      { scale: 1 },
+      {
+        scale: 1.08,
+        duration: 0.45,
+        ease: "power2.out",
+        yoyo: true,
+        repeat: 1,
+        transformOrigin: "center center",
+        onComplete: () => {
+          // Nach dem Yoyo zurück zum normalen Icon
+          isWishlistInverted.value = false;
+        }
+      }
+    );
+  }
+
+  // Panel öffnen
+  isWishlistOpen.value = true;
+}
 </script>
 
 <style>
@@ -289,14 +345,14 @@ input:-webkit-autofill:focus {
   .site-header {
     position: fixed;
     top: 0; left: 0; z-index: 20;
-    transform: translateX(-100%);     /* Start: aus dem Viewport links */
+    transform: translateX(-100%);
     background-color: var(--white);
     height: 100vh; width: 100%;
     padding: 200px 1rem 1rem 1rem;
     transition: transform .3s ease;
   }
   .site-header.open {
-    transform: translateX(0);         /* offen: sichtbar */
+    transform: translateX(0);
   }
 }
 
@@ -373,7 +429,6 @@ ul.main-nav li:hover .num {
 @media (max-width: 991px) {
   ul.main-nav li:hover .num  { font-size: 2rem; transform: translate(0, 0); }
 }
-
 
 ul.main-nav li a { color: var(--black); text-decoration: none; }
 

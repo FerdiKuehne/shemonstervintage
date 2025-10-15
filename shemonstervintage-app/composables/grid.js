@@ -412,7 +412,7 @@ function onMouseClick(event) {
 
           urls.value.push(target.userData.url);
 
-          gsap.to(element, {backgroundColor: '#000', duration: 0.5, delay: 0.1, yoyo: true, repeat: 1});
+          gsap.to(element, { scale: 1.2, duration: 0.3, delay: 0.1, yoyo: true, repeat: 1, ease: "power1.out"});
 
           grid.attach(target);
           target.position.copy(originalPosition);

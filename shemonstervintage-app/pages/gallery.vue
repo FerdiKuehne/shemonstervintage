@@ -1,6 +1,6 @@
 <template>
   <div class="container-fluid p-0">
-    <div class="page-headline">GALLERY</div>
+    <div class="page-headline">SABOTAGE ARCHIVE</div>
   </div>
 </template>
 
