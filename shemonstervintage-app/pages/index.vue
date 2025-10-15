@@ -35,7 +35,7 @@ onMounted(async () => {
 <template>
   <div>
     <div class="container-fluid p-0">
-      <div class="page-headline">HOME</div>
+      <div class="page-headline">VINTAGE</div>
     </div>
   </div>
 </template>

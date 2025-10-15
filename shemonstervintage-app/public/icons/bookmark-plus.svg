@@ -1,14 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg"
      viewBox="0 0 64 64"
-     fill="none"
-     stroke="currentColor"
-     stroke-width="2"
-     stroke-linecap="round"
-     stroke-linejoin="round"
-     aria-labelledby="bookmarkPlusTitle"
-     role="img">
-  <title id="bookmarkPlusTitle">Lesezeichen mit Plus-Symbol</title>
-  <polygon points="51.081 59.656 32.276 47.43 13.463 59.656 13.463 3.737 51.081 3.737 51.081 59.656"/>
-  <line x1="32.264" y1="15.364" x2="32.264" y2="34.292"/>
-  <line x1="41.729" y1="24.828" x2="22.8" y2="24.828"/>
+     shape-rendering="crispEdges">
+
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+        stroke: #000;
+        stroke-width: 1;          /* 1 px */
+        stroke-linecap: butt;     /* keine Verdickung an Enden */
+        stroke-linejoin: miter;
+      }
+      .st1 { fill: #fff; }
+    </style>
+  </defs>
+
+  <!-- Hülle -->
+  <g>
+    <path class="st1"
+          d="M14,5h36v53.166l-17.454-11.251c-.165-.106-.354-.159-.542-.159s-.376.053-.542.159l-17.462,11.251V5Z"
+          vector-effect="non-scaling-stroke"/>
+    <path d="M49,6v50.331l-15.912-10.256c-.33-.213-.707-.319-1.084-.319s-.753.106-1.083.319l-15.921,10.257V6h34M51,4H13v56l19.004-12.244,18.996,12.244V4h0Z"
+          vector-effect="non-scaling-stroke"/>
+  </g>
+
+  <!-- Plus: auf halbe Pixel gesetzt -->
+  <!-- Vertikal: x = 32.5; Horizontal: y = 24.5 -->
+  <line class="st0"
+        x1="32.5" y1="15.5" x2="32.5" y2="33.5"
+        vector-effect="non-scaling-stroke"/>
+  <line class="st0"
+        x1="23.5" y1="24.5" x2="41.5" y2="24.5"
+        vector-effect="non-scaling-stroke"/>
 </svg>
