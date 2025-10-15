@@ -40,6 +40,7 @@ onMounted(async () => {
   }
 
      grid = await initGrid(
+      $three.scene,
       dpr,
       $three.renderer,
       $three.camera,

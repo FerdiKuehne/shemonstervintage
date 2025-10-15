@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 64 64"
+     fill="none"
+     stroke="currentColor"
+     stroke-width="2"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     aria-labelledby="bookmarkPlusTitle"
+     role="img">
+  <title id="bookmarkPlusTitle">Lesezeichen mit Plus-Symbol</title>
+  <polygon points="51.081 59.656 32.276 47.43 13.463 59.656 13.463 3.737 51.081 3.737 51.081 59.656"/>
+  <line x1="32.264" y1="15.364" x2="32.264" y2="34.292"/>
+  <line x1="41.729" y1="24.828" x2="22.8" y2="24.828"/>
+</svg>

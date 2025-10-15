@@ -9,8 +9,18 @@ import {
   Box3,
   Vector3,
   MeshBasicMaterial,
+  BoxGeometry,
   ShaderMaterial,
   Vector2,
+  LineBasicMaterial,
+  Line,
+  DoubleSide,
+  Color,
+  EdgesGeometry,
+  LineSegments,
+  ShapeGeometry,
+  ExtrudeGeometry,
+  Raycaster
 } from "three";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -18,6 +28,9 @@ import { nextTick } from "vue";
 import vertexShader from "./shaders/griditems/vertex.glsl?raw";
 import fragmentShader from "./shaders/griditems/fragment.glsl?raw";
 import { BasicShader } from "three-stdlib";
+import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
+import { transform, transpileDeclaration } from "typescript";
+import { urls } from "./refsHelper.js";
 
 let gridSize, currendGrid;
 let resizeTimeout;
@@ -40,12 +53,63 @@ const geometry = new PlaneGeometry(targetWidth, targetHeight);
 
 gsap.registerPlugin(ScrollTrigger);
 
-
-
-
 let images = []; 
 let backImage = [];
 let batch = 1;
+let clickableBtn = [];
+let frustumHeight, frustumWidth;
+
+let bookmarkIcon; // store globally
+
+async function loadSVGIcon() {
+  if (window.bookmarkIcon) return window.bookmarkIcon;
+
+  const fillMaterial = new MeshBasicMaterial({ color: "#FFFFFF",
+    transparent: true,
+    opacity: 0.2,
+  });
+const stokeMaterial = new LineBasicMaterial({
+  color: "#000000",
+});
+
+  const loader = new SVGLoader();
+  const updateMap = [];
+
+  return new Promise((resolve, reject) => {
+    loader.load(
+      '/icons/bookmark-plus.svg',
+      (data) => {
+        const paths = data.paths;
+        const group = new Group();
+        paths.forEach((path) => {
+          const shapes = SVGLoader.createShapes(path);
+      
+          shapes.forEach((shape) => {
+            const meshGeometry = new ExtrudeGeometry(shape, {
+              bevelEnabled: false,
+            });
+            const linesGeometry = new EdgesGeometry(meshGeometry);
+            const mesh = new Mesh(meshGeometry, fillMaterial);
+            const lines = new LineSegments(linesGeometry, stokeMaterial);
+      
+            updateMap.push({ shape, mesh, lines });
+            group.add(mesh, lines);
+          });
+        });
+
+        const scaleFactor = 0.003; 
+
+        group.scale.set(scaleFactor, -scaleFactor, scaleFactor);
+        group.position.set(0, 0, 0.01);
+
+        bookmarkIcon = group;
+        resolve(group);
+      },
+      undefined,
+      reject
+    );
+  });
+}
 
 
 const loadFront = async (dpr) => {
@@ -162,6 +226,15 @@ async function loadGridImages(dpr,grid, images, renderer) {
 
           const mesh = new Mesh(geometry, material);
 
+          const svgIcon = bookmarkIcon.clone(true);
+          svgIcon.position.x = targetWidth / 2 - 0.19;
+          svgIcon.position.y = targetHeight / 2 - 0.03;
+          mesh.add(svgIcon);
+
+          mesh.userData.url = url;
+
+          clickableBtn.push(svgIcon);
+
           setGridPosition(indexDelta, gridSize, mesh);
           mesh.userData.text =
             "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.";
@@ -201,12 +274,18 @@ function getGridHeightInPx(camera) {
   gridHeightInPx = gridWorldHeight * worldToScreenRatio;
 }
 
+
+
 function updateContainerHeight(scrollerRef, camera) {
   gridWorldHeight = getGridSize().height; // total height of the grid in world units
 
   // Compute visible height of camera in world units
-  const frustumHeight =
+  frustumHeight =
     2 * camera.position.z * Math.tan((camera.fov * Math.PI) / 360);
+  frustumWidth = frustumHeight * camera.aspect;
+
+    console.log("frustumHeight: ", frustumHeight);
+    console.log("frustumWidth: ", frustumWidth);
 
   // Convert world units to vh:
   // The visible part (frustumHeight) corresponds to 100vh
@@ -253,8 +332,9 @@ function createScrollTrigger(dpr, camera, renderer, scrollContainer) {
   });
 }
 
-async function initGrid(dpr, renderer, camera, containerHeight, scrollContainer) {
+async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollContainer) {
   getCureentGridSize();
+  await loadSVGIcon(); // preload icon
   /* Center mid pre init */
   const totalWidth =
     gridSize * targetWidth + (gridSize - 1) * (gapX - targetWidth);
@@ -280,8 +360,6 @@ async function initGrid(dpr, renderer, camera, containerHeight, scrollContainer)
     updateContainerHeight(scrollContainer, camera);
   }, 200);
 
-
-
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -297,6 +375,55 @@ async function initGrid(dpr, renderer, camera, containerHeight, scrollContainer)
       updateContainerHeight(scrollContainer, camera);
     }, 200);
   });
+
+  // Raycaster for detecting clicks
+const raycaster = new Raycaster();
+const mouse = new Vector2();
+
+function onMouseClick(event) {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    const intersects = raycaster.intersectObjects(clickableBtn, true);
+
+    if (intersects.length > 0) {
+      const clickedObject = intersects[0].object;
+      const target = clickedObject.parent.parent; // The grid object
+      console.log("Clicked on object:", target);
+  
+      const originalPosition = target.position.clone();
+      const originalRotation = target.rotation.clone();
+  
+      // Move to scene root (so it can animate independently of grid)
+      scene.attach(target);
+  
+      // Optional: move to front for better visibility
+      const frontPosition = { x: frustumWidth / 2 - 0.2, y: frustumHeight / 2 - 0.2, z: 0.01 }; 
+
+      let scale = 0.01;
+
+      // Animate to front
+      gsap.to(target.position, { x: frontPosition.x, y: frontPosition.y, z: frontPosition.z, duration: 0.5 });
+      gsap.to(target.scale, {y: scale, x: scale, z: scale, duration: 1, onComplete: () => {
+          // After animation, return to original grid position
+          const element = document.getElementsByClassName('btn-wishlist')[0];
+
+          urls.value.push(target.userData.url);
+
+          gsap.to(element, {backgroundColor: '#000', duration: 0.5, delay: 0.1, yoyo: true, repeat: 1});
+
+          grid.attach(target);
+          target.position.copy(originalPosition);
+          target.rotation.copy(originalRotation);
+          target.scale.set(1,1,1);
+      }});
+  }
+  
+}
+
+window.addEventListener('click', onMouseClick);
 
   return grid;
 }

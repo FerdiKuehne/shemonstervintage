@@ -20,9 +20,8 @@
 
        </button>
     </div>
-    <div v-for="(item, i) in testData" :key="item.id" class="wishlist-item">
+    <div v-for="(item, i) in urls" :key="i" class="wishlist-item">
       <div
-        @click="removeItem(item.id)"
         class="remove-item"
         style="cursor: pointer"
       >
@@ -40,38 +39,38 @@
         </svg>
       </div>
       <picture class="wishlist-image">
-        <source
+       <!--
+       <source
           srcset="https://picsum.photos/800/900?random=1"
           media="(min-width: 650px)"
         />
         <source
           srcset="https://picsum.photos/400/300?random=1"
           media="(min-width: 465px)"
-        />
+        /> 
+       --> 
         <img
-          :src="`https://picsum.photos/800/900?random=${i + 1}`"
-          :alt="item.name" class="wishlist-item-image"
+          :src="item"
+          alt="bild" class="wishlist-item-image"
         />
       </picture>
       <div class="item-details">
-        <div class="whishlist-beschreibung">{{ item.description }}</div>
+        <div class="whishlist-beschreibung">{{ item }}</div>
         <div class="whishlist-materialien">
-          Price: ${{ item.price.toFixed(2) }}
+          Price: $
         </div>
       </div> 
     </div>
   </div> 
-    <div class="whishlist-empty" v-if="testData.length === 0">
+    <div v-if="urls.length === 0" class="whishlist-empty">
       <p>Your wishlist is empty.</p>
     </div>
     <div v-else class="wishlist-actions">
       <h3>
-        Total: ${{
-          testData.reduce((total, item) => total + item.price, 0).toFixed(2)
-        }}
+        Total: 
       </h3>
       <div class="button-wrapper">
-        <button class="btn link small" @click="testData = []">Clear Wishlist</button>
+        <button class="btn link small" @click="urls = []">Clear Wishlist</button>
         <button class="btn primary" @click="sendWishlist">Send</button>
       </div>
     </div>
@@ -138,6 +137,7 @@
 
 <script setup>
 import { ref, nextTick } from "vue";
+import {urls} from '../composables/refsHelper.js'
 
 definePageMeta({
   layout: "three",
