@@ -70,13 +70,16 @@ let hingeRight = null;
 // Tiefen/Timing
 const DEPTH_GRID = 3.0;
 const DEPTH_OBJ  = 2.2;
-const OPEN_DUR   = 0.6;
-const CLOSE_DUR  = 0.5;
+
+// —— „goldene Mitte“ ——
+const OPEN_DUR   = 0.52;
+const CLOSE_DUR  = 0.44;
 const OPEN_EASE  = "power2.out";
 const CLOSE_EASE = "power2.inOut";
+const ANIM_SPEED = 1.15;   // globaler Multiplikator für alle TLs
+// ————————————————
 
-// Warten bis das Vue-Description-Panel ausgeblendet ist, bevor das Grid zurückkommt
-const DESC_FADE_MS = 300;
+const DESC_FADE_MS = 260;
 
 /* =========================
    NDC-Cropshader (Maske klebt am Bild)
@@ -109,7 +112,7 @@ const cropFragment = /* glsl */`
 
     vec4 tex = texture2D(map, vUv);
 
-    // Wie MeshBasic: sRGB-Texture -> Linear arbeiten -> zurück nach sRGB ausgeben
+    // Wie MeshBasic: sRGB-Texture -> Linear arbeiten -> zurück nach sRGB
     vec3 lin = SRGBToLinear(tex.rgb);
     vec3 outSRGB = LinearToSRGB(lin);
 
@@ -129,9 +132,8 @@ function makeAnimatedCropMaterial(texture) {
     transparent: true,
     depthWrite: false,
   });
-
-  mat.toneMapped = true; 
-
+  // Tonemapping zulassen; Shader linearisiert → Helligkeit konsistent
+  mat.toneMapped = true;
   return mat;
 }
 
@@ -186,7 +188,7 @@ let activeCrop = {
 };
 
 /**
- * FIX: Maskenmitte = Bildmitte (jeder Frame)
+ * Maskenmitte = Bildmitte (jeder Frame)
  * → Bild bleibt stets mittig beschnitten.
  * Wir tweenen nur die Halbbreite zur 50vw-Maske.
  */
@@ -195,7 +197,7 @@ function updateCropUniformDynamic(mesh, camera, progress) {
 
   const L = (a,b,t)=> a + (b-a)*t;
 
-  const { halfNdc: imgHalf, centerNdc: imgCenter } = captureMeshScreenNdc(mesh, camera);
+  const { centerNdc: imgCenter } = captureMeshScreenNdc(mesh, camera);
   const half = L(activeCrop.halfStart, 0.5, progress);
 
   const u = activeCrop.cropMaterial.uniforms;
@@ -492,6 +494,7 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
         const OVERSCAN = 1.01;
         const scaleImg = (visibleHeight * OVERSCAN) / targetHeight;
 
+        // Objekt so platzieren, dass die 50vw-Box an der Browserkante anliegt
         const centerOffsetWorld = (visibleWidth * 0.25) * baseSide;
         positionX = centerOffsetWorld;
         objToward.setX(positionX);
@@ -564,7 +567,9 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
                 });
 
                 const startGridReturn = () => {
-                  const tlClose = gsap.timeline({ defaults: { duration: CLOSE_DUR, ease: CLOSE_EASE } });
+                  const tlClose = gsap.timeline({ defaults: { duration: CLOSE_DUR, ease: CLOSE_EASE } })
+                    .timeScale(ANIM_SPEED);
+
                   tlClose.to(activeHinge.rotation, {
                     x: originalHingeRot.x, y: originalHingeRot.y, z: originalHingeRot.z
                   }, 0);
@@ -590,7 +595,7 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
               },
             };
           }
-        });
+        }).timeScale(ANIM_SPEED); // Speed-Sync für Öffnen
 
         // Fade vorbereiten
         tl.call(() => { prepareForFade(gridMats); }, null, 0);
