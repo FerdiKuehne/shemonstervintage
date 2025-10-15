@@ -364,6 +364,7 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
 
   getCureentGridSize();
   buildBookmarkIcon();
+  
 
   const totalWidth = gridSize * targetWidth + (gridSize - 1) * (gapX - targetWidth);
   grid.position.x = -totalWidth / 2 + targetWidth / 2;
@@ -453,13 +454,13 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
           x: positionX,
           y: 0,
           z: zPos,
-          duration: 1,
+          duration: 0.5,
         });
         gsap.to(clickedObject.scale, {
           y: scaleImg,
           x: scaleImg,
           z: scaleImg,
-          duration: 1,
+          duration: 0.5,
           onComplete: () => {
             console.log(
               "height after scale: " + clickedObject.geometry.parameters.height
@@ -493,13 +494,13 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
               x: originalPosition.x,
               y: originalPosition.y,
               z: originalPosition.z,
-              duration: 0.3,
+              duration: 0.5,
             });
             gsap.to(clickedObject.scale, {
               y: originalScale.y,
               x: originalScale.x,
               z: originalScale.z,
-              duration: 0.3,
+              duration: 0.5,
               onComplete: () => {
                 
           
