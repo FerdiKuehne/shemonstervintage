@@ -356,10 +356,15 @@ onMounted(() => {})
 
 .register { 
   position: relative;
-  width: 90%; 
+  width: 40%; 
   border: 1px solid var(--black); 
   padding: 1rem; 
   background-color: var(--white); 
+}
+@media (max-width: 991px) {
+  .register { 
+    width: 90%; 
+  }
 }
 
 /* --- X rechts oben, über allem in der Box --- */
