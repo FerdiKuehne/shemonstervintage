@@ -44,11 +44,7 @@ onMounted(async () => {
       scrollerRef
     );
 
-
-
     $three.scene.add(grid);
-
-    console.log(grid);
 
 });
 </script>

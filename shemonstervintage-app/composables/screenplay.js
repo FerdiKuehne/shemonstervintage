@@ -64,10 +64,10 @@ function homeCameraShift(camera,passAMat, controls) {
   moveCamera({
     camera,
     passAMat,
-    yaw: 10,
-    pitch: 30,
+    yaw: 20,
+    pitch: 20,
     fov: 30,
-    duration: 4, // optional
+    duration: 2, // optional
     controls,
   });
 }

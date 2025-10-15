@@ -29,14 +29,12 @@ export async function createBackgroundPanoFromAPI(
   renderer,
   dpr = window.devicePixelRatio || 1
 ) {
-  // Fetch device-specific texture with DPR parameter
-  console.log("Device Pixel Ratio (DPR):", dpr);
+ 
   /* const res = await fetch(`/test/api/texture.php?dpr=${dpr}`); */
   const res = await fetch(`http://localhost:8000/stokes/background?dpr=${dpr}`);
 
   /* produktiv */
   const data = await res.json();
-console.log(data);
 
   let textureUrl = "http://localhost:8000" + data.data.texture;
 
@@ -98,11 +96,7 @@ console.log(data);
   const quadA = new Mesh(new PlaneGeometry(2, 2), passAMat);
 
 
-
-console.log("--------------------------------");
-
   screenSceneA.add(quadA);
-  console.log("Added quad to screenSceneA:", quadA);
 
   const passBMat = new ShaderMaterial({
     uniforms: {
@@ -120,7 +114,6 @@ console.log("--------------------------------");
   const quadB = new Mesh(new PlaneGeometry(2, 2), passBMat);
 
   screenSceneB.add(quadB);
-  console.log("Added quad to screenSceneA:", quadB);
 
   const updateCamBasis = () => {
     const dir = camera.position.clone().sub(controls.target);
