@@ -113,20 +113,13 @@ const stokeMaterial = new LineBasicMaterial({
 
 
 const loadFront = async (dpr) => {
-  console.log("Loading front images for batch:", batch, "with DPR:", dpr);
   const url = `http://localhost:8000/stokes/gallery?type=front&batch=${batch}&dpr=${dpr}`;
-  console.log(url);
-  console.log("Fetching front images from API...");
 
   try {
     const res = await fetch(url);
     const data = await res.json();
 
-    console.log("Parsed data:", data.data.front);
-    console.log("Data success status:", data.success);
     const urls = Object.values(data.data.front);
-
-    console.log("Current images before merge:", urls);
 
     if (data.success) {
       batch++; // increment batch for next call
@@ -190,9 +183,7 @@ function setGridPosition(index, columns, object) {
 
 async function loadGridImages(dpr,grid, images, renderer) {
   images = await loadFront(dpr);
-  console.log("Loading batch:", batch);
-  console.log("Total images to load:", images.length);
-  console.log(images);
+
   const promises = images.map((url, index) => {
     return new Promise((resolve, reject) => {
       const indexDelta = index + grid.children.length;
@@ -231,7 +222,7 @@ async function loadGridImages(dpr,grid, images, renderer) {
           svgIcon.position.y = targetHeight / 2 - 0.03;
           mesh.add(svgIcon);
 
-          mesh.userData.url = url;
+          mesh.userData.url = "http://localhost:8000"  + url;
 
           clickableBtn.push(svgIcon);
 
