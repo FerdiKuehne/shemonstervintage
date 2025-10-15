@@ -11,24 +11,18 @@ import {
   Vector3,
   MeshBasicMaterial,
   Vector2,
-  Vector4,
   LineBasicMaterial,
   BufferGeometry,
   Float32BufferAttribute,
   LineLoop,
   Shape,
   ShapeGeometry,
-  ExtrudeGeometry,
   Raycaster,
   ShaderMaterial,
 } from "three";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { nextTick } from "vue";
-import vertexShader from "./shaders/griditems/vertex.glsl?raw";
-import fragmentShader from "./shaders/griditems/fragment.glsl?raw";
-import { BasicShader } from "three-stdlib";
-import { transform, transpileDeclaration } from "typescript";
 import { urls, imagesDescription } from "./refsHelper.js";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -62,11 +56,7 @@ const targetWidth  = 4   * 0.46;
 const grid = new Group();
 const geometry = new PlaneGeometry(targetWidth, targetHeight);
 
-gsap.registerPlugin(ScrollTrigger);
-
 let images = [];
-let backImage = [];
-
 let batch = 1;
 let clickableBtn = [];
 let frustumHeight, frustumWidth;
@@ -86,97 +76,54 @@ const OPEN_EASE  = "power2.out";
 const CLOSE_EASE = "power2.inOut";
 
 // Warten bis das Vue-Description-Panel ausgeblendet ist, bevor das Grid zurückkommt
-const DESC_FADE_MS = 300; // passend zur <transition>
+const DESC_FADE_MS = 300;
 
 /* =========================
-   Screen-Space Crop Shader
+   NDC-basierter Crop-Shader (Maske fährt mit dem Objekt)
    ========================= */
 const cropVertex = /* glsl */`
-  varying vec2 vUv;
+  varying float vNdcX;
+  varying vec2  vUv;
   void main() {
     vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 clip = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vNdcX = clip.x / clip.w;           // NDC X in [-1..+1]
+    gl_Position = clip;
   }
 `;
 
-// cropFragment (neu, ohne #include)
 const cropFragment = /* glsl */`
-  precision mediump float;
+  precision highp float;
   uniform sampler2D map;
-  uniform vec2 uViewport;   // Pixel (width, height)
-  uniform vec4 uCrop;       // Pixel rect: (x, y, w, h)
-  varying vec2 vUv;
+  uniform float uCenterNDC;   // Ziel-/Ist-Maskenmitte in NDC
+  uniform float uHalfWidthNDC;// halbe Maskenbreite in NDC
+  varying float vNdcX;
+  varying vec2  vUv;
 
   void main() {
-    vec2 frag = gl_FragCoord.xy;
-    vec2 minR = uCrop.xy;
-    vec2 maxR = uCrop.xy + uCrop.zw;
-
-    // außerhalb des 50%-Rects: verwerfen
-    if (frag.x < minR.x || frag.x > maxR.x || frag.y < minR.y || frag.y > maxR.y) {
-      discard;
-    }
-
+    // volle Höhe, horizontale Beschneidung in NDC
+    if (abs(vNdcX - uCenterNDC) > uHalfWidthNDC) discard;
     gl_FragColor = texture2D(map, vUv);
   }
 `;
 
-function makeCropMaterial(texture, renderer, side /* 'left' | 'right' */) {
-  const size = renderer.getSize(new THREE.Vector2());
-  const vw = size.x;
-  const vh = size.y;
-
-  const cropX = (side === "right") ? Math.floor(vw * 0.5) : 0;
-  const crop = new THREE.Vector4(cropX, 0, Math.floor(vw * 0.5), vh);
-
-  const mat = new THREE.ShaderMaterial({
+function makeAnimatedCropMaterial(texture) {
+  const mat = new ShaderMaterial({
     uniforms: {
-      map:       { value: texture },
-      uViewport: { value: new THREE.Vector2(vw, vh) },
-      uCrop:     { value: crop },
+      map:            { value: texture },
+      uCenterNDC:     { value: 0.0 },
+      uHalfWidthNDC:  { value: 1.0 }, // wird direkt beim Start korrekt gesetzt
     },
     vertexShader:   cropVertex,
     fragmentShader: cropFragment,
-    transparent: false,
+    transparent: true,
+    depthWrite: false,   // reduziert Z-Artefakte beim Faden
   });
-
-  // Wichtig: keine Three-Chunks → kein ToneMapping hier
   mat.toneMapped = false;
   return mat;
 }
 
-function updateCropUniforms(cropMat, renderer, side) {
-  if (!cropMat || !cropMat.uniforms?.uViewport) return;
-  const size = renderer.getSize(new Vector2());
-  const vw = size.x, vh = size.y;
-  cropMat.uniforms.uViewport.value.set(vw, vh);
-  const cropX = (side === "right") ? Math.floor(vw * 0.5) : 0;
-  cropMat.uniforms.uCrop.value.set(cropX, 0, Math.floor(vw * 0.5), vh);
-  cropMat.uniforms.uViewport.needsUpdate = true;
-  cropMat.uniforms.uCrop.needsUpdate = true;
-}
-
-// Aktiver Crop-Zustand für das vorgezogene Objekt
-let activeCrop = {
-  mesh: null,
-  originalMaterial: null,
-  cropMaterial: null,
-  side: "left",
-};
-
-/* =========================
-   Helpers
-   ========================= */
-function rectShape(x, y, w, h) {
-  const s = new Shape();
-  s.moveTo(x, y);
-  s.lineTo(x + w, y);
-  s.lineTo(x + w, y + h);
-  s.lineTo(x, y + h);
-  s.lineTo(x, y);
-  return s;
-}
-
+// helper: polyline -> LineLoop (XY-Punkte in Screen-like SVG-Einheiten)
 function makeLineLoopFromXY(pointsXY, material, dx = 0, dy = 0) {
   const geom = new BufferGeometry();
   const count = pointsXY.length / 2;
@@ -190,94 +137,79 @@ function makeLineLoopFromXY(pointsXY, material, dx = 0, dy = 0) {
   return new LineLoop(geom, material);
 }
 
-/** tiefes Klonen inkl. eigener Materialinstanzen */
-function cloneWithUniqueMaterials(node) {
-  const clone = node.clone(true);
-  clone.traverse((o) => {
-    if (o.material) {
-      if (Array.isArray(o.material)) o.material = o.material.map((m) => m.clone());
-      else o.material = o.material.clone();
-    }
-  });
-  return clone;
+// Hilfsvektor & lokale Ecken deines Plane
+const _tmpV = new Vector3();
+const LOCAL_CORNERS = [
+  new Vector3(-targetWidth/2,  targetHeight/2, 0), // TL
+  new Vector3( targetWidth/2,  targetHeight/2, 0), // TR
+  new Vector3(-targetWidth/2, -targetHeight/2, 0), // BL
+  new Vector3( targetWidth/2, -targetHeight/2, 0), // BR
+];
+
+// gibt NDC.x eines Weltpunkts zurück
+function worldToNdcX(world, camera) {
+  _tmpV.copy(world).project(camera);
+  return _tmpV.x; // -1..+1
 }
 
-/** Bookmark-Icon – alle Teile als Icon markieren + stabile Draw-Order */
-function buildBookmarkIcon() {
-  if (bookmarkIcon) return bookmarkIcon;
+function captureMeshScreenNdc(mesh, camera) {
+  // aktuelle Screenbreite des Meshes in NDC: min/max der 4 Ecken
+  const ndcXs = LOCAL_CORNERS.map(c => worldToNdcX(mesh.localToWorld(c.clone()), camera));
+  const minX = Math.min(...ndcXs);
+  const maxX = Math.max(...ndcXs);
+  const centerNow = (minX + maxX) * 0.5;
+  const halfNow   = (maxX - minX) * 0.5;
 
-  const g = new Group();
+  // Zentrum des Mesh-URSPRUNGs (für saubere Mittenführung)
+  const originNdc = worldToNdcX(mesh.localToWorld(new Vector3(0,0,0)), camera);
 
-  const outlinePtsXY = [52,60, 32,48, 12,60, 12,4, 52,4, 52,60];
-  const outlineMat = new LineBasicMaterial({ color: 0x000000 });
-  const off = (OUTLINE_THICKNESS_PX * SVG_UNITS_PER_PX) / 2;
-
-  [
-    [0,0], [off,0],[-off,0], [0,off],[0,-off], [off,off],[-off,off], [off,-off],[-off,-off]
-  ].forEach(([dx,dy]) => {
-    const loop = makeLineLoopFromXY(outlinePtsXY, outlineMat.clone(), dx, dy);
-    loop.userData.isIcon = true;
-    loop.renderOrder = 10;
-    g.add(loop);
-  });
-
-  const t = PLUS_THICKNESS_PX * SVG_UNITS_PER_PX;
-  const plusMatV = new MeshBasicMaterial({ color: 0x000000 });
-  const plusMatH = new MeshBasicMaterial({ color: 0x000000 });
-
-  const vShape = rectShape(32 - t / 2, 15.0, t, 18.0);
-  const vGeo   = new ShapeGeometry(vShape);
-  const vMesh  = new Mesh(vGeo, plusMatV);
-  vMesh.position.z = 0.02;
-  vMesh.userData.isIcon = true;
-  vMesh.renderOrder = 10;
-  g.add(vMesh);
-
-  const hShape = rectShape(24.0, 24 - t / 2, 18.0, t);
-  const hGeo   = new ShapeGeometry(hShape);
-  const hMesh  = new Mesh(hGeo, plusMatH);
-  hMesh.position.z = 0.02;
-  hMesh.userData.isIcon = true;
-  hMesh.renderOrder = 10;
-  g.add(hMesh);
-
-  const hitSize = 24;
-  const hitGeom = new PlaneGeometry(hitSize, hitSize);
-  const hitMat  = new MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false });
-  const hitMesh = new Mesh(hitGeom, hitMat);
-  hitMesh.name = "bookmark-hit";
-  hitMesh.position.set(32,32,0.02);
-  hitMesh.userData.isIcon = true;
-  hitMesh.renderOrder = 10;
-  g.add(hitMesh);
-
-  g.userData.isIcon = true;
-
-  g.position.set(-VIEWBOX_SIZE / 2, -VIEWBOX_SIZE / 2, 0.01);
-  g.scale.set(ICON_SCALE, -ICON_SCALE, ICON_SCALE);
-
-  bookmarkIcon = g;
-  return bookmarkIcon;
+  // Für die Maske nehmen wir die echte Breite (halfNow), die Mitte aber am besten den Ursprung
+  // (dein Plane ist um den Ursprung gebaut, passt zum Scale/Position-Tween)
+  return { centerNdc: originNdc, halfNdc: halfNow };
 }
 
-/** alle Materialien unterhalb eines Roots */
-function collectMaterials(root) {
-  const mats = new Set();
-  root.traverse((o) => {
-    if (o.material) {
-      if (Array.isArray(o.material)) o.material.forEach((m) => mats.add(m));
-      else mats.add(o.material);
-    }
-  });
-  return Array.from(mats);
+/** anim state für die Maske */
+let activeCrop = {
+  mesh: null,
+  originalMaterial: null,
+  cropMaterial: null,
+  side: "left",          // "left" → Zielzentrum -0.5, "right" → +0.5
+  centerStart: 0,
+  halfStart: 0,
+  centerEnd: 0,
+  halfEnd: 0,
+  _captured: false,
+};
+
+function updateCropForMeshNDC(mesh, camera, cropMat, progress, anim) {
+  if (!mesh || !cropMat) return;
+
+  // Start einmalig erfassen (aus aktueller Projektion)
+  if (!anim._captured) {
+    const { centerNdc, halfNdc } = captureMeshScreenNdc(mesh, camera);
+    anim.centerStart = centerNdc;
+    anim.halfStart   = halfNdc;
+    anim._captured   = true;
+  }
+
+  // Zielwerte: 50vw → halbe Breite = 0.5 (NDC), Zentrum bei ±0.5 (25vw/75vw)
+  anim.centerEnd = (anim.side === "right") ?  +0.5 : -0.5;
+  anim.halfEnd   = 0.5;
+
+  const lerp = (a,b,t)=> a + (b-a)*t;
+
+  const center = lerp(anim.centerStart, anim.centerEnd, progress);
+  const half   = lerp(anim.halfStart,   anim.halfEnd,   progress);
+
+  cropMat.uniforms.uCenterNDC.value    = center;
+  cropMat.uniforms.uHalfWidthNDC.value = half;
+  cropMat.uniforms.uCenterNDC.needsUpdate    = true;
+  cropMat.uniforms.uHalfWidthNDC.needsUpdate = true;
 }
 
-/**
- * Materialien, die wir fürs Grid faden:
- * - ganzes Grid
- * - Icon-Knoten KOMPLETT ignorieren (damit deren States unberührt bleiben)
- * - Subtree des geklickten Objekts ausschließen
- */
+/* =========================
+   Fade-Helper (unverändert)
+   ========================= */
 function collectGridFadeMaterials(root, excludeNodes = []) {
   const excludeSet = new Set();
   excludeNodes.forEach(n => n.traverse(o => excludeSet.add(o)));
@@ -285,7 +217,7 @@ function collectGridFadeMaterials(root, excludeNodes = []) {
   const mats = new Set();
   root.traverse((o) => {
     if (excludeSet.has(o)) return;
-    if (o.userData?.isIcon) return; // Icons explizit NICHT anfassen!
+    if (o.userData?.isIcon) return;
     if (o.material) {
       if (Array.isArray(o.material)) o.material.forEach((m) => mats.add(m));
       else mats.add(o.material);
@@ -293,23 +225,14 @@ function collectGridFadeMaterials(root, excludeNodes = []) {
   });
   return Array.from(mats);
 }
-
-/** Icon-Nodes (für einfaches sichtbar/unsichtbar schalten) */
 function collectIconNodes(root, excludeNodes = []) {
   const excludeSet = new Set();
   excludeNodes.forEach(n => n.traverse(o => excludeSet.add(o)));
-
   const nodes = [];
-  root.traverse((o) => {
-    if (excludeSet.has(o)) return;
-    if (o.userData?.isIcon) nodes.push(o);
-  });
+  root.traverse((o) => { if (!excludeSet.has(o) && o.userData?.isIcon) nodes.push(o); });
   return nodes;
 }
-
-/** Original-Renderstates sichern & wiederherstellen (für Grid-Fade) */
 const originalState = new WeakMap();
-
 function prepareForFade(materials) {
   materials.forEach((m) => {
     if (!originalState.has(m)) {
@@ -325,7 +248,6 @@ function prepareForFade(materials) {
     m.depthTest  = false;
   });
 }
-
 function restoreAfterFade(materials) {
   materials.forEach((m) => {
     const st = originalState.get(m);
@@ -344,7 +266,7 @@ function restoreAfterFade(materials) {
 }
 
 /* =========================
-   Data
+   Data / Grid / Scroll (wie gehabt)
    ========================= */
 const loadFront = async (dpr) => {
   const url = `http://localhost:8000/stokes/gallery?type=front&batch=${batch}&dpr=${dpr}`;
@@ -394,12 +316,10 @@ function setGridPosition(index, columns, object) {
 
 async function loadGridImages(dpr, grid, imgs, renderer) {
   imgs = await loadFront(dpr);
-
   const promises = imgs.map((url, index) =>
     new Promise((resolve, reject) => {
       const indexDelta = index + grid.children.length;
       const loader = new TextureLoader();
-
       loader.load(
         "http://localhost:8000" + url,
         (texture) => {
@@ -412,26 +332,19 @@ async function loadGridImages(dpr, grid, imgs, renderer) {
           const material = new MeshBasicMaterial({ map: texture });
           const mesh = new Mesh(geometry, material);
 
-          // Icon klonen – eigene Materials + Icon-Flag + renderOrder
-          const iconTemplate = buildBookmarkIcon();
-          const iconGroup = cloneWithUniqueMaterials(iconTemplate);
+          // Icon
+          const iconGroup = buildBookmarkIcon().clone(true);
           iconGroup.position.x =  targetWidth  / 2 - ICON_MARGIN_X_WU;
           iconGroup.position.y =  targetHeight / 2 - ICON_MARGIN_Y_WU;
           iconGroup.traverse(o => { o.userData.isIcon = true; o.renderOrder = 10; });
           mesh.add(iconGroup);
 
-          mesh.userData.url = "http://localhost:8000" + url;
-
-          iconGroup.userData.type = "icon";
-
-          clickableBtn.push(iconGroup);
-          clickableBtn.push(mesh);
-
+          mesh.userData.url  = "http://localhost:8000" + url;
           mesh.userData.text = "Lorem ipsum ...";
           mesh.userData.type = "image";
 
           const hit = iconGroup.getObjectByName("bookmark-hit");
-          clickableBtn.push(hit || iconGroup);
+          clickableBtn.push(iconGroup, mesh, (hit || iconGroup));
 
           setGridPosition(indexDelta, gridSize, mesh);
           grid.add(mesh);
@@ -442,7 +355,6 @@ async function loadGridImages(dpr, grid, imgs, renderer) {
       );
     })
   );
-
   await Promise.all(promises);
   const size = getGridSize();
   currendGrid = gridSize;
@@ -464,7 +376,6 @@ function getGridHeightInPx(camera) {
   const gridHeightInPx = gridWorldHeight * worldToScreenRatio;
   return gridHeightInPx;
 }
-
 function updateContainerHeight(scrollerRef, camera) {
   gridWorldHeight = getGridSize().height;
   frustumHeight = 2 * camera.position.z * Math.tan((camera.fov * Math.PI) / 360);
@@ -475,7 +386,6 @@ function updateContainerHeight(scrollerRef, camera) {
   scrollerRef.value.style.height = gridHeightInVh + "vh";
   ScrollTrigger.refresh();
 }
-
 function createScrollTrigger(dpr, camera, renderer, scrollContainer) {
   getGridHeightInPx(camera);
   scrollTrigger = ScrollTrigger.create({
@@ -538,11 +448,6 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
     renderer.setSize(window.innerWidth, window.innerHeight);
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => updateContainerHeight(scrollContainer, camera), 200);
-
-    // >>> Crop-Uniforms bei aktivem Objekt aktualisieren
-    if (activeCrop.mesh && activeCrop.cropMaterial) {
-      updateCropUniforms(activeCrop.cropMaterial, renderer, activeCrop.side);
-    }
   });
 
   const raycaster = new Raycaster();
@@ -595,10 +500,9 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
         positionX = baseSide * edgeOffset;
         objToward.setX(positionX);
 
-        // --- ICONS: sofort raus, kein Material-Fade ---
+        // ICONS: sofort raus
         const clickedIcon = clickedObject.children[0] || null;
         if (clickedIcon) clickedIcon.visible = false;
-
         const allGridIcons = collectIconNodes(grid, [clickedObject]);
         allGridIcons.forEach(n => n.visible = false);
 
@@ -628,11 +532,7 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
         const ANGLE = 0.6;
         const sign  = (baseSide > 0) ? +1 : -1;
 
-        // --- Seite (für Crop) bestimmen
-        const side = positionX > 0 ? "left" : "right"; // Objekt auf rechter Bildschirmhälfte → Crop links; und umgekehrt
-        // Actually: Wir docken das Objekt an der Seite an, auf der es steht:
-        // Wenn positionX > 0, steht es rechts → wir wollen die RECHTE Hälfte zeigen:
-        // Korrigiert:
+        // Seite (für finalen 50vw-Anker) bestimmen:
         const cropSide = positionX > 0 ? "right" : "left";
 
         const tl = gsap.timeline({
@@ -644,18 +544,19 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
               url: clickedObject.userData.url,
               side: positionX > 0 ? "left" : "right",
               onClick: () => {
-                // 1) Description zuerst ausfaden
+                // Description zuerst ausfaden
                 imagesDescription.value = null;
 
-                // 2) Objekt-Material zurücksetzen (Crop aus)
+                // Crop-Material zurücksetzen
                 if (activeCrop.mesh === clickedObject) {
                   clickedObject.material = activeCrop.originalMaterial;
                   activeCrop.mesh = null;
                   activeCrop.originalMaterial = null;
                   activeCrop.cropMaterial = null;
+                  activeCrop._captured = false;
                 }
 
-                // 3) Objekt zurückfahren
+                // Objekt zurückfahren
                 originalParent.attach(clickedObject);
                 gsap.to(clickedObject.rotation, {
                   x: originalRotation.x, y: originalRotation.y, z: originalRotation.z,
@@ -670,10 +571,8 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
                   duration: CLOSE_DUR, ease: CLOSE_EASE
                 });
 
-                // 4) Nach dem Description-Fade: Grid zurück + Grid-Mats auf 1 + Icons sichtbar
                 const startGridReturn = () => {
                   const tlClose = gsap.timeline({ defaults: { duration: CLOSE_DUR, ease: CLOSE_EASE } });
-
                   tlClose.to(activeHinge.rotation, {
                     x: originalHingeRot.x, y: originalHingeRot.y, z: originalHingeRot.z
                   }, 0);
@@ -685,11 +584,8 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
                     }
                   }, 0);
 
-                  // Grid-Opacity IN
                   prepareForFade(gridMats);
                   tlClose.to(gridMats, { opacity: 1 }, 0);
-
-                  // Am Ende: Render-States wiederherstellen und **alle Icons nur sichtbar schalten**
                   tlClose.add(() => {
                     restoreAfterFade(gridMats);
                     const allIconsNow = collectIconNodes(grid);
@@ -698,27 +594,40 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
                     openImg = false;
                   });
                 };
-
                 gsap.delayedCall(DESC_FADE_MS / 1000, startGridReturn);
               },
             };
           }
         });
 
-        // Grid-Mats vorbereiten (Icons & clickedObject sind ausgeschlossen)
+        // Fade vorbereiten
         tl.call(() => { prepareForFade(gridMats); }, null, 0);
 
-        // >>> VOR der Hinfahrt: Crop-Material setzen
+        // >>> VOR der Hinfahrt: Crop-Material setzen & animieren (NDC-basiert)
         tl.call(() => {
           const tex = clickedObject.material?.map;
           if (tex) {
             activeCrop.originalMaterial = clickedObject.material;
             activeCrop.side = cropSide;
-            activeCrop.cropMaterial = makeCropMaterial(tex, renderer, cropSide);
+            activeCrop.cropMaterial = makeAnimatedCropMaterial(tex);
             clickedObject.material = activeCrop.cropMaterial;
             activeCrop.mesh = clickedObject;
+            activeCrop._captured = false; // Startwerte bei erster onUpdate erfassen
           }
         }, null, 0);
+
+        // Dummy-Progress (0..1) synchron zur OPEN-Dauer
+        const cropProg = { t: 0 };
+        tl.to(cropProg, {
+          t: 1,
+          duration: OPEN_DUR,
+          ease: OPEN_EASE,
+          onUpdate: () => {
+            if (activeCrop.mesh && activeCrop.cropMaterial) {
+              updateCropForMeshNDC(activeCrop.mesh, camera, activeCrop.cropMaterial, cropProg.t, activeCrop);
+            }
+          }
+        }, 0);
 
         // Hinfahrt (Grid kippt/weg, Objekt nach vorn)
         tl.to(activeHinge.rotation, { y: originalHingeRot.y + sign * ANGLE }, 0)
@@ -736,32 +645,18 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
 
         scene.attach(target);
 
-        const frontPosition = {
-          x: frustumWidth / 2 - 0.2,
-          y: frustumHeight / 2 - 0.2,
-          z: 0.01,
-        };
-
+        const frontPosition = { x: frustumWidth / 2 - 0.2, y: frustumHeight / 2 - 0.2, z: 0.01 };
         let scale = 0.02;
 
         gsap.to(target.position, {
-          x: frontPosition.x,
-          y: frontPosition.y,
-          z: frontPosition.z,
-          duration: OPEN_DUR,
-          ease: OPEN_EASE
+          x: frontPosition.x, y: frontPosition.y, z: frontPosition.z,
+          duration: OPEN_DUR, ease: OPEN_EASE
         });
         gsap.to(target.scale, {
-          y: scale,
-          x: scale,
-          z: scale,
-          duration: OPEN_DUR + 0.4,
-          ease: OPEN_EASE,
-          onStart: () => {
-            window.dispatchEvent(new CustomEvent("wishlist:bump"));
-          },
+          y: scale, x: scale, z: scale,
+          duration: OPEN_DUR + 0.4, ease: OPEN_EASE,
+          onStart: () => { window.dispatchEvent(new CustomEvent("wishlist:bump")); },
           onComplete: () => {
-            console.log("URL:", target.userData.url);
             urls.value.push(target.userData.url);
             grid.attach(target);
             target.position.copy(originalPosition);
@@ -776,6 +671,64 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
   window.addEventListener("click", onMouseClick);
 
   return grid;
+}
+
+/* =========================
+   Bookmark-Icon Bau (unverändert)
+   ========================= */
+function buildBookmarkIcon() {
+  if (bookmarkIcon) return bookmarkIcon;
+  const g = new Group();
+
+  const outlinePtsXY = [52,60, 32,48, 12,60, 12,4, 52,4, 52,60];
+  const outlineMat = new LineBasicMaterial({ color: 0x000000 });
+  const off = (OUTLINE_THICKNESS_PX * SVG_UNITS_PER_PX) / 2;
+
+  [
+    [0,0], [off,0],[-off,0], [0,off],[0,-off], [off,off],[-off,off], [off,-off],[-off,-off]
+  ].forEach(([dx,dy]) => {
+    const loop = makeLineLoopFromXY(outlinePtsXY, outlineMat.clone(), dx, dy);
+    loop.userData.isIcon = true;
+    loop.renderOrder = 10;
+    g.add(loop);
+  });
+
+  const t = PLUS_THICKNESS_PX * SVG_UNITS_PER_PX;
+  const plusMatV = new MeshBasicMaterial({ color: 0x000000 });
+  const plusMatH = new MeshBasicMaterial({ color: 0x000000 });
+
+  const rectShape = (x,y,w,h)=>{ const s=new Shape(); s.moveTo(x,y); s.lineTo(x+w,y); s.lineTo(x+w,y+h); s.lineTo(x,y+h); s.lineTo(x,y); return s; };
+
+  const vGeo   = new ShapeGeometry(rectShape(32 - t / 2, 15.0, t, 18.0));
+  const vMesh  = new Mesh(vGeo, plusMatV);
+  vMesh.position.z = 0.02;
+  vMesh.userData.isIcon = true;
+  vMesh.renderOrder = 10;
+  g.add(vMesh);
+
+  const hGeo   = new ShapeGeometry(rectShape(24.0, 24 - t / 2, 18.0, t));
+  const hMesh  = new Mesh(hGeo, plusMatH);
+  hMesh.position.z = 0.02;
+  hMesh.userData.isIcon = true;
+  hMesh.renderOrder = 10;
+  g.add(hMesh);
+
+  const hitSize = 24;
+  const hitGeom = new PlaneGeometry(hitSize, hitSize);
+  const hitMat  = new MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false });
+  const hitMesh = new Mesh(hitGeom, hitMat);
+  hitMesh.name = "bookmark-hit";
+  hitMesh.position.set(32,32,0.02);
+  hitMesh.userData.isIcon = true;
+  hitMesh.renderOrder = 10;
+  g.add(hitMesh);
+
+  g.userData.isIcon = true;
+  g.position.set(-VIEWBOX_SIZE / 2, -VIEWBOX_SIZE / 2, 0.01);
+  g.scale.set(ICON_SCALE, -ICON_SCALE, ICON_SCALE);
+
+  bookmarkIcon = g;
+  return bookmarkIcon;
 }
 
 export { initGrid, updateContainerHeight };
