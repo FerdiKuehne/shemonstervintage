@@ -71,13 +71,12 @@ let hingeRight = null;
 const DEPTH_GRID = 3.0;
 const DEPTH_OBJ  = 2.2;
 
-// —— „goldene Mitte“ ——
+// „goldene Mitte“
 const OPEN_DUR   = 0.52;
 const CLOSE_DUR  = 0.44;
 const OPEN_EASE  = "power2.out";
 const CLOSE_EASE = "power2.inOut";
-const ANIM_SPEED = 1.15;   // globaler Multiplikator für alle TLs
-// ————————————————
+const ANIM_SPEED = 1.15;
 
 const DESC_FADE_MS = 260;
 
@@ -112,7 +111,7 @@ const cropFragment = /* glsl */`
 
     vec4 tex = texture2D(map, vUv);
 
-    // Wie MeshBasic: sRGB-Texture -> Linear arbeiten -> zurück nach sRGB
+    // MeshBasic-äquivalente Farbführung
     vec3 lin = SRGBToLinear(tex.rgb);
     vec3 outSRGB = LinearToSRGB(lin);
 
@@ -132,7 +131,6 @@ function makeAnimatedCropMaterial(texture) {
     transparent: true,
     depthWrite: false,
   });
-  // Tonemapping zulassen; Shader linearisiert → Helligkeit konsistent
   mat.toneMapped = true;
   return mat;
 }
@@ -167,15 +165,11 @@ function worldToNdcX(world, camera) {
 }
 
 function captureMeshScreenNdc(mesh, camera) {
-  // Breite (für halfStart) aus Ecken
   const ndcXs = LOCAL_CORNERS.map(c => worldToNdcX(mesh.localToWorld(c.clone()), camera));
   const minX = Math.min(...ndcXs);
   const maxX = Math.max(...ndcXs);
-  const halfNow = (maxX - minX) * 0.5;
-
-  // Mitte aus Ursprung (robust & glatt)
+  const halfNow   = (maxX - minX) * 0.5;
   const centerNow = worldToNdcX(mesh.localToWorld(new Vector3(0,0,0)), camera);
-
   return { halfNdc: halfNow, centerNdc: centerNow };
 }
 
@@ -187,22 +181,15 @@ let activeCrop = {
   halfStart: 0, // Start-Halbbreite (NDC)
 };
 
-/**
- * Maskenmitte = Bildmitte (jeder Frame)
- * → Bild bleibt stets mittig beschnitten.
- * Wir tweenen nur die Halbbreite zur 50vw-Maske.
- */
-function updateCropUniformDynamic(mesh, camera, progress) {
+/** generischer Uniform-Updater: center = Bildmitte (live), half tweenbar */
+function updateCropUniformCustom(mesh, camera, halfA, halfB, t) {
   if (!mesh || !activeCrop.cropMaterial) return;
-
-  const L = (a,b,t)=> a + (b-a)*t;
-
-  const { centerNdc: imgCenter } = captureMeshScreenNdc(mesh, camera);
-  const half = L(activeCrop.halfStart, 0.5, progress);
-
+  const L = (a,b,x)=> a + (b-a)*x;
+  const { centerNdc } = captureMeshScreenNdc(mesh, camera);
+  const half = L(halfA, halfB, t);
   const u = activeCrop.cropMaterial.uniforms;
-  u.uCenterNDC.value     = imgCenter;
-  u.uHalfWidthNDC.value  = half;
+  u.uCenterNDC.value    = centerNdc;
+  u.uHalfWidthNDC.value = half;
   u.uCenterNDC.needsUpdate    = true;
   u.uHalfWidthNDC.needsUpdate = true;
 }
@@ -227,7 +214,7 @@ function collectGridFadeMaterials(root, excludeNodes = []) {
 }
 function collectIconNodes(root, excludeNodes = []) {
   const excludeSet = new Set();
-  excludeNodes.forEach(n => n.traverse(o => excludeSet.add(o)));
+  excludeNodes.forEach(n => n.traverse(o => o && excludeSet.add(o)));
   const nodes = [];
   root.traverse((o) => { if (!excludeSet.has(o) && o.userData?.isIcon) nodes.push(o); });
   return nodes;
@@ -543,59 +530,78 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
                 // Description zuerst ausfaden
                 imagesDescription.value = null;
 
-                // Crop-Material zurücksetzen
-                if (activeCrop.mesh === clickedObject) {
-                  clickedObject.material = activeCrop.originalMaterial;
-                  activeCrop.mesh = null;
-                  activeCrop.originalMaterial = null;
-                  activeCrop.cropMaterial = null;
-                }
+                // —— WICHTIG: Maske NICHT sofort entfernen! Wir animieren sie zurück. ——
+                // (Vorher stand hier: clickedObject.material = activeCrop.originalMaterial)
 
                 // Objekt zurückfahren
                 originalParent.attach(clickedObject);
-                gsap.to(clickedObject.rotation, {
-                  x: originalRotation.x, y: originalRotation.y, z: originalRotation.z,
-                  duration: CLOSE_DUR, ease: CLOSE_EASE
-                });
-                gsap.to(clickedObject.position, {
-                  x: originalPosition.x, y: originalPosition.y, z: originalPosition.z,
-                  duration: CLOSE_DUR, ease: CLOSE_EASE
-                });
-                gsap.to(clickedObject.scale, {
-                  x: originalScale.x, y: originalScale.y, z: originalScale.z,
-                  duration: CLOSE_DUR, ease: CLOSE_EASE
-                });
 
-                const startGridReturn = () => {
-                  const tlClose = gsap.timeline({ defaults: { duration: CLOSE_DUR, ease: CLOSE_EASE } })
-                    .timeScale(ANIM_SPEED);
+                const tlClose = gsap.timeline({ defaults: { duration: CLOSE_DUR, ease: CLOSE_EASE } })
+                  .timeScale(ANIM_SPEED);
 
-                  tlClose.to(activeHinge.rotation, {
-                    x: originalHingeRot.x, y: originalHingeRot.y, z: originalHingeRot.z
-                  }, 0);
-                  tlClose.to(activeHinge.position, {
-                    x: originalHingePos.x, y: originalHingePos.y, z: originalHingePos.z,
-                    onComplete: () => {
-                      if (originalGridParent) originalGridParent.attach(grid);
-                      else scene.attach(grid);
+                // Crop zurück: Halbbreite 0.5 → ursprüngliche halfStart (Center folgt automatisch)
+                const cropBack = { t: 0 };
+                tlClose.to(cropBack, {
+                  t: 1,
+                  duration: CLOSE_DUR,
+                  ease: CLOSE_EASE,
+                  onUpdate: () => {
+                    if (activeCrop.mesh === clickedObject && activeCrop.cropMaterial) {
+                      updateCropUniformCustom(clickedObject, camera, 0.5, activeCrop.halfStart, cropBack.t);
                     }
-                  }, 0);
+                  }
+                }, 0);
 
-                  prepareForFade(gridMats);
-                  tlClose.to(gridMats, { opacity: 1 }, 0);
-                  tlClose.add(() => {
-                    restoreAfterFade(gridMats);
-                    const allIconsNow = collectIconNodes(grid);
-                    allIconsNow.forEach(n => n.visible = true);
-                    if (clickedObject.children[0]) clickedObject.children[0].visible = true;
-                    openImg = false;
-                  });
-                };
-                gsap.delayedCall(DESC_FADE_MS / 1000, startGridReturn);
+                // Transformationen zurück
+                tlClose.to(clickedObject.rotation, {
+                  x: originalRotation.x, y: originalRotation.y, z: originalRotation.z
+                }, 0);
+                tlClose.to(clickedObject.position, {
+                  x: originalPosition.x, y: originalPosition.y, z: originalPosition.z
+                }, 0);
+                tlClose.to(clickedObject.scale, {
+                  x: originalScale.x, y: originalScale.y, z: originalScale.z
+                }, 0);
+
+                // Grid wieder einfahren
+                tlClose.to(activeHinge.rotation, {
+                  x: originalHingeRot.x, y: originalHingeRot.y, z: originalHingeRot.z
+                }, 0);
+                tlClose.to(activeHinge.position, {
+                  x: originalHingePos.x, y: originalHingePos.y, z: originalHingePos.z,
+                  onComplete: () => {
+                    // Grid zurückhängen
+                    if (originalGridParent) originalGridParent.attach(grid);
+                    else scene.attach(grid);
+                  }
+                }, 0);
+
+                // Grid-Mats wieder einblenden
+                const gridMats = collectGridFadeMaterials(grid, [clickedObject]);
+                prepareForFade(gridMats);
+                tlClose.to(gridMats, { opacity: 1 }, 0);
+
+                // Am Ende: Icons wieder an, dann ERST das Originalmaterial zurücksetzen
+                tlClose.add(() => {
+                  restoreAfterFade(gridMats);
+                  const allIconsNow = collectIconNodes(grid);
+                  allIconsNow.forEach(n => n.visible = true);
+                  if (clickedObject.children[0]) clickedObject.children[0].visible = true;
+
+                  // Jetzt sauber zurücksetzen
+                  if (activeCrop.mesh === clickedObject) {
+                    clickedObject.material = activeCrop.originalMaterial;
+                    activeCrop.mesh = null;
+                    activeCrop.originalMaterial = null;
+                    activeCrop.cropMaterial = null;
+                    activeCrop.halfStart = 0;
+                  }
+                  openImg = false;
+                });
               },
             };
           }
-        }).timeScale(ANIM_SPEED); // Speed-Sync für Öffnen
+        }).timeScale(ANIM_SPEED);
 
         // Fade vorbereiten
         tl.call(() => { prepareForFade(gridMats); }, null, 0);
@@ -613,12 +619,12 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
             const { halfNdc } = captureMeshScreenNdc(clickedObject, camera);
             activeCrop.halfStart = Math.min(halfNdc, 0.5);
 
-            // initiale Uniforms
-            updateCropUniformDynamic(clickedObject, camera, 0);
+            // initiale Uniforms (progress 0: half = halfStart)
+            updateCropUniformCustom(clickedObject, camera, activeCrop.halfStart, 0.5, 0);
           }
         }, null, 0);
 
-        // Dummy-Progress 0→1 für Halbbreiten-Tween (Maske folgt Bildmitte automatisch)
+        // Halbbreiten-Tween (hinweg): halfStart → 0.5
         const cropProg = { t: 0 };
         tl.to(cropProg, {
           t: 1,
@@ -626,7 +632,7 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
           ease: OPEN_EASE,
           onUpdate: () => {
             if (activeCrop.mesh && activeCrop.cropMaterial) {
-              updateCropUniformDynamic(activeCrop.mesh, camera, cropProg.t);
+              updateCropUniformCustom(activeCrop.mesh, camera, activeCrop.halfStart, 0.5, cropProg.t);
             }
           }
         }, 0);
