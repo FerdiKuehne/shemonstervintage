@@ -320,7 +320,7 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
       y: frustumHeight / 2 - 0.2,
       z: 0.01
     };
-    const scale = 0.01;
+    const scale = 0.02;
 
     // Position animieren
     gsap.to(target.position, {

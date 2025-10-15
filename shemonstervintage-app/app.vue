@@ -170,7 +170,7 @@ function bumpWishlist() {
   });
 
   // Scale vor/zurück
-  tl.to(el, { scale: 1.08, duration: 0.22, transformOrigin: "center center" }, 0)
+  tl.to(el, { scale: 1.2, duration: 0.22, transformOrigin: "center center" }, 0)
     .to(el, { scale: 1.00, duration: 0.22, ease: "power2.in" }, ">-0.02");
 
   el._wishTL = tl;
