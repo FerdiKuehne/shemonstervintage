@@ -249,7 +249,7 @@ const testData = ref([
 }
 
 .wishlist-item.new-item {
-  z-index: 0;
+  z-index: -1;
 }
 
 /* Only apply animation to the last item */
@@ -322,7 +322,7 @@ const testData = ref([
   position: relative;
   border-bottom: 1px solid var(--black);
   background-color: var(--white);
-  z-index: 1;
+  z-index: 0;
 }
 
 .item-details {
