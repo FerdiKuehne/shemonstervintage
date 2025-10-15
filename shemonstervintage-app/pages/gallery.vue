@@ -53,8 +53,6 @@ onMounted(async () => {
 
     $three.scene.add(grid);
 
-    console.log(grid);
-
 });
 
 onBeforeUnmount(() => {

@@ -1,16 +1,19 @@
 <template>
-
   <div class="container-fluid p-0">
     <div class="page-headline">ABOUT</div>
-  </div>
-  <div class="about-page">
-    <h2>ABOUT</h2>
-    <div>About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text About Text Text</div>
+    <div class="about-page">
+      <h2>ABOUT</h2>
+      <div>
+        About Text Text About Text Text About Text Text About Text Text About
+        Text Text About Text Text About Text Text About Text Text About Text
+        Text About Text Text About Text Text About Text Text
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import {aboutCameraShift} from "@/composables/screenplay"
+import { aboutCameraShift } from "@/composables/screenplay";
 definePageMeta({
   layout: "three",
 });
@@ -18,7 +21,6 @@ definePageMeta({
 let $three;
 
 onMounted(async () => {
-
   if (import.meta.dev) {
     const mod = await import("~/composables/threeDev.js"); // path to your function-based file
     const devScene = await mod.init(true, true, false, false, false); // returns { scene, camera, renderer, controls, backgroundSphere, animateObjects }
@@ -37,19 +39,15 @@ onMounted(async () => {
     await $three.ready;
     aboutCameraShift($three.camera, $three.passAMat, $three.controls);
   }
-  
 });
+
 </script>
 
-
 <style scoped>
-
 .about-page {
   position: fixed;
   top: 50%;
   left: 50%;
   width: calc(50% - 1rem);
 }
-
-
 </style>

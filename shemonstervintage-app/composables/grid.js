@@ -248,7 +248,7 @@ async function loadGridImages(dpr,grid, images, renderer) {
   const size = getGridSize();
   currendGrid = gridSize;
   gridWorldHeight = size.height;
-  console.log("Final grid size:", size.height);
+  
   return size;
 }
 
@@ -275,8 +275,7 @@ function updateContainerHeight(scrollerRef, camera) {
     2 * camera.position.z * Math.tan((camera.fov * Math.PI) / 360);
   frustumWidth = frustumHeight * camera.aspect;
 
-    console.log("frustumHeight: ", frustumHeight);
-    console.log("frustumWidth: ", frustumWidth);
+
 
   // Convert world units to vh:
   // The visible part (frustumHeight) corresponds to 100vh
@@ -382,7 +381,7 @@ function onMouseClick(event) {
     if (intersects.length > 0) {
       const clickedObject = intersects[0].object;
       const target = clickedObject.parent.parent; // The grid object
-      console.log("Clicked on object:", target);
+      
   
       const originalPosition = target.position.clone();
       const originalRotation = target.rotation.clone();
