@@ -29,15 +29,14 @@ import { BasicShader } from "three-stdlib";
 import { transform, transpileDeclaration } from "typescript";
 import { urls, imagesDescription } from "./refsHelper.js";
 
-
 gsap.registerPlugin(ScrollTrigger);
 
 /* =========================
    Config – deine Stellschrauben
    ========================= */
 // Linienstärken
-const OUTLINE_THICKNESS_PX = 0.5; // Rahmen (Quad-Stroke) in px  ← dein Wert
-const PLUS_THICKNESS_PX    = 1.0; // Plus in px                  ← dein Wert
+const OUTLINE_THICKNESS_PX = 0.5; // Rahmen (Quad-Stroke) in px
+const PLUS_THICKNESS_PX    = 1.0; // Plus in px
 
 // Icon-Skalierung/Koordinaten
 const ICON_SCALE = 0.003;   // SVG->Three Skalierung
@@ -75,6 +74,9 @@ let frustumHeight, frustumWidth;
 
 let bookmarkIcon;
 
+// NEU: Hinge-Gruppen für linke/rechte Kante
+let hingeLeft = null;
+let hingeRight = null;
 
 /* =========================
    Helpers
@@ -170,8 +172,6 @@ function buildBookmarkIcon() {
   return bookmarkIcon;
 }
 
-
-
 const loadFront = async (dpr) => {
   const url = `http://localhost:8000/stokes/gallery?type=front&batch=${batch}&dpr=${dpr}`;
   try {
@@ -191,7 +191,6 @@ const loadFront = async (dpr) => {
     return [];
   }
 };
-
 
 function getGridSize() {
   const rows   = Math.ceil(grid.children.length / gridSize);
@@ -268,7 +267,6 @@ async function loadGridImages(dpr, grid, imgs, renderer) {
           iconGroup.position.y =  targetHeight / 2 - ICON_MARGIN_Y_WU; // oben  nach innen
           mesh.add(iconGroup);
 
-
           mesh.userData.url = "http://localhost:8000" + url;
 
           iconGroup.userData.type = "icon";
@@ -319,7 +317,6 @@ function getGridHeightInPx(camera) {
   return gridHeightInPx;
 }
 
-
 function updateContainerHeight(scrollerRef, camera) {
   gridWorldHeight = getGridSize().height;
   frustumHeight = 2 * camera.position.z * Math.tan((camera.fov * Math.PI) / 360);
@@ -330,7 +327,6 @@ function updateContainerHeight(scrollerRef, camera) {
   scrollerRef.value.style.height = gridHeightInVh + "vh";
   ScrollTrigger.refresh();
 }
-
 
 function createScrollTrigger(dpr, camera, renderer, scrollContainer) {
   getGridHeightInPx(camera);
@@ -358,14 +354,11 @@ function createScrollTrigger(dpr, camera, renderer, scrollContainer) {
   });
 }
 
-
-
 async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollContainer) {
 
   getCureentGridSize();
   buildBookmarkIcon();
   
-
   const totalWidth = gridSize * targetWidth + (gridSize - 1) * (gapX - targetWidth);
   grid.position.x = -totalWidth / 2 + targetWidth / 2;
   grid.position.y = targetHeight - gridPosYOffset;
@@ -373,6 +366,10 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
   await loadGridImages(dpr, grid, images, renderer);
   updateContainerHeight(scrollContainer, camera);
   createScrollTrigger(dpr, camera, renderer, scrollContainer);
+
+  // NEU: Hinge-Gruppen einmalig anlegen
+  if (!hingeLeft)  { hingeLeft  = new Group(); scene.add(hingeLeft); }
+  if (!hingeRight) { hingeRight = new Group(); scene.add(hingeRight); }
 
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -398,8 +395,6 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
   const mouse = new Vector2();
   let openImg = false;
 
-
-
   // Klick auf das Icon
   function onMouseClick(event) {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -410,131 +405,175 @@ async function initGrid(scene, dpr, renderer, camera, containerHeight, scrollCon
     if (intersects.length > 0 && !openImg) {
       const clickedObject = intersects[0].object;
 
-      console.log(clickedObject.userData.type);
+      if (clickedObject.userData.type === "image") {
+        openImg = true;
 
-if (clickedObject.userData.type === "image") {
-  openImg = true;
+        // Originale merken
+        const originalParent   = clickedObject.parent;
+        const originalPosition = clickedObject.position.clone();
+        const originalRotation = clickedObject.rotation.clone();
+        const originalScale    = clickedObject.scale.clone();
 
-  // Originale merken
-  const originalParent   = clickedObject.parent;
-  const originalPosition = clickedObject.position.clone();
-  const originalRotation = clickedObject.rotation.clone();
-  const originalScale    = clickedObject.scale.clone();
+        // Für Rückbau: originaler Grid-Parent
+        const originalGridParent = grid.parent;
 
-  // Zusätzlich Grid-Originale (für Rückweg sauber)
-  const originalGridPosition = grid.position.clone();
-  const originalGridRotation = grid.rotation.clone();
+        // Objekt fürs freie Animieren lösen (Welt-Transform bleibt erhalten)
+        scene.attach(clickedObject);
 
-  // Für freie Animation ins Scene-Root (Weltpose bleibt erhalten)
-  scene.attach(clickedObject);
+        // ---------- Zielpose berechnen (seitlich + zur Kamera) ----------
+        const dir = new Vector3();
+        camera.getWorldDirection(dir); // Blickrichtung der Kamera (normiert)
 
-  // ---------- Zielpose berechnen (seitlich + zur Kamera) ----------
-  const dir = new Vector3();
-  camera.getWorldDirection(dir); // Blickrichtung der Kamera (normiert)
+        // Seite bestimmen
+        const zPos = 1.0;
+        const halfFovRad = (camera.fov * Math.PI) / 360;
 
-  // Seite bestimmen wie gehabt
-  const zPos = 1.0;
-  const halfFovRad = (camera.fov * Math.PI) / 360;
+        let positionX = clickedObject.position.x;
+        const baseSide = positionX === 0 ? (Math.random() > 0.5 ? 1 : -1) : (positionX > 0 ? -1 : 1);
 
-  // finaler Basispunkt (seitlich + z)
-  let positionX = clickedObject.position.x;
-  const tmpDistHeight = 2 * camera.position.z * Math.tan(halfFovRad); // nur temporär für Seitversatz
-  const tmpWidth = tmpDistHeight * camera.aspect;
+        // Tiefe relativ zur Kamera (Grid weg, Objekt zur Kamera)
+        const depthShift = 1.5;
 
-  // wir bestimmen später noch den exakten Randabstand, placeholder:
-  const baseSide = positionX === 0 ? (Math.random() > 0.5 ? 1 : -1) : (positionX > 0 ? -1 : 1);
+        // Erstmal vorläufiger Zielpunkt fürs Objekt
+        const objBase = new Vector3(0, 0, zPos);
+        let objToward = objBase.clone().add(dir.clone().multiplyScalar(-depthShift));
 
-  // Tiefe relativ zur Kamera (Grid weg, Objekt zur Kamera)
-  const depthShift = 1.5;
-  const gridAway = originalGridPosition.clone().add(dir.clone().multiplyScalar(depthShift));
+        // ---------- Full-bleed (oben/unten bündig) + links/rechts wie vorher ----------
+        const dist = camera.position.distanceTo(objToward);
+        const visibleHeight = 2 * dist * Math.tan(halfFovRad);
+        const visibleWidth  = visibleHeight * camera.aspect;
 
-  // Erstmal vorläufiger Zielpunkt
-  const objBase = new Vector3(0, 0, zPos);
-  let objToward = objBase.clone().add(dir.clone().multiplyScalar(-depthShift));
+        // Overscan, damit keine Spalten bleiben
+        const OVERSCAN = 1.01; // 1% höher als Viewport
+        const scaleImg = (visibleHeight * OVERSCAN) / targetHeight;
 
+        // halbe Kartenbreite bei der neuen Skalierung
+        const halfItemWidth = (targetWidth * scaleImg) / 2;
 
+        // Abstand von der Mitte bis zur bündigen Kante
+        const edgeOffset = (visibleWidth / 2) - halfItemWidth;
 
-// ---------- Full-bleed (oben/unten bündig) + links/rechts wie vorher ----------
-  const dist = camera.position.distanceTo(objToward);
-  const visibleHeight = 2 * dist * Math.tan(halfFovRad);
-  const visibleWidth  = visibleHeight * camera.aspect;
+        // baseSide: -1 = links, +1 = rechts
+        positionX = baseSide * edgeOffset;
 
-  // leichtes Overscan, damit keine Spalten bleiben
-  const OVERSCAN = 1.01; // 1% höher als Viewport
-  const scaleImg = (visibleHeight * OVERSCAN) / targetHeight;
+        // Ziel X setzen (Y/Z bleiben)
+        objToward.setX(positionX);
 
-  // halbe Kartenbreite bei der neuen Skalierung
-  const halfItemWidth = (targetWidth * scaleImg) / 2;
+        // Bookmark-Icon ausblenden
+        if (clickedObject.children[0]) clickedObject.children[0].visible = false;
 
-  // Abstand von der Mitte bis zur bündigen Kante
-  const edgeOffset = (visibleWidth / 2) - halfItemWidth;
+        // ---------- HINGE-Setup: Kante wählen & Grid an Hinge hängen ----------
+        // Grid-Bounds in Weltkoordinaten
+        const gridBox = new Box3().setFromObject(grid);
+        const leftEdgeX  = gridBox.min.x;
+        const rightEdgeX = gridBox.max.x;
+        const midY = (gridBox.min.y + gridBox.max.y) * 0.5;
+        const midZ = (gridBox.min.z + gridBox.max.z) * 0.5;
 
-  // baseSide kommt von dir: -1 = links, +1 = rechts
-  positionX = baseSide * edgeOffset;
+        // Hinge-Positionen updaten (liegen im Scene-Root)
+        hingeLeft.position.set(leftEdgeX,  midY, midZ);
+        hingeRight.position.set(rightEdgeX, midY, midZ);
 
-  // Ziel X setzen (Y/Z bleiben)
-  objToward.setX(positionX);
+        // Je nach Seite Hinge wählen:
+        // Objekt geht nach rechts (baseSide=+1) → links kippen
+        // Objekt geht nach links  (baseSide=-1) → rechts kippen
+        const activeHinge = (baseSide > 0) ? hingeLeft : hingeRight;
 
-  // Bookmark-Icon ausblenden
-  if (clickedObject.children[0]) clickedObject.children[0].visible = false;
+        // Original Hinge-Transform merken
+        const originalHingePos = activeHinge.position.clone();
+        const originalHingeRot = activeHinge.rotation.clone();
 
-  // ---------- Hinfahrt ----------
-  gsap.to(grid.rotation, { y: originalGridRotation.y + 1, duration: 0.5, ease: "power2.out" });
-  gsap.to(grid.position, { x: gridAway.x, y: gridAway.y, z: gridAway.z, duration: 0.5, ease: "power2.out" });
+        // Sicherstellen, dass Hinge im Scene-Root hängt, dann Grid unter Hinge hängen
+        scene.attach(activeHinge);
+        activeHinge.attach(grid);
 
-  gsap.to(clickedObject.position, {
-    x: objToward.x, y: objToward.y, z: objToward.z,
-    duration: 0.5, ease: "power2.out"
-  });
-  gsap.to(clickedObject.scale, {
-    x: scaleImg, y: scaleImg, z: scaleImg,
-    duration: 0.5, ease: "power2.out"
-  });
+        // Tiefen-Shift am Hinge (statt am Grid)
+        const hingeAway = activeHinge.position.clone().add(dir.clone().multiplyScalar(depthShift));
 
-  imagesDescription.value = {
-    description:
-      "lorem ipsum dolor sit amet consetetur sadipscing elitr sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat sed diam voluptua. at vero eos et accusam et justo duo dolores et ea rebum stet clita kasd gubergren no sea takimata sanctus est lorem ipsum dolor sit amet",
-    url: clickedObject.userData.url,
-    side: positionX > 0 ? "left" : "right",
-    onClick: () => {
-      // ---------- Rückfahrt ----------
-      // 1) Grid-Rotation & -Position sauber zurück
-      gsap.to(grid.rotation, {
-        x: originalGridRotation.x, y: originalGridRotation.y, z: originalGridRotation.z,
-        duration: 0.5, ease: "power2.inOut"
-      });
-      gsap.to(grid.position, {
-        x: originalGridPosition.x, y: originalGridPosition.y, z: originalGridPosition.z,
-        duration: 0.5, ease: "power2.inOut"
-      });
+        // ---------- Hinfahrt ----------
+        // Tür-artiges Kippen um Y an der gewählten Kante + in die Tiefe fahren
+        const ANGLE = 0.6;                 // ≈ 34°, anpassen nach Geschmack
+        const sign  = (baseSide > 0) ? +1 : -1; // rechts andocken → +, links → -
 
-      // 2) Vor dem Rück-Tween wieder in den Original-Parent attachen.
-      //    Dadurch bleibt die Weltpose gleich (kein "Sprung"),
-      //    und wir tweenen lokal zurück auf originale Werte.
-      originalParent.attach(clickedObject);
+        gsap.to(activeHinge.rotation, {
+          y: originalHingeRot.y + sign * ANGLE,
+          duration: 0.5,
+          ease: "power2.out",
+        });
+        gsap.to(activeHinge.position, {
+          x: hingeAway.x,
+          y: hingeAway.y,
+          z: hingeAway.z,
+          duration: 0.5,
+          ease: "power2.out",
+        });
 
-      // 3) Rotation/Position/Scale exakt auf die gemerkten Originale
-      gsap.to(clickedObject.rotation, {
-        x: originalRotation.x, y: originalRotation.y, z: originalRotation.z,
-        duration: 0.5, ease: "power2.inOut"
-      });
-      gsap.to(clickedObject.position, {
-        x: originalPosition.x, y: originalPosition.y, z: originalPosition.z,
-        duration: 0.5, ease: "power2.inOut"
-      });
-      gsap.to(clickedObject.scale, {
-        x: originalScale.x, y: originalScale.y, z: originalScale.z,
-        duration: 0.5, ease: "power2.inOut",
-        onComplete: () => {
-          if (clickedObject.children[0]) clickedObject.children[0].visible = true;
-          openImg = false;
-        }
-      });
+        // Objekt: zur Kamera + skalieren
+        gsap.to(clickedObject.position, {
+          x: objToward.x, y: objToward.y, z: objToward.z,
+          duration: 0.5, ease: "power2.out"
+        });
+        gsap.to(clickedObject.scale, {
+          x: scaleImg, y: scaleImg, z: scaleImg,
+          duration: 0.5, ease: "power2.out"
+        });
 
-      imagesDescription.value = null;
-    },
-  };
-} else {
+        // ---------- Panel + Rückweg ----------
+        imagesDescription.value = {
+          description:
+            "lorem ipsum dolor sit amet consetetur sadipscing elitr sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat sed diam voluptua. at vero eos et accusam et justo duo dolores et ea rebum stet clita kasd gubergren no sea takimata sanctus est lorem ipsum dolor sit amet",
+          url: clickedObject.userData.url,
+          side: positionX > 0 ? "left" : "right",
+          onClick: () => {
+            // 1) Erst Objekt zurück in Original-Parent hängen, dann lokal zurück tweenen
+            originalParent.attach(clickedObject);
+
+            gsap.to(clickedObject.rotation, {
+              x: originalRotation.x, y: originalRotation.y, z: originalRotation.z,
+              duration: 0.5, ease: "power2.inOut"
+            });
+            gsap.to(clickedObject.position, {
+              x: originalPosition.x, y: originalPosition.y, z: originalPosition.z,
+              duration: 0.5, ease: "power2.inOut"
+            });
+            gsap.to(clickedObject.scale, {
+              x: originalScale.x, y: originalScale.y, z: originalScale.z,
+              duration: 0.5, ease: "power2.inOut",
+              onComplete: () => {
+                if (clickedObject.children[0]) clickedObject.children[0].visible = true;
+                openImg = false;
+              }
+            });
+
+            // 2) Hinge (Kippgelenk) wieder auf Original-Transform fahren
+            gsap.to(activeHinge.rotation, {
+              x: originalHingeRot.x,
+              y: originalHingeRot.y, // wichtig: y zurücksetzen
+              z: originalHingeRot.z,
+              duration: 0.5,
+              ease: "power2.inOut",
+            });
+            gsap.to(activeHinge.position, {
+              x: originalHingePos.x,
+              y: originalHingePos.y,
+              z: originalHingePos.z,
+              duration: 0.5,
+              ease: "power2.inOut",
+              onComplete: () => {
+                // 3) Grid zurück an den ursprünglichen Parent hängen
+                if (originalGridParent) {
+                  originalGridParent.attach(grid);
+                } else {
+                  scene.attach(grid); // Fallback: zurück ins Scene-Root
+                }
+              }
+            });
+
+            imagesDescription.value = null;
+          },
+        };
+
+      } else {
         const target = clickedObject.parent.parent; // The grid object
 
         const originalPosition = target.position.clone();
@@ -559,7 +598,7 @@ if (clickedObject.userData.type === "image") {
           y: frontPosition.y,
           z: frontPosition.z,
           duration: 0.5,
-           ease: "power2.out"
+          ease: "power2.out"
         });
         gsap.to(target.scale, {
           y: scale,
@@ -571,7 +610,6 @@ if (clickedObject.userData.type === "image") {
             window.dispatchEvent(new CustomEvent("wishlist:bump"));
           },
           onComplete: () => {
-      
             grid.attach(target);
             target.position.copy(originalPosition);
             target.rotation.copy(originalRotation);
