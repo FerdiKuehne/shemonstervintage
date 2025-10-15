@@ -45,13 +45,20 @@
             height="32"
             fill="none"
             stroke="#000"
-            stroke-width="2"
+            stroke-width="1"
             stroke-miterlimit="10"
-            :style="{ opacity: isWishlistInverted ? 0 : 1, transition: 'opacity .18s ease' }"
+            shape-rendering="crispEdges"
+            :style="{ opacity: isWishlistInverted ? 0 : 1, transition: 'opacity .12s ease' }"
           >
-            <polygon points="51.081 59.656 32.276 47.43 13.463 59.656 13.463 3.737 51.081 3.737 51.081 59.656"/>
-            <line x1="32.264" y1="15.364" x2="32.264" y2="34.292"/>
-            <line x1="41.729" y1="24.828" x2="22.8"  y2="24.828"/>
+            <!-- Hülle: nur Kontur -->
+            <polygon
+              points="52 60 32 48 12 60 12 4 52 4 52 60"
+              fill="none"
+              vector-effect="non-scaling-stroke"
+            />
+            <!-- Pluszeichen: ganzzahlige Koordinaten, 2px Stroke -->
+            <line x1="32" y1="15" x2="32" y2="33" vector-effect="non-scaling-stroke"/>
+            <line x1="23" y1="24" x2="41" y2="24" vector-effect="non-scaling-stroke"/>
           </svg>
 
           <!-- invertiert (schwarzer Fill + weiße Plus-Linien) -->
@@ -61,18 +68,29 @@
             viewBox="0 0 64 64"
             width="32"
             height="32"
-            :style="{ opacity: isWishlistInverted ? 1 : 0, transition: 'opacity .18s ease' }"
+            shape-rendering="crispEdges"
+            :style="{ opacity: isWishlistInverted ? 1 : 0, transition: 'opacity .12s ease' }"
           >
+            <!-- Hülle: schwarze Füllung + schwarze Kontur -->
             <polygon
-              points="51.081 59.656 32.276 47.43 13.463 59.656 13.463 3.737 51.081 3.737 51.081 59.656"
-              stroke="#000" stroke-width="2" stroke-miterlimit="10"
-              fill="#000" style="fill:#000"
+              points="52 60 32 48 12 60 12 4 52 4 52 60"
+              stroke="#000"
+              stroke-width="1"
+              stroke-miterlimit="10"
+              fill="#000"
+              vector-effect="non-scaling-stroke"
             />
-            <line x1="32.264" y1="15.364" x2="32.264" y2="34.292" stroke="#fff" stroke-width="2" stroke-miterlimit="10" />
-            <line x1="41.729" y1="24.828" x2="22.8"  y2="24.828" stroke="#fff" stroke-width="2" stroke-miterlimit="10" />
+            <!-- Pluszeichen: weiße Linien -->
+            <line x1="32" y1="15" x2="32" y2="33"
+                  stroke="#fff" stroke-width="1" stroke-miterlimit="10"
+                  vector-effect="non-scaling-stroke"/>
+            <line x1="23" y1="24" x2="41" y2="24"
+                  stroke="#fff" stroke-width="1" stroke-miterlimit="10"
+                  vector-effect="non-scaling-stroke"/>
           </svg>
         </span>
       </button>
+
     </li>
   </ul>
 
@@ -431,7 +449,7 @@ ul.header-nav {
 }
 ul.header-nav li { margin: 0 0.5rem; }
 ul.header-nav li:first-child { margin-right: 0.5rem; }
-ul.header-nav li:last-child { margin-left: 0.5rem; }
+ul.header-nav li:last-child { margin-left: 0.5rem; display: flex ;}
 ul.header-nav li a { font-size: 0.8rem; text-decoration: none; color: var(--black); display: block; }
 
 ul.main-nav { list-style: none; margin: 0; padding: 0; }
