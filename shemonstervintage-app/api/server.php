@@ -15,17 +15,26 @@ $file = __DIR__ . '/public' . $path;
 
 // Serve static files (images, CSS, JS) first
 if (is_file($file)) {
-    header("Access-Control-Allow-Origin: *");
-    header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    header("Access-Control-Allow-Headers: Content-Type, Authorization");
+    // Allow cross-origin access for static assets only (safe)
+    header("Access-Control-Allow-Origin: http://localhost:3000");
+    header("Access-Control-Allow-Methods: GET, OPTIONS");
+    header("Access-Control-Allow-Headers: Content-Type");
+    header("Access-Control-Allow-Credentials: false"); // no cookies needed for static
+    header("Access-Control-Max-Age: 86400");
+
     header("Content-Type: " . mime_content_type($file));
     readfile($file);
     ob_end_flush();
-    return true; // stop further routing
+    return true;
 }
+
 
 // Define $uri for API routing to avoid undefined variable
 $uri = $path;
+
+
+error_log("[SERVER:PHP:CORS] Handling URI: $uri");
+
 
 // Route everything else to your API
 require __DIR__ . '/public/index.php';

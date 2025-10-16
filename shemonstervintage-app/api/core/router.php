@@ -1,5 +1,9 @@
 <?php
 // core/Router.php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', 'php://stdout');
 
 require_once __DIR__ . '/Response.php';
 
@@ -35,14 +39,15 @@ class Router
     public function handle(string $uri, string $method): void
     {
         try {
+            error_log("[Router:CORS] Preflight OPTIONS for URI: $uri");
             // Handle CORS preflight requests automatically
             if ($method === 'OPTIONS') {
-                $this->sendCorsHeaders();
+                $this->sendCorsHeaders($uri);
                 http_response_code(204); // No content
                 exit;
             }
 
-            $this->sendCorsHeaders(); // always allow configured origins
+            $this->sendCorsHeaders($uri); // always allow configured origins
 
             $path = parse_url($uri, PHP_URL_PATH);
             $path = $this->sanitizePath($path);
@@ -100,15 +105,33 @@ class Router
     /**
      * Send safe CORS headers.
      */
-    private function sendCorsHeaders(): void
+    private function sendCorsHeaders(string $uri = ''): void
     {
-        // In production, set your domain instead of *
-        header('Access-Control-Allow-Origin: *');
-        header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization');
-        header('Access-Control-Max-Age: 86400');
+        $frontendOrigin = 'http://localhost:3000'; // dev origin
+    
+        // Log the incoming URI and method
+        error_log("[Router:CORS] Handling URI: $uri, Method: {$_SERVER['REQUEST_METHOD']}");
+    
+        // Apply specific origin for credentialed routes (like /auth/*)
+        if (preg_match('#^/auth/#', $uri)) {
+            header("Access-Control-Allow-Origin: $frontendOrigin");
+            header("Access-Control-Allow-Credentials: true");
+            error_log("[Router:CORS] Applied CORS for AUTH route → Origin: $frontendOrigin, Credentials: true");
+        } else {
+            // Safe for public assets / general routes
+            header("Access-Control-Allow-Origin: *");
+            header("Access-Control-Allow-Credentials: false");
+            error_log("[Router:CORS] Applied CORS for GENERAL route → Origin: *");
+        }
+    
+        header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization");
+        header("Access-Control-Max-Age: 86400");
+    
+        error_log("[Router:CORS] CORS headers sent successfully");
     }
-
+    
+    
     /**
      * Standardized 404 response.
      */

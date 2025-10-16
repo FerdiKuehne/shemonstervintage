@@ -83,11 +83,15 @@ async function login() {
     if (!response.ok) throw new Error("Login failed");
     const data = await response.json();
     user.value = data.user;
-    router.push("/dashboard");
+    router.push("/profile");
   } catch (err) {
     error.value = "Login failed" +  err;
   }
 }
+
+
+
+
 </script>
 
 <style scoped>

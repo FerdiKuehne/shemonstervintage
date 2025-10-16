@@ -12,21 +12,11 @@ require_once __DIR__ . '/../../vendor/jwt/src/JWT.php';
 
 use Firebase\JWT\JWT;
 
-// Load JWT config
 $config = require __DIR__ . '/../../config/jwt.php';
 
 // ----------------------------
-// CORS & preflight
+// Ensure POST
 // ----------------------------
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
-}
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     Response::error('Only POST requests allowed', 405);
 }
@@ -47,7 +37,7 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 }
 
 // ----------------------------
-// Connect to DB and fetch user
+// Connect to DB
 // ----------------------------
 $db = Database::getConnection();
 $stmt = $db->prepare('SELECT id, email, password_hash AS password, username AS name FROM customers WHERE email = :email LIMIT 1');
@@ -61,7 +51,7 @@ if (!$user || !password_verify($password, $user['password'])) {
 }
 
 // ----------------------------
-// Generate JWT using config
+// JWT generation
 // ----------------------------
 $issuedAt   = time();
 $expiration = $issuedAt + $config['expiration'];
@@ -84,11 +74,25 @@ $update = $db->prepare('UPDATE customers SET last_login = NOW() WHERE id = :id')
 $update->execute([':id' => $user['id']]);
 
 // ----------------------------
-// Send response
+// Set cookie
+// ----------------------------
+$isLocal = in_array($_SERVER['SERVER_NAME'], ['localhost', '127.0.0.1']);
+$cookieOptions = [
+    'expires' => time() + 1800,
+    'path' => '/',
+    'domain' => $isLocal ? '' : 'shemonstervintage.com',
+    'secure' => !$isLocal,
+    'httponly' => true,
+    'samesite' => $isLocal ? 'Lax' : 'Strict',
+];
+
+setcookie('auth_token', $jwt, $cookieOptions);
+
+// ----------------------------
+// Respond
 // ----------------------------
 Response::success([
     'message' => 'Login successful',
-    'token' => $jwt,
     'user' => [
         'id' => (int)$user['id'],
         'name' => $user['name'],
