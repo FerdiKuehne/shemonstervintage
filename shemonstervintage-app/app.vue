@@ -551,11 +551,14 @@ ul.main-nav li:hover:after { content: "_"; animation: blink 0.3s infinite; }
 
 @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
 
+
 .scroller {
   height: 200vh; overflow-y: auto; overflow-x: hidden;
   position: relative; z-index: 0;
 }
 .scroller::-webkit-scrollbar { display: none; }
+
+
 
 .three-container {
   pointer-events: auto; position: fixed; top: 0; left: 0;

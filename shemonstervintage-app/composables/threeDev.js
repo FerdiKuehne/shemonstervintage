@@ -11,6 +11,7 @@ import {
   Clock,
   BoxGeometry,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   Mesh,
   DirectionalLight,
   Raycaster,
@@ -34,6 +35,48 @@ import {
 import { gsap } from "gsap";
 import { Observer } from "gsap/Observer";
 gsap.registerPlugin(Observer);
+
+const mat = new MeshStandardMaterial({
+  color: 0x5a7dff,
+  roughness: 0.4,
+  metalness: 0.08,
+  emissive: 0x6690ff,
+  emissiveIntensity: 0.18,
+  transparent: false,
+  opacity: 1.0,
+  depthWrite: true,
+  polygonOffset: true,
+  polygonOffsetFactor: 2,
+  polygonOffsetUnits: 2,
+});
+
+
+function createAboutObjekt() {
+  const box = new BoxGeometry( 0.2, 0.2, 0.2 );
+  const material = new MeshBasicMaterial({ color: 0xff00ff });
+  return new Mesh(box,material)
+}
+
+function createGalleryObjekt() {
+  const box = new BoxGeometry( 0.2, 0.2, 0.2  );
+  const material = new MeshBasicMaterial({ color: 0x0000ff });
+  return new Mesh(box,material)
+
+}
+
+function createLocationObjekt() {
+  const box = new BoxGeometry( 0.2, 0.2, 0.2  );
+  const material = new MeshBasicMaterial({ color: 0x00ff00 });
+  return new Mesh(box,material)
+}
+
+function createContactObjekt(){
+  const box = new BoxGeometry(0.2, 0.2, 0.2 );
+  const material = new MeshBasicMaterial({ color: 0xff0000 });
+  return new Mesh(box,material)
+}
+
+
 
 // ------------------------------------------------------------
 // Init
@@ -61,6 +104,19 @@ async function init(
   dl.position.set(1, 1, 1);
   scene.add(new HemisphereLight(0xffffff, 0x222233, 1.0));
   scene.add(dl);
+
+  const aboutObject = createAboutObjekt(); 
+  const galleryObject = createGalleryObjekt();
+  const contactOnject = createContactObjekt();
+  const locationObjekt = createLocationObjekt();
+
+
+  aboutObject.position.set(-1.65, -0.57, -1.92); 
+  galleryObject.position.set(-1.65, -0.57, -1.92); 
+  contactOnject.position.set(0, -.4 , -1.73); 
+  locationObjekt.position.set(-0.3, 0.48, -1.06); 
+
+  scene.add(aboutObject,galleryObject,contactOnject,locationObjekt);
 
   // Kamera
   const camera = new PerspectiveCamera(
@@ -164,6 +220,10 @@ async function init(
     passAMat.uniforms.uMix.value = 1.0; // Effekt aktiv
     passAMat.uniforms.fovY.value = MathUtils.degToRad(camera.fov);
 
+    scene.add(aboutObject,galleryObject,contactOnject,locationObjekt);
+
+
+    console.log(pano.screenSceneB.children);
 
     // --- Zustand für Bewegungs-Erkennung ---
     pano._motionState = {
@@ -202,11 +262,14 @@ async function init(
   function animate() {
     // Delta-Zeit (stabil für Geschwindigkeiten)
     const dt = Math.max(1e-4, clock.getDelta());
+    
 
+    controls.update();
+    
     if (animateObjects.length > 0) {
       animateObjects.forEach((cb) => cb(dt));
     }
-    controls?.update();
+    
 
     if (arToolkitSource && arToolkitSource.ready) {
       arToolkitContext.update(arToolkitSource.domElement);
@@ -214,6 +277,9 @@ async function init(
 
     if (backgroundSphereNeeded) {
       pano.updateCamBasis();
+
+  
+    
 
       // uTime weiterreichen (hier: absolute Zeit OK)
       passAMat.uniforms.uTime.value = clock.elapsedTime;
@@ -270,6 +336,7 @@ async function init(
       renderer.setRenderTarget(pano.rtObjects);
       renderer.clear(true, true, true);
       renderer.render(scene, camera);
+      
       renderer.setRenderTarget(prev);
 
       renderer.setRenderTarget(pano.rtCombined);
@@ -279,6 +346,7 @@ async function init(
 
       pano.passBMat.uniforms.src.value = pano.rtCombined.texture;
       renderer.render(pano.screenSceneB, fsCam);
+
     } else {
       renderer.render(scene, camera);
     }
