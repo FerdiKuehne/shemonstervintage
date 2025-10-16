@@ -36,7 +36,7 @@ const ANIM = {
   close:  { dur: 0.40, ease: "power2.inOut" }, // Detail -> Grid
   speed:  1.15,                                // globales timeScale
   pause:  0.00,                                // kurze Pause zw. Bild-Return & Grid-Return
-  hinge:  { angle: 0.6, depth: 3.0 },
+  hinge:  { angle: 0.6, depth: 2.0 },
   object: { depth: 2.2, overscan: 1.01 },
   crop:   { targetHalfNDC: 0.5, offNDC: 2.0 }, // offNDC > 1.0 => Maske "aus"
 };
