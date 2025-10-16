@@ -32,7 +32,7 @@ gsap.registerPlugin(ScrollTrigger);
    Zentrale Animationssteuerung
    ========================= */
 const ANIM = {
-  open:   { dur: 0.40, ease: "power2.out" },   // Grid -> Detail
+  open:   { dur: 0.48, ease: "power2.out" },   // Grid -> Detail
   close:  { dur: 0.40, ease: "power2.inOut" }, // Detail -> Grid
   speed:  1.15,                                // globales timeScale
   pause:  0.06,                                // kurze Pause zw. Bild-Return & Grid-Return
@@ -53,14 +53,12 @@ const delayed = (sec, fn) => gsap.delayedCall(sec, fn);
 /* =========================
    Farbraum/Look Steuerung (runtime tweakbar)
    ========================= */
-// Modus-Erklärung:
-// - "srgb":    sRGB -> Linear -> Exposure -> sRGB (präzise IEC-Kurven)
-// - "passthrough": keinerlei sRGB-Konvertierung, nur Exposure/Gamma direkt auf Textur
-// - "gamma22": pow(2.2)-Näherung statt IEC (manchmal näher am „Bild-Tag“-Look je nach Pipeline)
 const COLOR = {
-  mode: "passthrough", // "srgb" | "passthrough" | "gamma22"
-  exposure: 1.04,      // 1.00..1.08 (kleine Schritte)
-  gamma: 2.00,         // 1.00..0.95 (feiner Ausgleich)
+  // "srgb": sRGB->Linear->Exposure->sRGB (präzise IEC), "passthrough": keine Konvertierung,
+  // "gamma22": pow(2.2)-Annäherung
+  mode: "passthrough",
+  exposure: 1.04,
+  gamma: 0.99,
 };
 
 /* =========================
@@ -118,8 +116,7 @@ const cropVertex = /* glsl */ `
   }
 `;
 
-// Keine Three.js-Includes → kompatibel mit AR.js/versch. Three-Builds
-// Drei Color-Modi + Exposure/Gamma als Uniforms
+// Drei Color-Modi + Exposure/Gamma als Uniforms – ohne Three-Chunks
 const cropFragment = /* glsl */ `
   precision highp float;
   uniform sampler2D map;
@@ -128,8 +125,8 @@ const cropFragment = /* glsl */ `
   uniform float uGlobalAlpha;    // Global-Alpha fürs Fading
 
   uniform int   uColorMode;      // 0=srgb, 1=passthrough, 2=gamma22
-  uniform float uExposure;       // Gain in linearem bzw. Texturraum (je nach Modus)
-  uniform float uGamma;          // Post-Gamma auf dem Ausgabewert
+  uniform float uExposure;       // Gain
+  uniform float uGamma;          // Post-Gamma
 
   varying float vNdcX;
   varying vec2  vUv;
@@ -190,10 +187,9 @@ function makeAnimatedCropMaterial(texture) {
     },
     vertexShader: cropVertex,
     fragmentShader: cropFragment,
-    transparent: true,   // stabil transparent
-    depthWrite: true,    // stabil, kein Flip
+    transparent: true,
+    depthWrite: true,
   });
-  // Wir managen Farbraum im Shader → kein ToneMapping durch Three
   mat.toneMapped = false;
   return mat;
 }
@@ -724,95 +720,102 @@ async function initGrid(
         const sign  = baseSide > 0 ? +1 : -1;
 
         // === Timeline OPEN
-        const tl = makeTL("open").eventCallback("onComplete", () => {
-          imagesDescription.value = {
-            description:
-              "lorem ipsum dolor sit amet consetetur sadipscing elitr sed diam nonumy eirmod tempor ...",
-            url: clickedObject.userData.url,
-            side: positionX > 0 ? "left" : "right",
-            onClick: () => {
-              imagesDescription.value = null;
+        const tl = makeTL("open")
+          // >>>>> NAVI: Desktop ausblenden
+          .eventCallback("onStart", () => {
+            window.dispatchEvent(new CustomEvent("detail:open"));
+          })
+          .eventCallback("onComplete", () => {
+            imagesDescription.value = {
+              description:
+                "lorem ipsum dolor sit amet consetetur sadipscing elitr sed diam nonumy eirmod tempor ...",
+              url: clickedObject.userData.url,
+              side: positionX > 0 ? "left" : "right",
+              onClick: () => {
+                imagesDescription.value = null;
 
-              // === 1) Objekt-Rückfahrt + Reverse-Crop (0.5 -> halfStart) ===
-              originalParent.attach(clickedObject);
-              const tlObjBack = makeTL("close");
+                // === 1) Objekt-Rückfahrt + Reverse-Crop (0.5 -> halfStart) ===
+                originalParent.attach(clickedObject);
+                const tlObjBack = makeTL("close");
 
-              if (clickedObject.material && clickedObject.material.uniforms) {
-                const rev = { t: 1 };
-                tlObjBack.to(rev, {
-                  t: 0,
-                  onUpdate: () => {
-                    const { centerNdc: imgCenter } = captureMeshScreenNdc(clickedObject, camera);
-                    const L = (a, b, t) => a + (b - a) * t;
-                    const half = L(activeCrop.halfStart, ANIM.crop.targetHalfNDC, rev.t);
-                    const u = clickedObject.material.uniforms;
-                    u.uCenterNDC.value = imgCenter;
-                    u.uHalfWidthNDC.value = half;
-                    u.uCenterNDC.needsUpdate = true;
-                    u.uHalfWidthNDC.needsUpdate = true;
-                  },
-                }, 0);
-              }
-
-              tlObjBack.to(clickedObject.rotation, {
-                x: originalRotation.x, y: originalRotation.y, z: originalRotation.z,
-              }, 0);
-              tlObjBack.to(clickedObject.position, {
-                x: originalPosition.x, y: originalPosition.y, z: originalPosition.z,
-              }, 0);
-              tlObjBack.to(clickedObject.scale, {
-                x: originalScale.x, y: originalScale.y, z: originalScale.z,
-              }, 0);
-
-              // === 2) Nach Rückkehr ins Grid: Maske wieder AUS (kein Swap)
-              tlObjBack.add(() => {
-                const u = clickedObject.material?.uniforms;
-                if (u) {
-                  u.uHalfWidthNDC.value = ANIM.crop.offNDC; // Maske aus
-                  u.uHalfWidthNDC.needsUpdate = true;
+                if (clickedObject.material && clickedObject.material.uniforms) {
+                  const rev = { t: 1 };
+                  tlObjBack.to(rev, {
+                    t: 0,
+                    onUpdate: () => {
+                      const { centerNdc: imgCenter } = captureMeshScreenNdc(clickedObject, camera);
+                      const L = (a, b, t) => a + (b - a) * t;
+                      const half = L(activeCrop.halfStart, ANIM.crop.targetHalfNDC, rev.t);
+                      const u = clickedObject.material.uniforms;
+                      u.uCenterNDC.value = imgCenter;
+                      u.uHalfWidthNDC.value = half;
+                      u.uCenterNDC.needsUpdate = true;
+                      u.uHalfWidthNDC.needsUpdate = true;
+                    },
+                  }, 0);
                 }
-              });
 
-              // === 3) Grid zurückholen ===
-              tlObjBack.add(() => {
-                requestAnimationFrame(() => {
-                  delayed(Math.max(0.02, ANIM.pause), () => {
-                    const tlClose = makeTL("close");
+                tlObjBack.to(clickedObject.rotation, {
+                  x: originalRotation.x, y: originalRotation.y, z: originalRotation.z,
+                }, 0);
+                tlObjBack.to(clickedObject.position, {
+                  x: originalPosition.x, y: originalPosition.y, z: originalPosition.z,
+                }, 0);
+                tlObjBack.to(clickedObject.scale, {
+                  x: originalScale.x, y: originalScale.y, z: originalScale.z,
+                }, 0);
 
-                    tlClose.to(activeHinge.rotation, {
-                      x: originalHingeRot.x, y: originalHingeRot.y, z: originalHingeRot.z,
-                    }, 0);
-                    tlClose.to(activeHinge.position, {
-                      x: originalHingePos.x, y: originalHingePos.y, z: originalHingePos.z,
-                      onComplete: () => {
-                        if (originalGridParent) originalGridParent.attach(grid);
-                        else scene.attach(grid);
-                      },
-                    }, 0);
+                // === 2) Nach Rückkehr ins Grid: Maske wieder AUS (kein Swap)
+                tlObjBack.add(() => {
+                  const u = clickedObject.material?.uniforms;
+                  if (u) {
+                    u.uHalfWidthNDC.value = ANIM.crop.offNDC; // Maske aus
+                    u.uHalfWidthNDC.needsUpdate = true;
+                  }
+                });
 
-                    // Grid-Fade IN (Shader uGlobalAlpha + Basic opacity gemeinsam)
-                    prepareForFade(gridMats);
-                    const gridFadeTargetsIn = makeFadeTargets(gridMats);
-                    tlClose.to(gridFadeTargetsIn, { value: 1, opacity: 1 }, 0);
+                // === 3) Grid zurückholen ===
+                tlObjBack.add(() => {
+                  requestAnimationFrame(() => {
+                    delayed(Math.max(0.02, ANIM.pause), () => {
+                      const tlClose = makeTL("close");
 
-                    tlClose.add(() => {
-                      restoreAfterFade(gridMats);
-                      const allIconsNow = collectIconNodes(grid);
-                      allIconsNow.forEach((n) => (n.visible = true));
-                      if (clickedObject.children[0]) clickedObject.children[0].visible = true;
-                      openImg = false;
+                      tlClose.to(activeHinge.rotation, {
+                        x: originalHingeRot.x, y: originalHingeRot.y, z: originalHingeRot.z,
+                      }, 0);
+                      tlClose.to(activeHinge.position, {
+                        x: originalHingePos.x, y: originalHingePos.y, z: originalHingePos.z,
+                        onComplete: () => {
+                          if (originalGridParent) originalGridParent.attach(grid);
+                          else scene.attach(grid);
+                        },
+                      }, 0);
+
+                      // Grid-Fade IN (Shader uGlobalAlpha + Basic opacity gemeinsam)
+                      prepareForFade(gridMats);
+                      const gridFadeTargetsIn = makeFadeTargets(gridMats);
+                      tlClose.to(gridFadeTargetsIn, { value: 1, opacity: 1 }, 0);
+
+                      tlClose.add(() => {
+                        restoreAfterFade(gridMats);
+                        const allIconsNow = collectIconNodes(grid);
+                        allIconsNow.forEach((n) => (n.visible = true));
+                        if (clickedObject.children[0]) clickedObject.children[0].visible = true;
+                        openImg = false;
+
+                        // >>>>> NAVI: Desktop wieder einblenden
+                        window.dispatchEvent(new CustomEvent("detail:close"));
+                      });
                     });
                   });
                 });
-              });
-            },
-          };
-        });
+              },
+            };
+          });
 
         // Fade vorbereiten (Grid OUT)
         tl.call(() => { prepareForFade(gridMats); }, null, 0);
         tl.call(() => {
-          // direkt vor dem Fade Alpha auf 1 setzen (sicher)
           for (const m of gridMats) {
             if (m instanceof ShaderMaterial && m.uniforms?.uGlobalAlpha) {
               m.uniforms.uGlobalAlpha.value = 1;
