@@ -494,7 +494,7 @@ ul.main-nav li {
 @media (max-width: 991px) {
   ul.main-nav li  { font-size: 4rem; line-height: 4rem; padding: .2rem 0; }
 }
-ul.main-nav li:hover { font-size: 5rem; line-height: 5rem; transition: font-size 0.3s, line-height .3s; }
+ul.main-nav li:hover { font-size: 3rem; line-height: 3rem; transition: font-size 0.3s, line-height .3s; }
 @media (max-width: 991px) {
   ul.main-nav li:hover { font-size: 4rem; line-height: 4rem; padding: .2rem 0; }
 }
@@ -507,7 +507,7 @@ ul.main-nav li .num {
   ul.main-nav li .num  { font-size: 2rem; transform: translate(0, 0); }
 }
 ul.main-nav li:hover .num { 
-  font-size: 2rem; transform: translate(0, -33px);
+  font-size: 1rem; transform: translate(0, -23px);
   transition: font-size .3s, transform .3s; 
 }
 @media (max-width: 991px) {
