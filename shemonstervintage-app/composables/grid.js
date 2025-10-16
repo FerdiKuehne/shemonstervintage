@@ -32,7 +32,7 @@ gsap.registerPlugin(ScrollTrigger);
    Zentrale Animationssteuerung
    ========================= */
 const ANIM = {
-  open:   { dur: 0.48, ease: "power2.out" },   // Grid -> Detail
+  open:   { dur: 0.40, ease: "power2.out" },   // Grid -> Detail
   close:  { dur: 0.40, ease: "power2.inOut" }, // Detail -> Grid
   speed:  1.15,                                // globales timeScale
   pause:  0.06,                                // kurze Pause zw. Bild-Return & Grid-Return
