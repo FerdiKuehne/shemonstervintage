@@ -82,8 +82,8 @@ let scrollTrigger;
 let gridWorldHeight = 0;
 let gridPosYOffset = 0.1;
 
-const gapX = 2.05;
-const gapY = 2.2;
+const gapX = 2.0;
+const gapY = 2.25;
 const targetHeight = 4.5 * 0.46;
 const targetWidth = 4 * 0.46;
 
