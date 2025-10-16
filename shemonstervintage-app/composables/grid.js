@@ -32,10 +32,10 @@ gsap.registerPlugin(ScrollTrigger);
    Zentrale Animationssteuerung
    ========================= */
 const ANIM = {
-  open:   { dur: 0.48, ease: "power2.out" },   // Grid -> Detail
+  open:   { dur: 0.40, ease: "power2.out" },   // Grid -> Detail
   close:  { dur: 0.40, ease: "power2.inOut" }, // Detail -> Grid
   speed:  1.15,                                // globales timeScale
-  pause:  0.06,                                // kurze Pause zw. Bild-Return & Grid-Return
+  pause:  0.00,                                // kurze Pause zw. Bild-Return & Grid-Return
   hinge:  { angle: 0.6, depth: 3.0 },
   object: { depth: 2.2, overscan: 1.01 },
   crop:   { targetHalfNDC: 0.5, offNDC: 2.0 }, // offNDC > 1.0 => Maske "aus"
@@ -58,7 +58,7 @@ const COLOR = {
   // "gamma22": pow(2.2)-Annäherung
   mode: "passthrough",
   exposure: 1.04,
-  gamma: 0.99,
+  gamma: 2.00,
 };
 
 /* =========================
