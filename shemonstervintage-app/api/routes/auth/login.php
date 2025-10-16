@@ -78,24 +78,30 @@ $update->execute([':id' => $user['id']]);
 // ----------------------------
 $isLocal = in_array($_SERVER['SERVER_NAME'], ['localhost', '127.0.0.1']);
 $cookieOptions = [
-    'expires' => time() + 1800,
+    'expires' => time() + 3600,
     'path' => '/',
-    'domain' => $isLocal ? '' : 'shemonstervintage.com',
-    'secure' => !$isLocal,
+    'domain' => 'localhost',      // Must match your frontend domain if testing
+    'secure' => false,            // localhost is not HTTPS
     'httponly' => true,
-    'samesite' => $isLocal ? 'Lax' : 'Strict',
+    'samesite' => 'Lax'           // Lax allows cross-site requests from top-level navigation
 ];
+
 
 setcookie('auth_token', $jwt, $cookieOptions);
 
-// ----------------------------
-// Respond
-// ----------------------------
-Response::success([
+$response = [
     'message' => 'Login successful',
     'user' => [
         'id' => (int)$user['id'],
         'name' => $user['name'],
         'email' => $user['email'],
     ],
-]);
+];
+
+error_log('[LOGIN RESPONSE] ' . print_r($response, true));
+error_log('[LOGIN cookieOptions] ' . print_r($cookieOptions, true));
+
+// ----------------------------
+// Respond
+// ----------------------------
+Response::success($response);

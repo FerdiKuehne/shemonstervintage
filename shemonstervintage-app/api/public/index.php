@@ -15,9 +15,9 @@ EnvLoader::load(__DIR__ . '/../.env');
 error_log('[ENV] Loaded environment: ' . getenv('APP_ENV'));
 
 
-error_log('[ENV] Loaded environment: ' . getenv('APP_ENV'));
 
 
+error_log('[PRE CHECK COOKIE] ' . print_r($_COOKIE, true));
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     // Determine the origin

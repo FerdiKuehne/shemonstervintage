@@ -38,7 +38,6 @@ function moveCamera({
       ease: "power2.inOut",
       onUpdate: function () {
         const t = this.targets()[0].t;
-        console.log(t);
         // Animate rotation
         tempQuat.copy(startQuat).slerp(endQuat, t);
         camera.quaternion.copy(tempQuat);

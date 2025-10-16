@@ -23,10 +23,10 @@
         </svg>
       </button>
     </li>
-
+  <li @click="checkLogin">checkLogin</li>
     <li><NuxtLink to="/login">Login</NuxtLink></li>
     <li><NuxtLink to="/register">Register </NuxtLink></li>
-
+    <li v-if="userLoggIn"><button class="btn link small" @click="logout">Logout</button></li>
     <!-- Wishlist-Button -->
     <li>
       <button
@@ -146,6 +146,7 @@ import { scrollerRef } from "@/composables/scroller.js";
 import { onMounted, onBeforeUnmount, ref, computed, watch } from "vue";
 import { useRoute, useNuxtApp } from "#imports";
 import Wishlist from "@/components/wishlist.vue";
+import {userLoggIn} from "@/composables/refsHelper.js"
 
 const isWishlistOpen = ref(false);
 const isMenuOpen = ref(false);
@@ -158,6 +159,25 @@ const route = useRoute();
 const showCanvas = computed(() => route.path.endsWith("/editmode"));
 
 let $three = null;
+
+
+const loggedIn = ref(false);
+
+async function checkLogin() {
+  try {
+    const res = await fetch('http://localhost:8000/auth/check', {
+      method: 'GET',
+      credentials: 'include', // send cookie
+    });
+    const data = await res.json();
+
+    userLoggIn.value = data.data.loggedIn;
+  } catch (err) {
+    userLoggIn.value = false;
+  }
+}
+
+
 
 /* Zentrale Bump-Funktion, die von Button-Klick und von grid.js (Event) genutzt wird */
 function bumpWishlist() {
@@ -215,6 +235,7 @@ const onKey = (e) => {
 };
 
 onMounted(async () => {
+  checkLogin();
   window.addEventListener("keydown", onKey);
 
   // Event-Bridge von grid.js → löst Bump+Crossfade aus
@@ -231,10 +252,20 @@ onBeforeUnmount(() => {
   window.removeEventListener("wishlist:bump", bumpWishlist);
 });
 
-/* Body-Scroll sperren, wenn Menü offen */
+
 watch(isMenuOpen, (open) => {
   document.documentElement.style.overflow = open ? "hidden" : "";
 });
+
+function logout() {
+  fetch('http://localhost:8000/auth/logout', {
+    method: 'POST',
+    credentials: 'include',
+  }).then(() => {
+    userLoggIn.value = false;
+  });
+}
+
 </script>
 
 <style>

@@ -58,6 +58,7 @@
 <script setup>
 import { ref } from "vue";
 import { useRouter } from "#imports"; // Nuxt 3
+import {userLoggIn, userInfo} from "@/composables/refsHelper.js"
 
 definePageMeta({ layout: "three" });
 
@@ -71,6 +72,9 @@ function closeBox() {
   router.push("/"); // immer Home
 }
 
+
+
+
 async function login() {
   try {
     const response = await fetch("http://localhost:8000/auth/login", {
@@ -82,7 +86,17 @@ async function login() {
 
     if (!response.ok) throw new Error("Login failed");
     const data = await response.json();
-    user.value = data.user;
+    user.value = data;
+
+    console.log(data);
+
+
+    userInfo.value = data.data;
+
+    console.log( userInfo.value );
+
+    userLoggIn.value = true; // Setze den Login-Status auf true
+
     router.push("/profile");
   } catch (err) {
     error.value = "Login failed" +  err;

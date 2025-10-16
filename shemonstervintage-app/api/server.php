@@ -9,6 +9,9 @@ ini_set('error_log', 'php://stdout'); // log errors to Docker logs
 // Start output buffering to prevent headers issues
 ob_start();
 
+error_log('[SERVER.PHP CHECK COOKIE] ' . print_r($_COOKIE, true));
+error_log( "[SERVER.PHP CHECK URL]". parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
+
 // Parse the request path
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $file = __DIR__ . '/public' . $path;

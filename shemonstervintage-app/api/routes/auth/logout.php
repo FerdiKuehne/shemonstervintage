@@ -7,14 +7,6 @@ ini_set('error_log', 'php://stdout');
 require_once __DIR__ . '/../../core/Response.php';
 
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Only POST requests allowed', 405);
-}
 
 // ----------------------------
 // Clear auth cookie
@@ -24,11 +16,13 @@ $isLocal = $_SERVER['SERVER_NAME'] === 'localhost';
 $cookieOptions = [
     'expires' => time() - 3600, 
     'path' => '/',
-    'domain' => $isLocal ? '' : getenv('DOMAIN'),
-    'secure' => !$isLocal,
+    'domain' => 'localhost',      // Must match your frontend domain if testing
+    'secure' => false,            // localhost is not HTTPS
     'httponly' => true,
-    'samesite' => $isLocal ? 'Lax' : 'Strict',
+    'samesite' => 'Lax'           // Lax allows cross-site requests from top-level navigation
 ];
+
+error_log('[LOGOUT cookieOptions] ' . print_r($cookieOptions, true));
 
 setcookie('auth_token', '', $cookieOptions);
 
