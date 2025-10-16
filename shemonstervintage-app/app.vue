@@ -25,8 +25,9 @@
     </li>
   <li @click="checkLogin">checkLogin</li>
     <li><NuxtLink to="/login">Login</NuxtLink></li>
-    <li><NuxtLink to="/register">Register </NuxtLink></li>
     <li v-if="userLoggIn"><button class="btn link small" @click="logout">Logout</button></li>
+    <li><NuxtLink to="/register">Register</NuxtLink></li>
+
     <!-- Wishlist-Button -->
     <li>
       <button
@@ -50,13 +51,11 @@
             shape-rendering="crispEdges"
             :style="{ opacity: isWishlistInverted ? 0 : 1, transition: 'opacity .12s ease' }"
           >
-            <!-- Hülle: nur Kontur -->
             <polygon
               points="52 60 32 48 12 60 12 4 52 4 52 60"
               fill="none"
               vector-effect="non-scaling-stroke"
             />
-            <!-- Pluszeichen: ganzzahlige Koordinaten, 2px Stroke -->
             <line x1="32" y1="15" x2="32" y2="33" vector-effect="non-scaling-stroke"/>
             <line x1="23" y1="24" x2="41" y2="24" vector-effect="non-scaling-stroke"/>
           </svg>
@@ -71,7 +70,6 @@
             shape-rendering="crispEdges"
             :style="{ opacity: isWishlistInverted ? 1 : 0, transition: 'opacity .12s ease' }"
           >
-            <!-- Hülle: schwarze Füllung + schwarze Kontur -->
             <polygon
               points="52 60 32 48 12 60 12 4 52 4 52 60"
               stroke="#000"
@@ -80,7 +78,6 @@
               fill="#000"
               vector-effect="non-scaling-stroke"
             />
-            <!-- Pluszeichen: weiße Linien -->
             <line x1="32" y1="15" x2="32" y2="33"
                   stroke="#fff" stroke-width="1" stroke-miterlimit="10"
                   vector-effect="non-scaling-stroke"/>
@@ -95,7 +92,14 @@
   </ul>
 
   <!-- Header wird zum Off-Canvas Panel -->
-  <header id="mobile-menu" class="site-header" :class="{ open: isMenuOpen }">
+  <header
+    id="mobile-menu"
+    class="site-header"
+    :class="{
+      open: isMenuOpen,
+      'hide-on-detail': isDetailOpen && !isMobile
+    }"
+  >
     <ul class="main-nav">
       <li><NuxtLink to="/"        @click="isMenuOpen = false"><span class="num">01</span> Home</NuxtLink></li>
       <li><NuxtLink to="/about"   @click="isMenuOpen = false"><span class="num">02</span> About</NuxtLink></li>
@@ -153,6 +157,9 @@ const isMenuOpen = ref(false);
 
 const isWishlistInverted = ref(false);  // steuert Crossfade (inline opacity)
 const wishlistBtn = ref(null);          // GSAP Target
+
+const isDetailOpen = ref(false);        // <-- NEU: Detailzustand (Desktop)
+const isMobile = ref(false);            // <-- NEU: Breakpoint-Flag
 
 const scroller = scrollerRef;
 const route = useRoute();
@@ -234,15 +241,32 @@ const onKey = (e) => {
   }
 };
 
+/* === NEU: Desktop-Only Navi ausblenden, wenn Detail offen === */
+function updateIsMobile() {
+  if (typeof window !== "undefined") {
+    isMobile.value = window.matchMedia("(max-width: 991px)").matches;
+  }
+}
+
+function onDetailOpen()  { isDetailOpen.value = true; }
+function onDetailClose() { isDetailOpen.value = false; }
+
 onMounted(async () => {
   checkLogin();
   window.addEventListener("keydown", onKey);
 
-  // Event-Bridge von grid.js → löst Bump+Crossfade aus
+  // Wishlist-Bump (bestehend)
   window.addEventListener("wishlist:bump", bumpWishlist);
 
+  // Mobile-Breakpoint & Detail-Events (NEU)
+  updateIsMobile();
+  window.addEventListener("resize", updateIsMobile);
+  window.addEventListener("detail:open",  onDetailOpen);
+  window.addEventListener("detail:close", onDetailClose);
+
   if (!import.meta.dev) {
-    $three = useNuxtApp().$three;
+    const nuxt = useNuxtApp();
+    $three = nuxt.$three;
     await $three.init();
   }
 });
@@ -250,6 +274,10 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKey);
   window.removeEventListener("wishlist:bump", bumpWishlist);
+
+  window.removeEventListener("resize", updateIsMobile);
+  window.removeEventListener("detail:open",  onDetailOpen);
+  window.removeEventListener("detail:close", onDetailClose);
 });
 
 
@@ -438,8 +466,6 @@ input:-webkit-autofill:focus {
     gap: .5rem;
   }
 }
-
-
 </style>
 
 <style scoped>
@@ -460,7 +486,14 @@ input:-webkit-autofill:focus {
 /* Desktop: Header links mittig (wie vorher) */
 .site-header {
   position: fixed; top: 50%; left: 1rem; z-index: 20;
-  transform: translate(0, -50%); transition: transform .3s ease;
+  transform: translate(0, -50%); transition: transform .35s ease;
+}
+
+/* Nur Desktop: Navi rausfahren, wenn Detail offen */
+@media (min-width: 992px) {
+  .site-header.hide-on-detail {
+    transform: translate(-130%, -50%);
+  }
 }
 
 /* Mobil: Header als Off-Canvas-Panel von links */
@@ -493,7 +526,7 @@ ul.main-nav li {
 @media (max-width: 991px) {
   ul.main-nav li  { font-size: 4rem; line-height: 4rem; padding: .2rem 0; }
 }
-ul.main-nav li:hover { font-size: 5rem; line-height: 5rem; transition: font-size 0.3s, line-height .3s; }
+ul.main-nav li:hover { font-size: 3rem; line-height: 3rem; transition: font-size 0.3s, line-height .3s; }
 @media (max-width: 991px) {
   ul.main-nav li:hover { font-size: 4rem; line-height: 4rem; padding: .2rem 0; }
 }
@@ -506,7 +539,7 @@ ul.main-nav li .num {
   ul.main-nav li .num  { font-size: 2rem; transform: translate(0, 0); }
 }
 ul.main-nav li:hover .num { 
-  font-size: 2rem; transform: translate(0, -33px);
+  font-size: 1rem; transform: translate(0, -23px);
   transition: font-size .3s, transform .3s; 
 }
 @media (max-width: 991px) {

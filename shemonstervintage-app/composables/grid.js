@@ -19,6 +19,7 @@ import {
   ShapeGeometry,
   Raycaster,
   ShaderMaterial,
+  NoToneMapping,
 } from "three";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -28,7 +29,40 @@ import { urls, imagesDescription } from "./refsHelper.js";
 gsap.registerPlugin(ScrollTrigger);
 
 /* =========================
-   Config
+   Zentrale Animationssteuerung
+   ========================= */
+const ANIM = {
+  open:   { dur: 0.40, ease: "power2.out" },   // Grid -> Detail
+  close:  { dur: 0.40, ease: "power2.inOut" }, // Detail -> Grid
+  speed:  1.15,                                // globales timeScale
+  pause:  0.00,                                // kurze Pause zw. Bild-Return & Grid-Return
+  hinge:  { angle: 0.6, depth: 2.0 },
+  object: { depth: 2.2, overscan: 1.01 },
+  crop:   { targetHalfNDC: 0.5, offNDC: 2.0 }, // offNDC > 1.0 => Maske "aus"
+};
+
+const makeTL = (phase = "open") =>
+  gsap.timeline({ defaults: { duration: ANIM[phase].dur, ease: ANIM[phase].ease } })
+      .timeScale(ANIM.speed);
+
+const tween = (target, props, phase = "open") =>
+  gsap.to(target, { duration: ANIM[phase].dur, ease: ANIM[phase].ease, ...props });
+
+const delayed = (sec, fn) => gsap.delayedCall(sec, fn);
+
+/* =========================
+   Farbraum/Look Steuerung (runtime tweakbar)
+   ========================= */
+const COLOR = {
+  // "srgb": sRGB->Linear->Exposure->sRGB (präzise IEC), "passthrough": keine Konvertierung,
+  // "gamma22": pow(2.2)-Annäherung
+  mode: "passthrough",
+  exposure: 1.04,
+  gamma: 2.00,
+};
+
+/* =========================
+   UI/Icons/Geometrie Config
    ========================= */
 const OUTLINE_THICKNESS_PX = 0.5;
 const PLUS_THICKNESS_PX = 1.0;
@@ -48,42 +82,28 @@ let scrollTrigger;
 let gridWorldHeight = 0;
 let gridPosYOffset = 0.1;
 
-const gapX = 2.05;
-const gapY = 2.2;
+const gapX = 2.0;
+const gapY = 2.25;
 const targetHeight = 4.5 * 0.46;
 const targetWidth = 4 * 0.46;
 
 const grid = new Group();
 const geometry = new PlaneGeometry(targetWidth, targetHeight);
+grid.frustumCulled = false;
 
 let images = [];
 let batch = 1;
 let clickableBtn = [];
 let frustumHeight, frustumWidth;
 
-let bookmarkIcon;
+let bookmarkIconPrefab = null;
 
 // Hinge-Gruppen
 let hingeLeft = null;
 let hingeRight = null;
 
-// Tiefen/Timing
-const DEPTH_GRID = 3.0;
-const DEPTH_OBJ = 2.2;
-
-// ---------- SPEED TWEAKS ----------
-const OPEN_DUR = 0.42; // schneller (vorher 0.6)
-const CLOSE_DUR = 0.34; // schneller (vorher 0.5)
-const OPEN_EASE = "expo.out"; // knackiger (vorher power2.out)
-const CLOSE_EASE = "power3.inOut"; // smoother close
-const ANIM_SPEED = 1.35; // Globaler Multiplikator für ALLE Timelines (inkl. Masken-Progress)
-// ----------------------------------
-
-// Warten bis das Vue-Description-Panel ausgeblendet ist, bevor das Grid zurückkommt
-const DESC_FADE_MS = 220; // etwas schneller (vorher 300)
-
 /* =========================
-   NDC-Cropshader (Maske klebt am Bild)
+   Crop-Shader (Maske klebt am Bild) + flexible Farbraum-Modi
    ========================= */
 const cropVertex = /* glsl */ `
   varying float vNdcX;
@@ -91,56 +111,90 @@ const cropVertex = /* glsl */ `
   void main() {
     vUv = uv;
     vec4 clip = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    vNdcX = clip.x / clip.w;           // NDC X [-1..+1]
+    vNdcX = clip.x / clip.w; // NDC X [-1..+1]
     gl_Position = clip;
   }
 `;
 
+// Drei Color-Modi + Exposure/Gamma als Uniforms – ohne Three-Chunks
 const cropFragment = /* glsl */ `
   precision highp float;
   uniform sampler2D map;
   uniform float uCenterNDC;
-  uniform float uHalfWidthNDC;
+  uniform float uHalfWidthNDC;   // >1.0 => "Maske aus"
+  uniform float uGlobalAlpha;    // Global-Alpha fürs Fading
+
+  uniform int   uColorMode;      // 0=srgb, 1=passthrough, 2=gamma22
+  uniform float uExposure;       // Gain
+  uniform float uGamma;          // Post-Gamma
+
   varying float vNdcX;
   varying vec2  vUv;
 
-  // sRGB <-> Linear helpers (ohne three-Chunks)
-  vec3 SRGBToLinear(vec3 c)  { return pow(c, vec3(2.2)); }
-  vec3 LinearToSRGB(vec3 c)  { return pow(c, vec3(1.0/2.2)); }
+  // sRGB <-> Linear (IEC 61966-2-1)
+  vec3 sRGBToLinear(vec3 c){
+    bvec3 cutoff = lessThanEqual(c, vec3(0.04045));
+    vec3 low  = c / 12.92;
+    vec3 high = pow((c + 0.055) / 1.055, vec3(2.4));
+    return mix(high, low, vec3(cutoff));
+  }
+  vec3 LinearToSRGB(vec3 c){
+    bvec3 cutoff = lessThanEqual(c, vec3(0.0031308));
+    vec3 low  = c * 12.92;
+    vec3 high = 1.055 * pow(c, vec3(1.0/2.4)) - 0.055;
+    return mix(high, low, vec3(cutoff));
+  }
 
-  void main() {
+  void main(){
     if (abs(vNdcX - uCenterNDC) > uHalfWidthNDC) discard;
 
     vec4 tex = texture2D(map, vUv);
+    float a = tex.a * uGlobalAlpha;
 
-    // Wie MeshBasic: sRGB-Texture -> Linear arbeiten -> zurück nach sRGB ausgeben
-    vec3 lin = SRGBToLinear(tex.rgb);
-    vec3 outSRGB = LinearToSRGB(lin);
+    vec3 outColor;
 
-    gl_FragColor = vec4(outSRGB, tex.a);
+    if (uColorMode == 0) {
+      // sRGB -> Linear -> Exposure -> sRGB
+      vec3 lin = sRGBToLinear(tex.rgb);
+      lin *= uExposure;
+      outColor = LinearToSRGB(lin);
+      outColor = pow(outColor, vec3(1.0 / uGamma));
+    } else if (uColorMode == 1) {
+      // passthrough: keine sRGB-Konvertierung
+      outColor = pow(tex.rgb * uExposure, vec3(1.0 / uGamma));
+    } else {
+      // gamma22 Approx
+      vec3 lin = pow(tex.rgb, vec3(2.2));
+      lin *= uExposure;
+      outColor = pow(lin, vec3(1.0/2.2));
+      outColor = pow(outColor, vec3(1.0 / uGamma));
+    }
+
+    gl_FragColor = vec4(outColor, a);
   }
 `;
 
 function makeAnimatedCropMaterial(texture) {
   const mat = new ShaderMaterial({
     uniforms: {
-      map: { value: texture },
-      uCenterNDC: { value: 0.0 },
-      uHalfWidthNDC: { value: 1.0 },
+      map:            { value: texture },
+      uCenterNDC:     { value: 0.0 },              // pro Frame gesetzt
+      uHalfWidthNDC:  { value: ANIM.crop.offNDC }, // Grid: Maske aus
+      uGlobalAlpha:   { value: 1.0 },              // Grid-Fade
+      uColorMode:     { value: COLOR.mode === "srgb" ? 0 : (COLOR.mode === "passthrough" ? 1 : 2) },
+      uExposure:      { value: COLOR.exposure },
+      uGamma:         { value: COLOR.gamma },
     },
     vertexShader: cropVertex,
     fragmentShader: cropFragment,
     transparent: true,
-    depthWrite: false,
+    depthWrite: true,
   });
-
-  // Tonemapping aktiv lassen, aber wir linearisieren im Shader → konsistente Helligkeit
-  mat.toneMapped = true;
-
+  mat.toneMapped = false;
   return mat;
 }
 
-// helper: polyline -> LineLoop (XY-Punkte in Screen-like SVG-Einheiten)
+/* helper: polyline -> LineLoop (XY-Punkte in Screen-like SVG-Einheiten) */
 function makeLineLoopFromXY(pointsXY, material, dx = 0, dy = 0) {
   const geom = new BufferGeometry();
   const count = pointsXY.length / 2;
@@ -154,13 +208,17 @@ function makeLineLoopFromXY(pointsXY, material, dx = 0, dy = 0) {
   return new LineLoop(geom, material);
 }
 
-// Hilfsvektor & lokale Ecken deines Plane
+// Hilfsobjekte (weniger GC/Allokationen)
 const _tmpV = new Vector3();
+const _box3 = new Box3();
+const _tmpV3a = new Vector3();
+const _tmpV3b = new Vector3();
+
 const LOCAL_CORNERS = [
-  new Vector3(-targetWidth / 2, targetHeight / 2, 0), // TL
-  new Vector3(targetWidth / 2, targetHeight / 2, 0), // TR
+  new Vector3(-targetWidth / 2,  targetHeight / 2, 0), // TL
+  new Vector3( targetWidth / 2,  targetHeight / 2, 0), // TR
   new Vector3(-targetWidth / 2, -targetHeight / 2, 0), // BL
-  new Vector3(targetWidth / 2, -targetHeight / 2, 0), // BR
+  new Vector3( targetWidth / 2, -targetHeight / 2, 0), // BR
 ];
 
 // NDC.x eines Weltpunkts
@@ -170,53 +228,42 @@ function worldToNdcX(world, camera) {
 }
 
 function captureMeshScreenNdc(mesh, camera) {
-  // Breite (für halfStart) aus Ecken
-  const ndcXs = LOCAL_CORNERS.map((c) =>
-    worldToNdcX(mesh.localToWorld(c.clone()), camera)
-  );
-  const minX = Math.min(...ndcXs);
-  const maxX = Math.max(...ndcXs);
+  let minX = +Infinity, maxX = -Infinity;
+  for (let i = 0; i < LOCAL_CORNERS.length; i++) {
+    const ndc = worldToNdcX(mesh.localToWorld(LOCAL_CORNERS[i].clone()), camera);
+    if (ndc < minX) minX = ndc;
+    if (ndc > maxX) maxX = ndc;
+  }
   const halfNow = (maxX - minX) * 0.5;
-
-  // Mitte aus Ursprung (robust & glatt)
-  const centerNow = worldToNdcX(
-    mesh.localToWorld(new Vector3(0, 0, 0)),
-    camera
-  );
-
+  const centerNow = worldToNdcX(mesh.localToWorld(_tmpV3a.set(0,0,0)), camera);
   return { halfNdc: halfNow, centerNdc: centerNow };
 }
 
 /** Crop-Anim State */
 let activeCrop = {
-  mesh: null,
-  originalMaterial: null,
-  cropMaterial: null,
-  halfStart: 0, // Start-Halbbreite (NDC)
+  mesh: null,            // aktuelles Bild
+  cropMaterial: null,    // dessen ShaderMaterial
+  halfStart: 0,          // Start-Halbbreite (Grid)
+  isActive: false,       // ob wir gerade animieren
 };
 
-/**
- * Maskenmitte = Bildmitte (jeder Frame)
- * → Bild bleibt stets mittig beschnitten.
- * Wir tweenen nur die Halbbreite zur 50vw-Maske.
- */
+/** Crop-Uniforms dynamisch aktualisieren (Mitte folgt Bild, Breite tweened) */
 function updateCropUniformDynamic(mesh, camera, progress) {
   if (!mesh || !activeCrop.cropMaterial) return;
-
   const L = (a, b, t) => a + (b - a) * t;
 
   const { centerNdc: imgCenter } = captureMeshScreenNdc(mesh, camera);
-  const half = L(activeCrop.halfStart, 0.5, progress);
+  const half = L(activeCrop.halfStart, ANIM.crop.targetHalfNDC, progress);
 
   const u = activeCrop.cropMaterial.uniforms;
-  u.uCenterNDC.value = imgCenter;
+  u.uCenterNDC.value    = imgCenter;
   u.uHalfWidthNDC.value = half;
   u.uCenterNDC.needsUpdate = true;
   u.uHalfWidthNDC.needsUpdate = true;
 }
 
 /* =========================
-   Fade-Helper
+   Fade-Helper (fürs Grid)
    ========================= */
 function collectGridFadeMaterials(root, excludeNodes = []) {
   const excludeSet = new Set();
@@ -258,7 +305,7 @@ function prepareForFade(materials) {
       m.needsUpdate = true;
     }
     m.depthWrite = false;
-    m.depthTest = false;
+    m.depthTest  = false;
   });
 }
 function restoreAfterFade(materials) {
@@ -266,16 +313,29 @@ function restoreAfterFade(materials) {
     const st = originalState.get(m);
     if (st) {
       m.transparent = st.transparent;
-      m.depthWrite = st.depthWrite;
-      m.depthTest = st.depthTest;
-      m.opacity = st.opacity;
+      m.depthWrite  = st.depthWrite;
+      m.depthTest   = st.depthTest;
+      m.opacity     = st.opacity;
       m.needsUpdate = true;
       originalState.delete(m);
     } else {
-      m.opacity = 1;
+      m.opacity     = 1;
       m.needsUpdate = true;
     }
   });
+}
+
+// Fadetargets: unterstützt Shader (uGlobalAlpha.value) und BasicMaterials (opacity)
+function makeFadeTargets(materials) {
+  const targets = [];
+  for (const m of materials) {
+    if (m instanceof ShaderMaterial && m.uniforms?.uGlobalAlpha) {
+      targets.push(m.uniforms.uGlobalAlpha); // { value: number }
+    } else if ("opacity" in m) {
+      targets.push(m); // MeshBasicMaterial etc.
+    }
+  }
+  return targets;
 }
 
 /* =========================
@@ -305,8 +365,8 @@ function getGridSize() {
   return { width, height };
 }
 function getObjectSize(obj) {
-  const box = new Box3().setFromObject(obj);
-  const size = box.getSize(new Vector3());
+  _box3.setFromObject(obj);
+  const size = _box3.getSize(_tmpV3a);
   return { width: size.x, height: size.y };
 }
 function updateGridPosition(nextGridSize) {
@@ -332,12 +392,13 @@ function setGridPosition(index, columns, object) {
   object.position.y = -(row * gapY);
 }
 
-async function loadGridImages(dpr, grid, imgs, renderer) {
+async function loadGridImages(dpr, gridGroup, imgs, renderer) {
   imgs = await loadFront(dpr);
+  const iconPrefab = buildBookmarkIcon(); // einmal beziehen, dann klonen
   const promises = imgs.map(
     (url, index) =>
       new Promise((resolve, reject) => {
-        const indexDelta = index + grid.children.length;
+        const indexDelta = index + gridGroup.children.length;
         const loader = new TextureLoader();
         loader.load(
           "http://localhost:8000" + url,
@@ -348,17 +409,14 @@ async function loadGridImages(dpr, grid, imgs, renderer) {
             texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
             texture.needsUpdate = true;
 
-            const material = new MeshBasicMaterial({ map: texture });
-            const mesh = new Mesh(geometry, material);
+            const cropMat = makeAnimatedCropMaterial(texture);
+            const mesh = new Mesh(geometry, cropMat);
+            mesh.frustumCulled = false;
 
-            // Icon
-            const iconGroup = buildBookmarkIcon().clone(true);
+            // Icon (klonen statt neu bauen)
+            const iconGroup = iconPrefab.clone(true);
             iconGroup.position.x = targetWidth / 2 - ICON_MARGIN_X_WU;
             iconGroup.position.y = targetHeight / 2 - ICON_MARGIN_Y_WU;
-            iconGroup.traverse((o) => {
-              o.userData.isIcon = true;
-              o.renderOrder = 10;
-            });
             mesh.add(iconGroup);
 
             mesh.userData.url = "http://localhost:8000" + url;
@@ -369,7 +427,7 @@ async function loadGridImages(dpr, grid, imgs, renderer) {
             clickableBtn.push(iconGroup, mesh, hit || iconGroup);
 
             setGridPosition(indexDelta, gridSize, mesh);
-            grid.add(mesh);
+            gridGroup.add(mesh);
             resolve();
           },
           undefined,
@@ -392,12 +450,12 @@ async function loadGridImages(dpr, grid, imgs, renderer) {
    ========================= */
 function getGridHeightInPx(camera) {
   const halfFovRad = (camera.fov * Math.PI) / 360;
-  const distance = camera.position.distanceTo(grid.position.clone());
+  const distance = camera.position.distanceTo(grid.position);
   const visibleHeight = 2 * distance * Math.tan(halfFovRad);
   const worldToScreenRatio = window.innerHeight / visibleHeight;
 
-  const box = new Box3().setFromObject(grid);
-  gridWorldHeight = box.max.y - box.min.y;
+  _box3.setFromObject(grid);
+  gridWorldHeight = _box3.max.y - _box3.min.y;
   const gridHeightInPx = gridWorldHeight * worldToScreenRatio;
   return gridHeightInPx;
 }
@@ -440,7 +498,7 @@ function createScrollTrigger(dpr, camera, renderer, scrollContainer) {
 }
 
 function buildBookmarkIcon() {
-  if (bookmarkIcon) return bookmarkIcon;
+  if (bookmarkIconPrefab) return bookmarkIconPrefab;
   const g = new Group();
 
   const outlinePtsXY = [52, 60, 32, 48, 12, 60, 12, 4, 52, 4, 52, 60];
@@ -510,8 +568,8 @@ function buildBookmarkIcon() {
   g.position.set(-VIEWBOX_SIZE / 2, -VIEWBOX_SIZE / 2, 0.01);
   g.scale.set(ICON_SCALE, -ICON_SCALE, ICON_SCALE);
 
-  bookmarkIcon = g;
-  return bookmarkIcon;
+  bookmarkIconPrefab = g;
+  return bookmarkIconPrefab;
 }
 
 /* =========================
@@ -525,6 +583,10 @@ async function initGrid(
   containerHeight,
   scrollContainer
 ) {
+  // Neutraler Output-Pfad (kein globales Tonemapping)
+  renderer.outputColorSpace = SRGBColorSpace;
+  renderer.toneMapping = NoToneMapping;
+
   getCureentGridSize();
   buildBookmarkIcon();
 
@@ -587,45 +649,38 @@ async function initGrid(
       if (clickedObject.userData.type === "image") {
         openImg = true;
 
-        const originalParent = clickedObject.parent;
+        const originalParent   = clickedObject.parent;
         const originalPosition = clickedObject.position.clone();
         const originalRotation = clickedObject.rotation.clone();
-        const originalScale = clickedObject.scale.clone();
+        const originalScale    = clickedObject.scale.clone();
 
         const originalGridParent = grid.parent;
 
+        // an Szene hängen (vorne)
         scene.attach(clickedObject);
 
-        const dir = new Vector3();
-        camera.getWorldDirection(dir);
+        // View-Setup
+        const viewDir = _tmpV3b;
+        camera.getWorldDirection(viewDir);
 
         const zPos = 1.0;
         const halfFovRad = (camera.fov * Math.PI) / 360;
 
         let positionX = clickedObject.position.x;
         const baseSide =
-          positionX === 0
-            ? Math.random() > 0.5
-              ? 1
-              : -1
-            : positionX > 0
-            ? -1
-            : 1;
+          positionX === 0 ? (Math.random() > 0.5 ? 1 : -1) : (positionX > 0 ? -1 : 1);
 
-        const objBase = new Vector3(0, 0, zPos);
-        let objToward = objBase
-          .clone()
-          .add(dir.clone().multiplyScalar(-DEPTH_OBJ));
+        const objBase   = _tmpV3a.set(0, 0, zPos);
+        const objToward = objBase.clone().add(viewDir.clone().multiplyScalar(-ANIM.object.depth));
 
         const dist = camera.position.distanceTo(objToward);
         const visibleHeight = 2 * dist * Math.tan(halfFovRad);
-        const visibleWidth = visibleHeight * camera.aspect;
+        const visibleWidth  = visibleHeight * camera.aspect;
 
-        const OVERSCAN = 1.01;
-        const scaleImg = (visibleHeight * OVERSCAN) / targetHeight;
+        const scaleImg = (visibleHeight * ANIM.object.overscan) / targetHeight;
 
         // Objekt so platzieren, dass die 50vw-Box an der Browserkante anliegt
-        const centerOffsetWorld = visibleWidth * 0.25 * baseSide;
+        const centerOffsetWorld = visibleWidth * 0.25 * (baseSide > 0 ? 1 : -1);
         positionX = centerOffsetWorld;
         objToward.setX(positionX);
 
@@ -636,13 +691,13 @@ async function initGrid(
         allGridIcons.forEach((n) => (n.visible = false));
 
         // Hinge-Setup
-        const gridBox = new Box3().setFromObject(grid);
-        const leftEdgeX = gridBox.min.x;
-        const rightEdgeX = gridBox.max.x;
-        const midY = (gridBox.min.y + gridBox.max.y) * 0.5;
-        const midZ = (gridBox.min.z + gridBox.max.z) * 0.5;
+        _box3.setFromObject(grid);
+        const leftEdgeX  = _box3.min.x;
+        const rightEdgeX = _box3.max.x;
+        const midY = (_box3.min.y + _box3.max.y) * 0.5;
+        const midZ = (_box3.min.z + _box3.max.z) * 0.5;
 
-        hingeLeft.position.set(leftEdgeX, midY, midZ);
+        hingeLeft.position.set(leftEdgeX,  midY, midZ);
         hingeRight.position.set(rightEdgeX, midY, midZ);
 
         const activeHinge = baseSide > 0 ? hingeLeft : hingeRight;
@@ -655,171 +710,158 @@ async function initGrid(
 
         const hingeAway = activeHinge.position
           .clone()
-          .add(dir.clone().multiplyScalar(DEPTH_GRID));
+          .add(viewDir.clone().multiplyScalar(ANIM.hinge.depth));
 
         // Nur Grid-Flächen faden (Icons & geklicktes Objekt ausgeschlossen)
         const gridMats = collectGridFadeMaterials(grid, [clickedObject]);
+        const gridFadeTargets = makeFadeTargets(gridMats);
 
-        const ANGLE = 0.6;
-        const sign = baseSide > 0 ? +1 : -1;
+        const ANGLE = ANIM.hinge.angle;
+        const sign  = baseSide > 0 ? +1 : -1;
 
-        const tl = gsap
-          .timeline({
-            defaults: { duration: OPEN_DUR, ease: OPEN_EASE },
-            onComplete: () => {
-              imagesDescription.value = {
-                description:
-                  "lorem ipsum dolor sit amet consetetur sadipscing elitr sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat sed diam voluptua. at vero eos et accusam et justo duo dolores et ea rebum stet clita kasd gubergren no sea takimata sanctus est lorem ipsum dolor sit amet",
-                url: clickedObject.userData.url,
-                side: positionX > 0 ? "left" : "right",
-                onClick: () => {
-                  // Description zuerst ausfaden
-                  imagesDescription.value = null;
+        // === Timeline OPEN
+        const tl = makeTL("open")
+          // >>>>> NAVI: Desktop ausblenden
+          .eventCallback("onStart", () => {
+            window.dispatchEvent(new CustomEvent("detail:open"));
+          })
+          .eventCallback("onComplete", () => {
+            imagesDescription.value = {
+              description:
+                "lorem ipsum dolor sit amet consetetur sadipscing elitr sed diam nonumy eirmod tempor ...",
+              url: clickedObject.userData.url,
+              side: positionX > 0 ? "left" : "right",
+              onClick: () => {
+                imagesDescription.value = null;
 
-                  // Crop-Material zurücksetzen
-                  if (activeCrop.mesh === clickedObject) {
-                    clickedObject.material = activeCrop.originalMaterial;
-                    activeCrop.mesh = null;
-                    activeCrop.originalMaterial = null;
-                    activeCrop.cropMaterial = null;
+                // === 1) Objekt-Rückfahrt + Reverse-Crop (0.5 -> halfStart) ===
+                originalParent.attach(clickedObject);
+                const tlObjBack = makeTL("close");
+
+                if (clickedObject.material && clickedObject.material.uniforms) {
+                  const rev = { t: 1 };
+                  tlObjBack.to(rev, {
+                    t: 0,
+                    onUpdate: () => {
+                      const { centerNdc: imgCenter } = captureMeshScreenNdc(clickedObject, camera);
+                      const L = (a, b, t) => a + (b - a) * t;
+                      const half = L(activeCrop.halfStart, ANIM.crop.targetHalfNDC, rev.t);
+                      const u = clickedObject.material.uniforms;
+                      u.uCenterNDC.value = imgCenter;
+                      u.uHalfWidthNDC.value = half;
+                      u.uCenterNDC.needsUpdate = true;
+                      u.uHalfWidthNDC.needsUpdate = true;
+                    },
+                  }, 0);
+                }
+
+                tlObjBack.to(clickedObject.rotation, {
+                  x: originalRotation.x, y: originalRotation.y, z: originalRotation.z,
+                }, 0);
+                tlObjBack.to(clickedObject.position, {
+                  x: originalPosition.x, y: originalPosition.y, z: originalPosition.z,
+                }, 0);
+                tlObjBack.to(clickedObject.scale, {
+                  x: originalScale.x, y: originalScale.y, z: originalScale.z,
+                }, 0);
+
+                // === 2) Nach Rückkehr ins Grid: Maske wieder AUS (kein Swap)
+                tlObjBack.add(() => {
+                  const u = clickedObject.material?.uniforms;
+                  if (u) {
+                    u.uHalfWidthNDC.value = ANIM.crop.offNDC; // Maske aus
+                    u.uHalfWidthNDC.needsUpdate = true;
                   }
+                });
 
-                  // Objekt zurückfahren
-                  originalParent.attach(clickedObject);
-                  gsap.to(clickedObject.rotation, {
-                    x: originalRotation.x,
-                    y: originalRotation.y,
-                    z: originalRotation.z,
-                    duration: CLOSE_DUR,
-                    ease: CLOSE_EASE,
-                  });
-                  gsap.to(clickedObject.position, {
-                    x: originalPosition.x,
-                    y: originalPosition.y,
-                    z: originalPosition.z,
-                    duration: CLOSE_DUR,
-                    ease: CLOSE_EASE,
-                  });
-                  gsap.to(clickedObject.scale, {
-                    x: originalScale.x,
-                    y: originalScale.y,
-                    z: originalScale.z,
-                    duration: CLOSE_DUR,
-                    ease: CLOSE_EASE,
-                  });
+                // === 3) Grid zurückholen ===
+                tlObjBack.add(() => {
+                  requestAnimationFrame(() => {
+                    delayed(Math.max(0.02, ANIM.pause), () => {
+                      const tlClose = makeTL("close");
 
-                  const startGridReturn = () => {
-                    const tlClose = gsap
-                      .timeline({
-                        defaults: { duration: CLOSE_DUR, ease: CLOSE_EASE },
-                      })
-                      .timeScale(ANIM_SPEED); // <<< speed sync
-
-                    tlClose.to(
-                      activeHinge.rotation,
-                      {
-                        x: originalHingeRot.x,
-                        y: originalHingeRot.y,
-                        z: originalHingeRot.z,
-                      },
-                      0
-                    );
-                    tlClose.to(
-                      activeHinge.position,
-                      {
-                        x: originalHingePos.x,
-                        y: originalHingePos.y,
-                        z: originalHingePos.z,
+                      tlClose.to(activeHinge.rotation, {
+                        x: originalHingeRot.x, y: originalHingeRot.y, z: originalHingeRot.z,
+                      }, 0);
+                      tlClose.to(activeHinge.position, {
+                        x: originalHingePos.x, y: originalHingePos.y, z: originalHingePos.z,
                         onComplete: () => {
-                          if (originalGridParent)
-                            originalGridParent.attach(grid);
+                          if (originalGridParent) originalGridParent.attach(grid);
                           else scene.attach(grid);
                         },
-                      },
-                      0
-                    );
+                      }, 0);
 
-                    prepareForFade(gridMats);
-                    tlClose.to(gridMats, { opacity: 1 }, 0);
-                    tlClose.add(() => {
-                      restoreAfterFade(gridMats);
-                      const allIconsNow = collectIconNodes(grid);
-                      allIconsNow.forEach((n) => (n.visible = true));
-                      if (clickedObject.children[0])
-                        clickedObject.children[0].visible = true;
-                      openImg = false;
+                      // Grid-Fade IN (Shader uGlobalAlpha + Basic opacity gemeinsam)
+                      prepareForFade(gridMats);
+                      const gridFadeTargetsIn = makeFadeTargets(gridMats);
+                      tlClose.to(gridFadeTargetsIn, { value: 1, opacity: 1 }, 0);
+
+                      tlClose.add(() => {
+                        restoreAfterFade(gridMats);
+                        const allIconsNow = collectIconNodes(grid);
+                        allIconsNow.forEach((n) => (n.visible = true));
+                        if (clickedObject.children[0]) clickedObject.children[0].visible = true;
+                        openImg = false;
+
+                        // >>>>> NAVI: Desktop wieder einblenden
+                        window.dispatchEvent(new CustomEvent("detail:close"));
+                      });
                     });
-                  };
-                  gsap.delayedCall(DESC_FADE_MS / 1000, startGridReturn);
-                },
-              };
-            },
-          })
-          .timeScale(ANIM_SPEED); // <<< speed sync für Öffnen
+                  });
+                });
+              },
+            };
+          });
 
-        // Fade vorbereiten
-        tl.call(
-          () => {
-            prepareForFade(gridMats);
-          },
-          null,
-          0
-        );
+        // Fade vorbereiten (Grid OUT)
+        tl.call(() => { prepareForFade(gridMats); }, null, 0);
+        tl.call(() => {
+          for (const m of gridMats) {
+            if (m instanceof ShaderMaterial && m.uniforms?.uGlobalAlpha) {
+              m.uniforms.uGlobalAlpha.value = 1;
+            } else if ("opacity" in m) {
+              m.opacity = 1;
+            }
+          }
+        }, null, 0);
 
-        // >>> VOR der Hinfahrt: Crop-Material setzen
-        tl.call(
-          () => {
-            const tex = clickedObject.material?.map;
-            if (tex) {
-              activeCrop.originalMaterial = clickedObject.material;
-              activeCrop.cropMaterial = makeAnimatedCropMaterial(tex);
-              clickedObject.material = activeCrop.cropMaterial;
-              activeCrop.mesh = clickedObject;
+        // Vor Hinfahrt: Crop-Startbreite bestimmen und Maske aktivieren
+        tl.call(() => {
+          const mat = clickedObject.material;
+          if (mat?.uniforms) {
+            const { halfNdc } = captureMeshScreenNdc(clickedObject, camera);
+            activeCrop.mesh = clickedObject;
+            activeCrop.cropMaterial = mat;
+            activeCrop.halfStart = Math.min(halfNdc, ANIM.crop.targetHalfNDC);
+            activeCrop.isActive = true;
+            updateCropUniformDynamic(clickedObject, camera, 0);
+          }
+        }, null, 0);
 
-              // Startbreite (klein im Grid)
-              const { halfNdc } = captureMeshScreenNdc(clickedObject, camera);
-              activeCrop.halfStart = Math.min(halfNdc, 0.5);
-
-              // initiale Uniforms
-              updateCropUniformDynamic(clickedObject, camera, 0);
+        // Crop 0 -> 1 (hin): halfStart -> 0.5
+        const cropProg = { t: 0 };
+        tl.to(cropProg, {
+          t: 1,
+          duration: ANIM.open.dur,
+          ease: ANIM.open.ease,
+          onUpdate: () => {
+            if (activeCrop.mesh && activeCrop.cropMaterial) {
+              updateCropUniformDynamic(activeCrop.mesh, camera, cropProg.t);
             }
           },
-          null,
-          0
-        );
-
-        // Dummy-Progress 0→1 für Halbbreiten-Tween (Maske folgt Bildmitte automatisch)
-        const cropProg = { t: 0 };
-        tl.to(
-          cropProg,
-          {
-            t: 1,
-            duration: OPEN_DUR,
-            ease: OPEN_EASE,
-            onUpdate: () => {
-              if (activeCrop.mesh && activeCrop.cropMaterial) {
-                updateCropUniformDynamic(activeCrop.mesh, camera, cropProg.t);
-              }
-            },
-          },
-          0
-        );
+        }, 0);
 
         // Hinfahrt (Grid kippt/weg, Objekt nach vorn)
         tl.to(activeHinge.rotation, { y: originalHingeRot.y + sign * ANGLE }, 0)
-          .to(
-            activeHinge.position,
-            { x: hingeAway.x, y: hingeAway.y, z: hingeAway.z },
-            0
-          )
-          .to(
-            clickedObject.position,
-            { x: objToward.x, y: objToward.y, z: objToward.z },
-            0
-          )
-          .to(clickedObject.scale, { x: scaleImg, y: scaleImg, z: scaleImg }, 0)
-          .to(gridMats, { opacity: 0 }, 0);
+          .to(activeHinge.position, { x: hingeAway.x, y: hingeAway.y, z: hingeAway.z }, 0)
+          .to(clickedObject.position, { x: objToward.x, y: objToward.y, z: objToward.z }, 0)
+          .to(clickedObject.scale,   { x: scaleImg, y: scaleImg, z: scaleImg }, 0);
+
+        // Grid-Fade OUT (Shader uGlobalAlpha + Basic opacity gemeinsam)
+        tl.to(gridFadeTargets, { value: 0, opacity: 0 }, 0);
+
       } else {
+        // Bookmark-Icon Klick
         const target = clickedObject.parent.parent;
 
         const originalPosition = target.position.clone();
@@ -833,24 +875,14 @@ async function initGrid(
           y: frustumHeight / 2 - 0.2,
           z: 0.01,
         };
-        let scale = 0.02;
+        const scale = 0.02;
 
-        gsap.to(target.position, {
-          x: frontPosition.x,
-          y: frontPosition.y,
-          z: frontPosition.z,
-          duration: OPEN_DUR,
-          ease: OPEN_EASE,
-        });
-        gsap.to(target.scale, {
-          y: scale,
-          x: scale,
-          z: scale,
-          duration: OPEN_DUR + 0.4,
-          ease: OPEN_EASE,
-          onStart: () => {
-            window.dispatchEvent(new CustomEvent("wishlist:bump"));
-          },
+        tween(target.position, {
+          x: frontPosition.x, y: frontPosition.y, z: frontPosition.z,
+        }, "open");
+        tween(target.scale, {
+          y: scale, x: scale, z: scale,
+          onStart: () => { window.dispatchEvent(new CustomEvent("wishlist:bump")); },
           onComplete: () => {
             urls.value.push(target.userData.url);
             grid.attach(target);
@@ -858,7 +890,7 @@ async function initGrid(
             target.rotation.copy(originalRotation);
             target.scale.copy(originalScale);
           },
-        });
+        }, "open");
       }
     }
   }
@@ -869,7 +901,6 @@ async function initGrid(
 }
 
 /* =========================
-   Bookmark-Icon Bau
+   Exports
    ========================= */
-
 export { initGrid, updateContainerHeight };
